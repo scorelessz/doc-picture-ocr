@@ -195,6 +195,33 @@ swiftc -O src/vision_ocr.swift -o bin/vision-ocr
 成品体积主要来自 opencv / onnxruntime / pymupdf / numpy 这几个大件。
 调试资源定位问题可以用环境变量 `OCR_RESOURCE_ROOT` 指定资源根目录。
 
+### 发布新版本
+
+```bash
+packaging/release.sh 1.1.0                  # 构建 → 签名 → 压缩 → 发 GitHub Release
+packaging/release.sh 1.1.0 --draft          # 先发草稿，确认无误再 publish
+packaging/release.sh 1.0.0 --skip-build     # 不重建，直接发布 dist/ 里现成的 .app
+```
+
+脚本会先把「会失败的事」查完再动手：`gh` 有没有登录、工作区有没有未提交的改动、
+tag 是不是已经存在。压缩用 `ditto -c -k --sequesterRsrc --keepParent` —— **不能用 `zip -r`**，
+它会破坏 `.app` 里 Framework 的符号链接，解压出来的包打不开。
+
+**`--skip-build` 存在的理由**：这个 app 只有 ad-hoc 签名，macOS 的 Gatekeeper 放行是
+**按二进制**记住的。重新构建会产生新的二进制，之前的放行就失效了，要重新放行一次。
+所以手上这个包如果已经验证过、放行过，发版时就别重建它。
+
+**为什么不用 GitHub Actions 自动构建**：
+
+1. macOS runner 在私有仓库里按 **10 倍**速率扣分钟数，一次构建（brew 装 Tk + PyInstaller
+   + 上传 126MB）十几分钟，等于一个月跑十几次就把免费额度用光。
+2. CI 产出的包同样没有 Apple 开发者签名，而且从网上下载会被打上 quarantine 属性，
+   Gatekeeper 拦得**更凶**（会报「已损坏」而不是「来自身份不明的开发者」）。
+   本机构建的包反而没有这个问题。
+3. 成品只在自己的 Mac 上跑。为单机产物养一条 CI，收益抵不过维护成本。
+
+真要上 CI，合理的分工是：**Actions 只跑测试和 lint，构建与发布留在本机**。
+
 ---
 
 ## 隐私
