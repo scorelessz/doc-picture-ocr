@@ -1,0 +1,101 @@
+{
+  "phase": "p0",
+  "pipeline": "python-books",
+  "date": "2026-10-31T05:02:52",
+  "machine": {
+    "chip": "Apple M4",
+    "ram_gb": 16.0,
+    "macos": "27.0.1",
+    "python": "3.13.18"
+  },
+  "source": {
+    "file": "City of Broken Promises.pdf",
+    "pages_total": 328,
+    "pages_run": 328,
+    "native_text_pages": 319,
+    "ground_truth": "native_text_layer"
+  },
+  "accuracy": {
+    "pages": 319,
+    "chars": 469747,
+    "edits": 12161,
+    "cer": 0.02589,
+    "worst_pages": [
+      {
+        "page": 10,
+        "cer": 1.0
+      },
+      {
+        "page": 20,
+        "cer": 1.0
+      },
+      {
+        "page": 62,
+        "cer": 1.0
+      },
+      {
+        "page": 98,
+        "cer": 1.0
+      },
+      {
+        "page": 160,
+        "cer": 1.0
+      },
+      {
+        "page": 324,
+        "cer": 1.0
+      },
+      {
+        "page": 3,
+        "cer": 0.5108
+      },
+      {
+        "page": 9,
+        "cer": 0.2234
+      },
+      {
+        "page": 8,
+        "cer": 0.2185
+      },
+      {
+        "page": 185,
+        "cer": 0.0868
+      }
+    ]
+  },
+  "fusion": {
+    "lines": 11632,
+    "both": 11481,
+    "divergent_rate": 0.3683,
+    "single_source_rate": 0.013,
+    "only_vision": 66,
+    "only_rapidocr": 85,
+    "dropped_empty": 0,
+    "dropped_contained": 32
+  },
+  "markdown": {
+    "paragraphs": 2499,
+    "headings": 10,
+    "chars": 561021,
+    "dropped": 314,
+    "dropped_detail": {
+      "微小碎块": 5,
+      "孤立标点或无文字碎块": 7,
+      "页码": 290,
+      "页码(框略高于正文, 凭跨页证据)": 12
+    },
+    "vertical_pages": 0,
+    "two_column_pages": 0
+  },
+  "searchable_pdf": {
+    "retrieval": 0.998
+  },
+  "status": "ok",
+  "degraded": [],
+  "perf": {
+    "seconds": 683.2,
+    "sec_per_page": 2.083,
+    "peak_rss_mb": 2208.9,
+    "peak_rss_children_mb": 137.1
+  }
+}
