@@ -243,7 +243,6 @@ app/            图形界面（Tkinter）与资源定位
 src/book_*.py   书籍线：渲染 / 双引擎 / 融合裁决 / Markdown / 隐形文字层
 src/run_books.py          批处理驱动 + 质量报告
 books.sh  一键OCR.command 书籍线入口
-run.sh  src/to_markdown.py 等   剧本线（手机拍摄的剧本 → 保留版面的 Markdown，有人工校对环节）
 bin/vision-ocr  Swift 编的 macOS Vision 识别器
 config/         术语表
 docs/           截图等
@@ -251,9 +250,7 @@ BOOKS.md        书籍线权威文档：数据契约、裁决规则、踩过的�
 CLAUDE.md       项目级约定与不变量（改代码前必读）
 ```
 
-项目里有**两条互不干扰的流水线**：这个 README 讲的是**书籍线**（全自动，无人工校对）；
-另有一条**剧本线**（`run.sh`）面向手机拍摄的剧本，保留剧本版面，带人工校对环节，
-它的流程写在 [CLAUDE.md](CLAUDE.md) 里。
+正在重构为 Mac 原生（Swift）+ 多模型 + 本地/在线双模式，见 [docs/REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md)。
 
 ---
 

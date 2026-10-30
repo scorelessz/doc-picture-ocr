@@ -14,7 +14,7 @@
 #   work/<名>.{vision,rapidocr,fused}.json   逐行识别与融合数据
 #
 # 全程本地推理, 不联网。已有产物默认跳过, 不覆盖任何已存在的文件。
-# 剧本线(手机拍摄的剧本)仍然用 ./run.sh, 两条线互不干扰。
+
 set -euo pipefail
 cd "$(dirname "$0")"
 

@@ -1,7 +1,7 @@
 # 书籍线：扫描件 PDF → 可搜索 PDF + 段落化 Markdown
 
-与剧本线（`run.sh` / `to_markdown.py`）**完全分开的第二条流水线**，全部是新增文件，
-没有改动任何已有文件。面向「标准书籍扫描件」：纯图像页、可能几百页、中文为主。
+原为与剧本线并行的第二条流水线（剧本线已删除），
+面向「标准书籍扫描件」：纯图像页、可能几百页、中文为主。
 全自动、纯本地、**没有人工校对环节**。
 
 状态：**可用**。两轮对抗式验收挖出的 2 critical + 7 major + 7 minor 已全部修复并逐条复现，
@@ -125,13 +125,10 @@
 - **拼贴式扫描取不到原生 dpi**（一页由多张小图拼成），退回 300dpi。
 - 旋转只实测了 90/270；180 走同一条 `rotation_matrix` 代码路径但未单独验证。
 - 术语表 `config/glossary.txt` 是**按剧本整理**的，书籍不一定适用，`--no-glossary` 可关。
-- `book_engines.py` **刻意不 import `run_rapidocr.py`**，自己写了归一化：
-  书籍线要和剧本线真正解耦，不让冻结文件变成新线的依赖。
 
 ## 多 fork 约束（和 CLAUDE.md 一致）
 
-- 只新增文件。`to_markdown.py` / `combine.py` / `normalize.py` / `postcheck.py` / `crosscheck.py`
-  只 import、不修改 —— 它们是其他 fork 的依赖。
+- 剧本线已于 2026-10-30 删除；`normalize.py` / `postcheck.py` / `crosscheck.py` 只剩书籍线用到的函数。
 - `output/` 下已有文件是其他 fork 的输入：所有模块**已存在就拒绝写**，`--force` 才覆盖
   （`book_md.py` 拒绝时退出码 3，一个字节都不写）。
 
