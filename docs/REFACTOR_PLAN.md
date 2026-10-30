@@ -1,164 +1,196 @@
-# 重构 Workflow：Mac 原生 · 多模型 · 本地/在线双模式
+# 重构 Workflow：Mac 原生 · 书籍扫描件 · 多模型 · 本地/在线双模式
 
-状态：**草案，待确认**（2026-10-30）。本文件只定流程和决策点，还没有改任何代码。
+状态：**第二版，决策已确认**（2026-10-30）。本文件只定流程，还没有改任何代码。
 
-## 0. 需求 → 解读
+## 0. 需求
 
-| # | 需求 | 解读（带 ⚠ 的是假设，需确认） |
+| # | 需求 | 落地方式 |
 |---|---|---|
-| 1 | 支持 xiaomi-ocr-0 | **Xiaomi-OCR-0**（2026-09-28 技术报告，arXiv 2609.36136）。0.8B，基于 Qwen3.5-0.8B-Base，Apache-2.0。官方给出 Transformers / vLLM / SGLang；社区有 GGUF（llama.cpp，需 mmproj）和 Ollama 包；**未见 MLX 版**。输出 Markdown / OTSL 表格 / LaTeX，**不输出坐标** |
-| 2 | 支持 MiniCPM | **MiniCPM-V 4.7**（2026-10-12，1B 与 35B-A3B 两档，Apache-2.0），llama.cpp / Ollama 可用。默认接 1B；35B-A3B 只在内存够的机器上作可选项 |
-| 3 | Mac 原生构建 | ⚠ 用 **Swift + SwiftUI + Xcode / SwiftPM** 重写，取代 Python + Tk + PyInstaller。App 与 CLI 共用同一个 Swift 核心库 |
-| 4 | 「apn 加速」 | ⚠ 理解为 **ANE（Apple Neural Engine）**。原则：能上 ANE 就上，不能就 Metal GPU，最后 CPU；运行时自动探测、可手动覆盖 |
-| 5 | 支持 Paddle 模型 | **PP-OCRv6**（det/cls/rec）、**PP-DocLayoutV3**（版面）、**PaddleOCR-VL-1.6**（VLM）。Mac 上不跑 PaddlePaddle 本体，走 paddle2onnx → ONNX →（Core ML 或 ONNX Runtime） |
-| 6 | 本地模型或在线 API key | 统一抽象 `Provider`：本地进程内推理 / 本地服务（Ollama、LM Studio、llama-server、mlx-vlm）/ 在线 API（OpenAI 兼容协议 + 各家预设）。API key 存 **Keychain** |
+| 1 | 支持 Xiaomi-OCR-0 | 0.8B，基于 Qwen3.5-0.8B-Base，Apache-2.0。官方 Transformers / vLLM / SGLang；社区 GGUF（llama.cpp，需 mmproj）与 Ollama 包；**未见 MLX 版**。输出 Markdown / OTSL / LaTeX，**不输出坐标** |
+| 2 | 支持 MiniCPM | MiniCPM-V 4.7（2026-10-12，1B 与 35B-A3B，Apache-2.0）。默认 1B；35B-A3B 按内存可选 |
+| 3 | Mac 原生构建 | Swift + SwiftUI + SwiftPM，取代 Python + Tk + PyInstaller。App 与 CLI 共用一个核心库 |
+| 4 | **ANE 加速** | 能上 ANE 就上，否则 Metal GPU，最后 CPU；启动时探测，可手动覆盖，实际用到的硬件写进报告 |
+| 5 | 支持 Paddle 模型 | PP-OCRv6（det/cls/rec）、PP-DocLayoutV3、PaddleOCR-VL-1.6。走 paddle2onnx → Core ML（ANE）/ ONNX Runtime 兜底 |
+| 6 | 本地模型或在线 API | 统一 `Provider` 抽象；在线服务预置几家 + 自定义，见 §3 |
+| 7 | **输出 Markdown 可选** | 产物可勾选：可搜索 PDF / Markdown（至少选一个） |
+| 8 | **选 Markdown 时识别分页、去页眉页脚页码** | 见 §4 |
+| — | 剧本线 | **删除**。只支持书籍扫描件 |
 
-## 1. 开工前必须定的决策
+## 1. 决策（已定）
 
-| ID | 问题 | 建议 | 理由 |
-|---|---|---|---|
-| D1 | 原生到什么程度 | **全 Swift 重写**，Python 只留在开发期工具（模型转换、基准评测） | 「原生构建」的价值在于：不带 Python 解释器、签名公证简单、能直接调 Vision/Core ML/PDFKit。顺带去掉 pymupdf 的 AGPL 依赖 |
-| D2 | 在线 provider 与现有边界冲突 | **允许，但默认关，逐文件显式同意**；绝不从本地自动降级到在线 | 现行 `CLAUDE.md`「用户文件不得外传」是硬边界，要你明确授权才能改。改后边界变成「默认不外传；外传必须本次操作显式选择」 |
-| D3 | VLM 推理运行时 | **进程内 llama.cpp（Metal）为主 + OpenAI 兼容 HTTP 兜底**；MLX Swift 作为 Phase 1 实测后的可选项 | 三个 VLM 都已有 GGUF；Xiaomi-OCR-0 没有 MLX 版、MLX Swift 对 Qwen3.5 视觉结构的支持未确认。HTTP 兜底同时覆盖本地服务和在线 API，一套代码 |
-| D4 | 两条线是否都保留 | **都保留**：书籍线（全自动）+ 剧本线（人工校对） | 两条线共享引擎与融合层，只是版面重建和校对环节不同 |
-| D5 | 最低系统 | **macOS 14+、仅 Apple Silicon** | MLX / ANE / 统一内存是加速的前提；Intel 机器跑 VLM 没有实用价值 |
+| ID | 决策 |
+|---|---|
+| D1 | 全 Swift 重写；Python 只留在开发期工具（模型转换、基准评测） |
+| D2 | 在线 provider 默认关；**每次要上传都弹窗由用户明确确认**（§3.2）；本地失败绝不自动切在线 |
+| D3 | VLM 运行时：进程内 llama.cpp（Metal）为主 + OpenAI 兼容 HTTP 兜底；MLX 等 Phase 1 实测后再定 |
+| D4 | 剧本线删除，只做书籍线 |
+| D5 | macOS 14+，仅 Apple Silicon |
 
-## 2. 三个架构判断（决定了后面的分阶段方式）
+## 2. 架构判断
 
-### 2.1 VLM 不给坐标 → 「几何骨架 + 读字引擎」分层
+### 2.1 VLM 不给坐标 →「几何骨架 + 读字引擎」
 
-现有流水线的核心不变量全部依赖**行级坐标**：交叉验证按几何对齐、校对结果按「页码 + 坐标」回填、
-可搜索 PDF 要把字写回原位。Xiaomi-OCR-0 / MiniCPM-V 整页输出 Markdown，没有坐标。
+可搜索 PDF 要把字写回原位、去页眉页脚靠页缘位置、跨页合并靠行位置 —— 全都需要**行框**。
 
-所以拆成两类角色：
+- **几何引擎**（框 + 字 + 置信度）：Vision、PP-OCRv6。
+- **读字引擎**（只出字）：Xiaomi-OCR-0、MiniCPM-V、PaddleOCR-VL。
+  - **区域模式（默认）**：按行框或 PP-DocLayoutV3 版面块裁图逐块读，结果天然带坐标。
+  - **整页模式**：整页出 Markdown，再与几何引擎的行做序列对齐挂回坐标；对不上的标 `unaligned`，不静默丢弃。
 
-- **几何引擎**（出框 + 字 + 置信度）：Vision、PP-OCRv6。负责行框、阅读顺序、版面。
-- **读字引擎**（只出字）：Xiaomi-OCR-0、MiniCPM-V、PaddleOCR-VL。两种喂法：
-  - **区域模式（默认）**：按几何引擎的行框/块框（或 PP-DocLayoutV3 的版面块）裁图，逐块读字
-    （Xiaomi-OCR-0 官方区域提示词就是 `Extract the text in the image.`），结果天然带坐标。
-  - **整页模式**：整页出 Markdown，再与几何引擎的行做序列对齐挂回坐标；对不上的段落标 `unaligned`，不静默丢弃。
+### 2.2 VLM 会「润色」→ 默认组合必须含一个 CTC 型识别器
 
-### 2.2 VLM 会「润色」→ 必须保留至少一个 CTC 型识别器做交叉验证
+VLM 有语言模型先验，会补字、改通顺、吞重复，这类错**读起来是对的**。CTC 识别器（Vision / PP-OCRv6 rec）
+不编造字，与 VLM 的错误相关性低，正是交叉验证需要的。VLM 单引擎模式可选，但报告标「无交叉验证」。
 
-VLM 带语言模型先验，会把原文「改通顺」、补字、吞重复（剧本里的「返，返，返」正是这类）。
-这种错**读起来是对的**，人工校对最难发现。CTC 识别器（PP-OCRv6 rec / Vision）不会编造字，
-两类引擎的错误相关性低 —— 正好是双引擎交叉验证最需要的性质。
+### 2.3 加速：各运行时实际用到的硬件
 
-因此：**任何默认组合都必须包含一个 CTC 型引擎**；VLM 单引擎模式可以有，但在报告里标「无交叉验证」。
-还要沿用 `CLAUDE.md` 的教训：Tesseract 当第三引擎因复核量 ×6 被否决，VLM 当第三引擎同样要先用数据过关（Phase 1）。
-
-### 2.3 加速：每种运行时实际能用到的硬件
-
-| 运行时 | 用到的硬件 | 用在哪 |
+| 运行时 | 硬件 | 用在哪 |
 |---|---|---|
-| Vision 框架 | 系统自动调度 ANE/GPU | Vision 引擎 |
-| Core ML（`MLComputeUnits.all` / `.cpuAndNeuralEngine`） | **ANE** / GPU / CPU | PP-OCRv6 det/rec、PP-DocLayoutV3（转成 `.mlpackage`） |
-| ONNX Runtime + CoreML EP | ANE/GPU（不支持的算子回落 CPU） | Paddle 模型转 Core ML 失败时的兜底 |
-| llama.cpp（Metal） | GPU | 三个 VLM 的 GGUF |
-| MLX | GPU（**不用 ANE**） | 可选 VLM 运行时 |
-| 在线 API | 远端 | — |
+| Vision 框架 | 系统自动调度 ANE / GPU | Vision 引擎 |
+| Core ML（`.cpuAndNeuralEngine` / `.all`） | **ANE** / GPU / CPU | PP-OCRv6、PP-DocLayoutV3 |
+| ONNX Runtime + CoreML EP | ANE/GPU，不支持的算子回落 CPU | Paddle 模型转 Core ML 失败时兜底 |
+| llama.cpp（Metal） | GPU | 三个 VLM（GGUF） |
+| MLX（可选） | GPU，**不用 ANE** | VLM |
 
-要点：**ANE 只对小的卷积/CTC 模型现实可用**；0.8B~1B 的 VLM 在 Mac 上实际跑在 Metal GPU。
-`AccelerationProbe` 在启动时探测芯片、可用内存、Core ML 能否把模型放上 ANE，结果写进质量报告，
-「用了什么硬件」必须可见，不能只是一个开关。
+ANE 现实中只适合小的卷积/CTC 模型；0.8B~1B 的 VLM 在 Mac 上跑在 Metal GPU。
 
-## 3. 目标架构
+## 3. Provider 层
+
+### 3.1 来源
+
+| 类型 | 内容 |
+|---|---|
+| 本地·进程内 | Vision、Core ML、ORT、llama.cpp |
+| 本地·服务 | Ollama、LM Studio、llama-server、mlx-vlm（都是 OpenAI 兼容，填 `http://localhost:…`） |
+| 在线·预置 | OpenAI、Google Gemini（OpenAI 兼容端点）、阿里云百炼 DashScope（兼容模式）、硅基流动 SiliconFlow、OpenRouter、Anthropic |
+| 在线·自定义 | 任意 OpenAI 兼容服务：填 Base URL + Key + 模型名 |
+
+**自适应**：用户选预置或填自定义后点「测试连接」——
+1. 拉 `/models` 列表供选择（拉不到就允许手填）；
+2. 用一张**程序自己生成的合成测试图**探测：是否支持图片输入、图片尺寸上限、返回格式。**不使用用户的任何文件**；
+3. 探测结果存成该 provider 的能力档案，后续自动按档案裁图/缩放/选提示词模板。
+
+Key 只存 Keychain，不写进设置文件和日志。
+
+### 3.2 上传确认（D2）
+
+只要本次任务会把页面图片发到**非本机**地址，开始前必弹确认窗，内容：
+
+- 服务商名称 + 实际域名（例：`api.siliconflow.cn`）
+- 将上传的文件名、页数、图片总大小；按能力档案估算的请求数与费用（估不出就写「未知」）
+- 一个必须手动勾选的复选框：「我确认将以上 N 页图片上传到 <域名>」，勾选前「开始」按钮不可点
+- 选项：「仅本次」（默认）/「本批次内不再询问」。**没有「永久不再询问」**
+
+不确认 → 任务不开始（不是降级成本地跑一半）。每次上传记录写进质量报告（时间、域名、页码）。
+测试：未确认时在线 provider 发不出任何请求（单测断言网络层零调用）。
+
+## 4. 输出与 Markdown 分页处理
+
+产物（可勾选，至少一个）：
 
 ```
-DocOCR.xcodeproj / Package.swift
-├── OCRCore            纯 Swift，无 Apple 框架依赖（Linux 上也能跑单测）
-│   ├── Model           Page / Line / BBox / Reading / Flag，JSON 契约（与现有 *.vision.json 兼容）
-│   ├── Normalize       equiv()：△ 读法、省略号折叠（NFKC 之后）… 原样移植
-│   ├── Fuse            N 引擎融合 + 裁决规则（book_fuse / crosscheck 移植）
-│   ├── Align           整页 VLM 文本 ↔ 行框 序列对齐
-│   ├── Layout          书籍段落化（book_md）/ 剧本版面（to_markdown）
-│   └── Glossary        config/glossary.txt 格式不变
-├── OCREngines         协议 GeometryEngine / TextReader + 各实现
-│   ├── VisionEngine        VNRecognizeTextRequest
-│   ├── PaddleEngine        PP-OCRv6 det/cls/rec，Core ML 优先、ORT 兜底
-│   ├── LayoutEngine        PP-DocLayoutV3
-│   └── VLMReader           Xiaomi-OCR-0 / MiniCPM-V / PaddleOCR-VL，提示词模板按模型配置
-├── OCRRuntime         推理后端
-│   ├── CoreMLRuntime / ORTRuntime
-│   ├── LlamaCppRuntime     进程内，Metal
-│   ├── MLXRuntime          可选（D3）
-│   └── HTTPRuntime         OpenAI 兼容：本地服务 + 在线 API
-├── OCRProviders       Provider 注册表、Keychain、外传同意闸门、限速/重试/费用估算
-├── ModelStore         下载（HF / ModelScope）、sha256 校验、版本钉死、~/Library/Application Support
-├── PDFOut             PDFKit + CoreGraphics 隐形文字层（取代 pymupdf）
-├── ocr-cli            swift-argument-parser，对齐现有 books.sh / run.sh 开关
-└── DocOCRApp          SwiftUI：批处理、模型管理、Provider 设置、质量报告、剧本线校对界面
+<名>.searchable.pdf   原图不重编码 + 隐形文字层（PDFKit / CoreGraphics，取代 pymupdf）
+<名>.md               段落化正文（可选）
+<名>.report.md        质量报告（总是生成）
 ```
 
-数据契约沿用现有 JSON（只加字段不改字段）：这样 Phase 2 起就能拿现有 Python 产物逐字节对比，
-新旧实现并行跑到 Phase 7 才下线 Python。
+勾选 Markdown 时的处理（移植并强化现有 `book_md.py`）：
 
-## 4. 分阶段 Workflow（每阶段有「过关门槛」，不过关不进下一阶段）
+1. **页眉页脚检测**：只在页缘区（上/下各约 8% 页高）的短文本里找；跨页重复 → 精确匹配后再模糊兜底
+   （OCR 对页眉本身也逐页读得不同）；奇偶页分别统计（书籍左右页页眉常不同）。
+2. **页码检测**：页缘区的阿拉伯数字 / 罗马数字 / 中文数字 / `- 12 -`、`第 12 页` 等格式；
+   要求与相邻页**序列一致**（递增、允许跳页），孤立数字不当页码，防止误删正文里的数字。
+3. **跨页合并段落**：上一页末行没有句末标点、下一页首行没有段首缩进 → 合并；章节标题不参与合并。
+4. **分页标记**（选项）：无 / `<!-- p.12 -->` 注释（默认，渲染时不可见但可回溯原页）/ 可见分隔线。
+5. **删除必须可审计**：去掉的每一处页眉、页脚、页码都按页列进质量报告，数量写进摘要；不静默吞。
 
-### Phase 0 · 冻结基准（在动任何代码之前）
-- 从 `~/Desktop/Ignore/old/ocr-归档-2026-10-19/` 选金标准集：剧本若干页（含单源错误集中区）+ 真书 373 页抽样 + 合成做旧样本。
-  人工校对过的成稿即真值。
-- 用现行 Python 流水线跑一遍，记录：字符准确率、编辑距离、逐行取回率、分歧率/单源率、秒/页、峰值内存。
-- 把 `CLAUDE.md`「不变量」每一条写成一个可执行用例（括号里的「实测后果」就是断言）。
-- **门槛**：基准数字入库（`bench/baseline.json`），用例全绿。
+可搜索 PDF 不受上述删除影响 —— 页眉页码仍留在隐形文字层里（它们本来就印在页面上）。
 
-### Phase 1 · 模型可行性实测（Mac 上，Python/命令行即可，不写产品代码）
-- 矩阵：{Xiaomi-OCR-0, MiniCPM-V 4.7 1B, PaddleOCR-VL-1.6, PP-OCRv6, Vision} × {llama.cpp, MLX, Transformers-MPS, Core ML, ORT-CoreML} × {区域模式, 整页模式}。
-- 每格量：CER、**编造率**（输出里原图没有的字）、**吞字率**、秒/页、峰值内存、实际落在 ANE/GPU/CPU 哪个上。
-- 关键问题要用数据回答：
-  1. 哪个 VLM 与 CTC 引擎的错误相关性最低（决定默认组合）？
-  2. 区域模式的调用次数 × 单次延迟，373 页要多久？（现状 8.4 分钟）
-  3. PP-OCRv6 转 Core ML 后能否上 ANE、精度是否掉？
-  4. 第三引擎带来的复核量增幅 vs 多抓到的错（对照 Tesseract 的 ×6 / 2 错/页）。
-- **门槛**：一张决策表 → 定默认引擎组合、默认运行时、D3 的最终答案。
+## 5. 目标架构（精简后）
 
-### Phase 2 · Swift 骨架 + Vision 引擎 + CLI
-- Package 结构、JSON 契约、`ocr-cli recognize`（只有 Vision）。
+```
+Package.swift
+├── OCRCore        纯 Swift，无 Apple 框架依赖（Linux 上可跑单测）
+│   ├── Model        Page / Line / BBox / Reading，JSON 契约与现有 *.vision.json 兼容
+│   ├── Normalize    全半角、省略号折叠（NFKC 之后）
+│   ├── Fuse         N 引擎几何配对 + 裁决（book_fuse / crosscheck.match_lines / postcheck 移植）
+│   ├── Align        整页 VLM 文本 ↔ 行框对齐
+│   └── BookLayout   页眉页脚页码、跨页合并、标题、分页标记 → Markdown
+├── OCREngines     VisionEngine / PaddleEngine / LayoutEngine / VLMReader
+├── OCRRuntime     CoreML / ORT / LlamaCpp / MLX(可选) / HTTP
+├── OCRProviders   预置 + 自定义、能力探测、Keychain、上传确认闸门
+├── ModelStore     HF / ModelScope 下载、sha256 校验、~/Library/Application Support
+├── PDFOut         隐形文字层
+├── ocr-cli        命令行（开关对齐现有 books.sh）
+└── DocOCRApp      SwiftUI
+```
+
+相比上一版删掉：剧本版面、人工校对界面、术语表回填、拼接校验。
+
+## 6. 分阶段 Workflow（每阶段有过关门槛）
+
+### Phase 0 · 清理 + 冻结基准
+- **删除剧本线**（git 历史保留）：`run.sh`、`src/{run_vision,run_rapidocr,to_markdown,make_review,check_fixes,contactsheet,combine,audit,arbitrate,nearmiss,run_tesseract}.py`；`crosscheck.py` 只保留书籍线用到的 `match_lines`；`CLAUDE.md` 改写为书籍线版本。
+- 金标准集：真书 373 页抽样 + 合成做旧样本 + 各类页眉页码样式的页。
+- 现行 Python 书籍线跑一遍记基准：字符准确率、编辑距离、逐行取回率、分歧/单源率、页眉页码去除的查全/查准、秒/页、峰值内存。
+- **门槛**：`bench/baseline.json` 入库。
+
+### Phase 1 · 模型实测（Mac 上跑脚本，不写产品代码）
+- 矩阵：{Xiaomi-OCR-0, MiniCPM-V 4.7 1B, PaddleOCR-VL-1.6, PP-OCRv6, Vision} × {llama.cpp, MLX, Transformers-MPS, Core ML, ORT-CoreML} × {区域, 整页}。
+- 指标：CER、**编造率**、**吞字率**、秒/页、峰值内存、实际落在 ANE/GPU/CPU。
+- 脚本只输出**数字**（JSON），不输出识别文本，方便你直接把结果提交回仓库给我看而不外传书的内容。
+- **门槛**：决策表 → 默认引擎组合、默认运行时、D3 终版。
+
+### Phase 2 · Swift 骨架 + Vision + CLI
 - **门槛**：同一批页图，Swift 版输出与现有 `bin/vision-ocr` 逐行一致。
 
-### Phase 3 · 移植融合与产出（用 Vision + 现有 RapidOCR JSON 喂数据）
-- Normalize / Fuse / Layout / Glossary / PDFOut 移植；Phase 0 的不变量用例改写成 XCTest。
-- **门槛**：喂相同输入 JSON，Swift 产出的 md 与 Python 版逐字一致；可搜索 PDF 逐行取回率 1.0000，原图字节 md5 不变。
+### Phase 3 · 移植融合与产出
+- Fuse / BookLayout / PDFOut；§4 的分页处理在这里实现。
+- **门槛**：喂相同 JSON，md 与 Python 版逐字一致（或差异全部可解释）；PDF 逐行取回率 1.0000、原图 md5 不变；页眉页码去除不低于基准。
 
-### Phase 4 · Paddle 引擎（PP-OCRv6 + PP-DocLayoutV3）
-- 开发期脚本 `tools/convert_paddle.py`：paddle2onnx → coremltools，产出 `.mlpackage` + sha256 清单。
-  用户自己微调的 Paddle 模型也走这个脚本导入。
-- **门槛**：金标准集上与 RapidOCR（同为 PP-OCRv6）精度持平；记录 ANE 命中率与速度。此时 Python 依赖已可整体去掉。
+### Phase 4 · Paddle 引擎
+- `tools/convert_paddle.py`：paddle2onnx → coremltools → `.mlpackage` + sha256 清单（也用于导入自训 Paddle 模型）。
+- **门槛**：精度与 RapidOCR 持平；记录 ANE 命中。此后 Python 运行时依赖全部去掉。
 
 ### Phase 5 · VLM 读字引擎（本地）
-- `LlamaCppRuntime` + 三个模型的提示词模板、区域/整页两种模式、`Align` 对齐。
-- 融合层从 2 引擎扩到 N 引擎；VLM 与 CTC 不一致时**默认信 CTC 的字形、信 VLM 的断句**（初始规则，Phase 1 数据为准）。
-- **门槛**：默认组合在金标准集上 ≥ Phase 0 基准，且编造率有专门指标（自校验指标不能和失效模式同向）。
+- llama.cpp 运行时 + 三个模型的提示词模板 + 区域/整页模式 + 对齐；融合扩到 N 引擎。
+- **门槛**：默认组合 ≥ 基准，编造率有独立指标。
 
-### Phase 6 · Provider 层（本地服务 + 在线 API）
-- `HTTPRuntime`（OpenAI 兼容），预设：Ollama、LM Studio、llama-server、mlx-vlm、以及你指定的在线服务商。
-- 外传闸门：逐文件同意、列出将发送的页、费用预估、发送日志；Keychain 存 key；本地失败**不**自动切在线。
-- **门槛**：断网时一切本地功能可用；未同意时在线 provider 发不出任何请求（用例断言）。
+### Phase 6 · Provider 层
+- §3 全部内容。**门槛**：断网时本地功能全可用；未确认时零外发请求。
 
 ### Phase 7 · SwiftUI App
-- 批处理队列、进度、质量报告、模型管理（下载/校验/删除）、Provider 设置、加速探测面板、剧本线原生校对界面（取代 HTML 校对页）。
-- **门槛**：现有 `.app` 的全部功能对齐；Python 实现下线。
+- 批处理、进度、产物勾选、分页选项、质量报告、模型管理、Provider 设置与测试连接、加速探测面板。
+- **门槛**：对齐现有 `.app` 全部功能；Python 实现下线。
 
 ### Phase 8 · 打包发布
-- Xcode archive → 签名 → 公证 → 沿用 `packaging/release.sh` 的发布流程；模型不进 .app，首次启动按需下载。
-- **门槛**：干净机器上首次启动到跑完一份样本全程无需终端。
+- Xcode archive → 签名 → 公证 → 沿用 `packaging/release.sh`；模型首次启动按需下载，不进 .app。
 
-## 5. 风险
+## 7. 怎么拿到你的 Mac 上测试
 
-| 风险 | 应对 |
-|---|---|
-| VLM 编造/润色，逐字精确目标被破坏 | 2.2 的 CTC 必选 + 编造率指标；VLM 结果永远可追溯到原图区域 |
-| 区域模式太慢 | 块级（版面块）裁图代替行级；批量推理；Phase 1 用数据决定 |
-| Xiaomi-OCR-0 的 GGUF 是社区转换、未经官方验证 | Phase 1 与 Transformers-MPS 原版逐页对比后再定；模型文件 sha256 钉死 |
-| PP-OCRv6 部分算子上不了 ANE | ORT-CoreML EP 兜底；如实报告落在哪个硬件 |
-| 在线 API 违背原有隐私承诺 | D2：默认关 + 显式同意 + 文档同步更新 |
-| 全量重写丢掉旧代码里沉淀的细节 | 新旧并行到 Phase 7；以 JSON 契约 + 不变量用例做逐字对拍 |
+本会话在 Linux 云容器里，没有 Xcode，读不到你的 Mac。三条路，按快捷程度排：
 
-## 6. 执行环境说明
+**A. Remote Control（最快：我直接在你的 Mac 上编译、跑测试、读结果）**
+你的 `Mac-mini-zwq` 已开 Remote Control，但现有文件夹（openwrt / work / Ignore）都**不对云会话开放**。要做的：
+1. 更新 Mac 上的 Claude 桌面 App；
+2. 在 设置 → Claude Code → Remote Control 里加入本项目所在文件夹（不能在 `~` 下的隐藏目录或 `~/Library` 里）；
+3. 告诉我，我发起连接请求，你在 Mac 上点允许。
 
-本次规划所在的云端容器是 Linux，**没有 Xcode / Swift 工具链，也访问不到你 Mac 上的归档数据**。
-所以：`OCRCore`（纯逻辑）可以在这里写并配 Linux Swift 单测；涉及 Vision / Core ML / Metal / PDFKit /
-SwiftUI 的部分只能在这里写代码，**编译、实测和 Phase 0/1 的基准必须在你的 Mac 上跑**。
+注意：这条路下我读到的文件内容会进入这个云端对话。只跑基准数字没问题；若要我看识别出的正文，用合成样本或你不介意的页。
+
+**B. git pull + 一条命令（不依赖 Remote Control）**
+每个阶段我会提供一个入口脚本，你只需：
+```bash
+git fetch origin claude/zen-dijkstra-81hcfw && git checkout claude/zen-dijkstra-81hcfw && git pull
+./dev/check.sh p1        # 或 p2 …：装依赖 → 构建 → 测试 → 基准，结果写到 bench/results/
+```
+- P1 是脚本（llama.cpp 用 brew 装，Python 依赖用 uv 装进隔离环境），不需要编译。
+- P2 起是 `swift build -c release`，只需 Xcode Command Line Tools；本机构建不带 quarantine 属性，不会被 Gatekeeper 拦。
+- 跑完 `git add bench/results && git commit && git push`（只有数字），我拉下来分析。
+
+**C. GitHub Actions 只跑测试**
+沿用 README 的结论：macOS runner 按 10 倍扣分钟、CI 产物下载后被 quarantine 拦得更凶。所以 Actions 只跑
+`OCRCore` 的单测（可以用 Linux runner，不扣 10 倍），构建和实测留在本机。
 
 ## 参考
 
