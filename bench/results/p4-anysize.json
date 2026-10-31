@@ -28,7 +28,9 @@
    "chars": 141,
    "rate": 0.5,
    "char_agreement": 0.9716,
-   "mean_iou": 0.9772
+   "mean_iou": 0.9772,
+   "judged": false,
+   "pass": null
   },
   "huge": {
    "images": 2,
@@ -42,7 +44,9 @@
    "chars": 1140,
    "rate": 0.9818,
    "char_agreement": 0.9991,
-   "mean_iou": 0.9917
+   "mean_iou": 0.9917,
+   "judged": true,
+   "pass": true
   },
   "long": {
    "images": 3,
@@ -56,7 +60,9 @@
    "chars": 11909,
    "rate": 0.9303,
    "char_agreement": 0.9975,
-   "mean_iou": 0.9415
+   "mean_iou": 0.9415,
+   "judged": true,
+   "pass": true
   },
   "paper": {
    "images": 5,
@@ -70,7 +76,9 @@
    "chars": 3715,
    "rate": 0.9779,
    "char_agreement": 0.9992,
-   "mean_iou": 0.9967
+   "mean_iou": 0.9967,
+   "judged": true,
+   "pass": true
   },
   "scale": {
    "images": 8,
@@ -84,7 +92,9 @@
    "chars": 7421,
    "rate": 0.9625,
    "char_agreement": 0.9987,
-   "mean_iou": 0.9953
+   "mean_iou": 0.9953,
+   "judged": true,
+   "pass": true
   },
   "small": {
    "images": 4,
@@ -98,7 +108,9 @@
    "chars": 368,
    "rate": 0.8696,
    "char_agreement": 0.9918,
-   "mean_iou": 0.9996
+   "mean_iou": 0.9996,
+   "judged": true,
+   "pass": false
   },
   "spread": {
    "images": 5,
@@ -112,7 +124,9 @@
    "chars": 7522,
    "rate": 0.9606,
    "char_agreement": 0.9984,
-   "mean_iou": 0.9926
+   "mean_iou": 0.9926,
+   "judged": true,
+   "pass": true
   }
  },
  "worst": [
@@ -223,5 +237,6 @@
    "line_recovery": 0.9806,
    "timing": "总 2.7s  载入 0.1s  首页 0.38s  其余均值 0.33s/页 | det 1.40 post 0.24 crop 0.11 cls 0.18 rec 0.51\nflex_pages 8 canvas_pages 0 til"
   }
- }
+ },
+ "criterion": "char_agreement >= 0.995, groups with >= 20 lines"
 }

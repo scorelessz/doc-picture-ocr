@@ -142,7 +142,11 @@ def main() -> int:
         g["rate"] = round(g["text_equal"] / max(1, g["ref"]), 4)
         g["char_agreement"] = round(1 - g["edits"] / max(1, g["chars"]), 4)
         g["mean_iou"] = round(g.pop("iou_sum") / max(1, g["paired"]), 4)
-    out = {"phase": "p4", "name": "any-size", "seed": a.seed, "units": a.units, "images": len(pngs), "total": tot,
+    # 判定口径: 字符一致率 ≥ 99.5%; 不足 20 行的类别样本太小, 只记录不判定
+    for g in groups.values():
+        g["judged"] = g["ref"] >= 20
+        g["pass"] = g["char_agreement"] >= 0.995 if g["judged"] else None
+    out = {"phase": "p4", "name": "any-size", "seed": a.seed, "criterion": "char_agreement >= 0.995, groups with >= 20 lines", "units": a.units, "images": len(pngs), "total": tot,
            "text_equal_rate": round(tot["text_equal"] / max(1, tot["ref"]), 4),
            "char_agreement": round(1 - tot["edits"] / max(1, tot["chars"]), 4), "groups": groups,
            "worst": sorted(worst)[:8], "timing": rr.stdout.strip()}
