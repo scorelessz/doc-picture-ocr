@@ -23,7 +23,7 @@ usage:
   ocr-cli recognize <pdf> [--pages A-B|a,b,c] [--dpi N] --out doc.vision.json
   ocr-cli page-info <pdf> [--pages A-B|a,b,c] [--ink] --out info.json
   ocr-cli fuse <vision.json> <rapidocr.json> --out fused.json [--legacy] [--force]
-  ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
+  ocr-cli md <fused.json> --out out.md [--no-page-marks] [--vlm-breaks] [--force] [--stats stats.json]
   ocr-cli pdf <源.pdf> <fused.json> --out x.searchable.pdf [--force] [--force-text] [--stats stats.json]
   ocr-cli paddle <image>... --models dir [--units ane|all|cpu|gpu] [--cls] --out lines.json
   ocr-cli vlm-fuse <fused.json> --vlm-dir dir --out fused.vlm.json [--report r.json]
@@ -34,7 +34,7 @@ usage:
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
                [--paddle coreml|python] [--models-dir dir] [--units ane|all|cpu|gpu]
-               [--vlm-url http://127.0.0.1:端口/v1] [--vlm-model 名]
+               [--vlm [--vl-model dir] | --vlm-url http://127.0.0.1:端口/v1 [--vlm-model 名]]
                [--python .venv/bin/python] [--result result.json]
 
 
@@ -280,6 +280,7 @@ do {
         let doc = try JSONDecoder().decode(MDDoc.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
         var o = MDOptions()
         o.pageMarks = !args.contains("--no-page-marks")
+        o.useVLMBreaks = args.contains("--vlm-breaks")
         let (md, st) = toMarkdown(doc, options: o)
         try withMark(md).write(to: URL(fileURLWithPath: out), atomically: true, encoding: .utf8)
         if let sp = option(args, "--stats") {
@@ -319,6 +320,7 @@ do {
         o.md = !args.contains("--no-md")
         o.searchable = !args.contains("--no-pdf")
         o.pageMarks = option(args, "--page-marks") ?? "comment"
+        o.vlmBreaks = args.contains("--vlm-breaks")
         guard ["none", "comment", "rule"].contains(o.pageMarks) else { fail(usage) }
         o.force = args.contains("--force")
         o.clobber = args.contains("--clobber")
@@ -341,6 +343,16 @@ do {
             }
             o.vlmURL = u
             o.vlmModel = option(args, "--vlm-model") ?? "local"
+        }
+        if args.contains("--vlm") {
+            let dir = option(args, "--vl-model") ?? ModelStore.defaultDirectory.deletingLastPathComponent().appendingPathComponent("vl/paddleocr-vl-1.6-8bit").path
+            do {
+                let vl = try PaddleVL(directory: URL(fileURLWithPath: dir, isDirectory: true))
+                Log.shared.info("vlm_loaded", ["model": .s(dir), "seconds": .d((vl.loadSeconds * 1000).rounded() / 1000), "runtime": .s("mlx-swift")])
+                o.vlmLocal = { px, w, h in vl.read(px, w: w, h: h).text }
+            } catch {
+                fail("\(error)（用 --vl-model 指定，或 --vlm-url 走本地服务）", code: 2)
+            }
         }
         do {
             let res = try runBook(o, log: warn)

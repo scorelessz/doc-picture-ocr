@@ -188,6 +188,20 @@ public func applyVLM(_ page: FusedPage, vlm: String?, rules r: VLMRules = VLMRul
         }
     }
 
+    // 断句信 VLM：VLM 换行处对应的 CTC 行就是段首。页首没有判断（可能是上一页的续段）
+    var starts = Set<Int>(), seen = 0
+    for segLine in rep.gate.text.components(separatedBy: "\n") {
+        let n = folded(segLine).count
+        if n > 0 {
+            if seen > 0 { starts.insert(seen) }
+            seen += n
+        }
+    }
+    for i in order {
+        guard let rg = ranges[i], !rg.isEmpty, let p = rg.compactMap(pos).first, p > 0 else { continue }
+        out.lines[i].vlmBreak = starts.contains(p)
+    }
+
     for i in order where page.lines[i].flag == "divergent" {
         guard let rg = ranges[i], !rg.isEmpty, let alt = page.lines[i].alt else { continue }
         let ps = rg.compactMap(pos)

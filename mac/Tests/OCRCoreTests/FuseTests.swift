@@ -257,6 +257,14 @@ final class VLMFuseTests: XCTestCase {
         XCTAssertTrue(p.lines.isEmpty)
     }
 
+    func testVLMBreakMarksParagraphStart() {
+        let (p, _) = applyVLM(page([line(0, "first line of a"), line(40, "paragraph here"), line(80, "second paragraph")]),
+                              vlm: "first line of a paragraph here\nsecond paragraph")
+        XCTAssertNil(p.lines[0].vlmBreak)          // 页首可能是上一页的续段，不判断
+        XCTAssertEqual(p.lines[1].vlmBreak, false)
+        XCTAssertEqual(p.lines[2].vlmBreak, true)
+    }
+
     func testLoopCut() {
         let g = gateVLM(String(repeating: "abcdefghijklmnopqrstuvwxyz", count: 12), estimate: 10000)
         XCTAssertTrue(g.loopCut)

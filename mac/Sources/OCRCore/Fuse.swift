@@ -46,8 +46,13 @@ public struct FusedLine: Codable, Equatable, Sendable {
     public var src: String
     public var alt: String?
     public var flag: String
+    /// VLM 对这一行是不是段首的判断（断句信 VLM）。nil = 没有判断。只在有 VLM 时写。
+    public var vlmBreak: Bool?
 
-    enum CodingKeys: String, CodingKey { case x, y, w, h, text, conf, src, alt, flag }
+    enum CodingKeys: String, CodingKey {
+        case x, y, w, h, text, conf, src, alt, flag
+        case vlmBreak = "vlm_break"
+    }
 
     public init(x: Double, y: Double, w: Double, h: Double, text: String, conf: Double,
                 src: String, alt: String?, flag: String) {
@@ -63,6 +68,7 @@ public struct FusedLine: Codable, Equatable, Sendable {
         try c.encode(text, forKey: .text); try c.encode(conf, forKey: .conf)
         try c.encode(src, forKey: .src); try c.encode(alt, forKey: .alt)
         try c.encode(flag, forKey: .flag)
+        try c.encodeIfPresent(vlmBreak, forKey: .vlmBreak)
     }
 }
 

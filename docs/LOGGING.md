@@ -27,10 +27,11 @@ macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE 
 | `compute_plan` | info | `model` `requested`（ane/all/cpu/gpu）`ops` `ane` `gpu` `cpu`（各设备的算子数） |
 | `stage` | info | `name` `seconds` `peak_rss_mb` `peak_rss_children_mb`；`ppocr-coreml` 另有 `units` `load_seconds` `det` `post` `crop` `rec` `canvas_fallbacks` |
 | `page` | debug | `page` `dpi` `width` `height` `dark` `gate` `vision_lines` `vision_seconds` `ppocr_lines` `ppocr_seconds` `fused_lines` `divergent` `only_vision` `only_ppocr` `dedup` `dedup_new_rule`；`--log-text` 时多 `lines` |
-| `md` | info | `paragraphs` `headings` `chars` `dropped`（理由 → 条数）`vertical_pages` `two_column_pages` |
+| `md` | info | `paragraphs` `headings` `chars` `vlm_break_overrides` `dropped`（理由 → 条数）`vertical_pages` `two_column_pages` |
 | `md_dropped` | debug | `page` `reason`；`--log-text` 时多 `text` |
 | `pdf` | info | `embedded` `skipped_native` `skipped_gate` `retrieval` `line_retrieval` `probe_found` `probe_checked` `size_in` `size_out` |
 | `vlm_page` | debug | `page` `seconds` `raw_chars` `kept_chars` `truncated` `loop_cut` `flips` `orphans` |
+| `vlm_loaded` | info | `model` `seconds` `runtime` |
 | `orientation` | debug | `rotation` `conf0` `best` |
 | `tiled` | debug | `tiles` `width` `height` |
 | `models_fetched` | info | `dir` `sha256` |

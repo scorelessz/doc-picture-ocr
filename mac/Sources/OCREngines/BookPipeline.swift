@@ -26,6 +26,9 @@ public struct BookOptions {
     /// 本地 VLM（OpenAI 兼容接口）。只接受本机地址：默认不外传用户文件。
     public var vlmURL: URL?
     public var vlmModel = "local"
+    /// 进程内 VLM：灰度像素 → 文字。设了就优先于 vlmURL。
+    public var vlmLocal: (([UInt8], Int, Int) -> String)?
+    public var vlmBreaks = false
 
     public init(pdf: URL, outdir: URL, workdir: URL, python: String) {
         self.pdf = pdf; self.outdir = outdir; self.workdir = workdir; self.python = python
@@ -298,7 +301,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
 
     // ---- VLM 第三票 ----
     var vlmReports: [VLMPageReport] = []
-    if let url = o.vlmURL {
+    if o.vlmLocal != nil || o.vlmURL != nil {
         try stage("vlm") {
             let doc2 = try PageRenderer.open(o.pdf)
             for i in fused.pages.indices {
@@ -314,7 +317,13 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                     let r0 = try PageRenderer.render(doc2, page: pno, dpi: slots[i].dpi)
                     var img = r0.image
                     if let rot = fused.pages[i].pageRotation, let p = paddle { img = try p.rotatedImage(img, rot) }
-                    let text = try vlmRead(img, url: url, model: o.vlmModel)
+                    let text: String
+                    if let f = o.vlmLocal {
+                        let (px, w, h) = try grayPixels(img)
+                        text = f(px, w, h)
+                    } else {
+                        text = try vlmRead(img, url: o.vlmURL!, model: o.vlmModel)
+                    }
                     let (p, r) = applyVLM(fused.pages[i], vlm: text)
                     fused.pages[i] = p
                     vlmReports.append(r)
@@ -362,9 +371,11 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
             var opt = MDOptions()
             opt.pageMarks = o.pageMarks != "none"
             opt.pageRule = o.pageMarks == "rule"
+            opt.useVLMBreaks = o.vlmBreaks
             let (md, st) = toMarkdown(try JSONDecoder().decode(MDDoc.self, from: Data(contentsOf: fURL)), options: opt)
             mdStats = st
             Log.shared.info("md", ["paragraphs": .i(st.paragraphs), "headings": .i(st.headings), "chars": .i(st.chars),
+                                   "vlm_break_overrides": .i(st.vlmBreakOverrides),
                                    "dropped": .o(st.droppedDetail.mapValues { .i($0) }),
                                    "vertical_pages": .a(st.verticalPages.map { .i($0) }),
                                    "two_column_pages": .a(st.twoColumnPages.map { .i($0) })])

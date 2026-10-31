@@ -226,6 +226,7 @@ public func buildReport(_ r: ReportInput) -> String {
         A("| 无墨迹未调用 | \(r.vlm.filter(\.skippedNoInk).map(\.page)) |")
         A("| 输出被截断(超长或循环) | \(cut.isEmpty ? "无" : "\(cut)") |")
         A("| 翻转的分歧行 | \(flips.count) |")
+        A("| VLM 改了段落切分的行 | \(r.md?.vlmBreakOverrides ?? 0) |")
         A("| VLM 独有且未进正文的片段 | \(orphans.count) |")
         A()
         if !flips.isEmpty {

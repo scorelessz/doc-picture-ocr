@@ -30,8 +30,12 @@ public struct MDLine: Decodable, Sendable {
     public var text: String?
     public var conf: Double?
     public var src: String?, flag: String?
+    public var vlmBreak: Bool?
 
-    enum CodingKeys: String, CodingKey { case x, y, w, h, text, conf, src, flag }
+    enum CodingKeys: String, CodingKey {
+        case x, y, w, h, text, conf, src, flag
+        case vlmBreak = "vlm_break"
+    }
 
     public init(x: Double?, y: Double?, w: Double?, h: Double?, text: String?,
                 conf: Double? = nil, src: String? = nil, flag: String? = nil) {
@@ -49,6 +53,7 @@ public struct MDLine: Decodable, Sendable {
         conf = try? c.decode(Double.self, forKey: .conf)
         src = try? c.decode(String.self, forKey: .src)
         flag = try? c.decode(String.self, forKey: .flag)
+        vlmBreak = try? c.decode(Bool.self, forKey: .vlmBreak)
     }
 }
 
@@ -73,6 +78,8 @@ public struct MDOptions: Sendable {
     public var pageRule = false
     public var indentChars = 1.5
     public var shortEnd = 0.85
+    /// 段落切分听 VLM。默认关：抽查页上没测到收益（docs/P5_RESULTS.md）
+    public var useVLMBreaks = false
     public init() {}
 }
 
@@ -87,6 +94,7 @@ public struct MDStats: Encodable, Equatable, Sendable {
     public var pages = 0, linesIn = 0, rows = 0, keptRows = 0, paragraphs = 0, headings = 0
     public var dropped = 0, divergent = 0, lowConf = 0, onlyOneEngine = 0, chars = 0
     public var malformedLines = 0
+    public var vlmBreakOverrides = 0
     public var verticalPages: [Int] = [], twoColumnPages: [Int] = []
     public var droppedDetail: [String: Int] = [:]
     public var droppedLines: [DroppedLine] = []
@@ -95,6 +103,7 @@ public struct MDStats: Encodable, Equatable, Sendable {
         case pages, rows, paragraphs, headings, dropped, divergent, chars
         case linesIn = "lines_in", keptRows = "kept_rows", lowConf = "low_conf"
         case onlyOneEngine = "only_one_engine", malformedLines = "malformed_lines"
+        case vlmBreakOverrides = "vlm_break_overrides"
         case verticalPages = "vertical_pages", twoColumnPages = "two_column_pages"
         case droppedDetail = "dropped_detail", droppedLines = "dropped_lines"
     }
@@ -107,14 +116,15 @@ final class Row {
     var text: String
     var conf: Double?
     var src: String?, flag: String?
+    var vlmBreak: Bool?
 
     init(x: Double, y: Double, w: Double, h: Double, text: String,
-         conf: Double? = nil, src: String? = nil, flag: String? = nil) {
+         conf: Double? = nil, src: String? = nil, flag: String? = nil, vlmBreak: Bool? = nil) {
         self.x = x; self.y = y; self.w = w; self.h = h; self.text = text
-        self.conf = conf; self.src = src; self.flag = flag
+        self.conf = conf; self.src = src; self.flag = flag; self.vlmBreak = vlmBreak
     }
 
-    func copy() -> Row { Row(x: x, y: y, w: w, h: h, text: text, conf: conf, src: src, flag: flag) }
+    func copy() -> Row { Row(x: x, y: y, w: w, h: h, text: text, conf: conf, src: src, flag: flag, vlmBreak: vlmBreak) }
     var stripped: String { pyStrip(text) }
     var cy: Double { y + h / 2 }
 }
@@ -741,7 +751,7 @@ public func toMarkdown(_ doc: MDDoc, options o: MDOptions = MDOptions()) -> (md:
     func clean(_ l: MDLine) -> Row {
         if l.x == nil || l.y == nil || l.w == nil || l.h == nil || l.text == nil { st.malformedLines += 1 }
         return Row(x: l.x ?? 0, y: l.y ?? 0, w: l.w ?? 0, h: l.h ?? 0, text: l.text ?? "",
-                   conf: l.conf, src: l.src, flag: l.flag)
+                   conf: l.conf, src: l.src, flag: l.flag, vlmBreak: l.vlmBreak)
     }
 
     func size(_ v: Double?) -> Double {
@@ -917,7 +927,14 @@ public func toMarkdown(_ doc: MDDoc, options o: MDOptions = MDOptions()) -> (md:
                 prev = Prev(heading: true)
                 continue
             }
-            if cur == nil || isParaStart(prev, r, pb.pm, o) {
+            var start = cur == nil || isParaStart(prev, r, pb.pm, o)
+            // 断句信 VLM，但首行缩进是版面上的硬证据：VLM 说「不换段」压不过它
+            let indented = r.x >= pb.pm.left + o.indentChars * pb.pm.charW
+            if o.useVLMBreaks, cur != nil, let b = r.vlmBreak, b != start, b || !indented {
+                start = b
+                st.vlmBreakOverrides += 1
+            }
+            if start {
                 flush()
                 flushPending()
                 cur = text
