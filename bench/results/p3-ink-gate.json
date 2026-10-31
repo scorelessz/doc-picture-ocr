@@ -1,0 +1,378 @@
+{
+ "phase": "p3",
+ "name": "ink-gate",
+ "threshold_dark": 0.001,
+ "en_pages": [
+  {
+   "page": 10,
+   "no_ink": true,
+   "text_source": "native_text",
+   "lines": 21,
+   "size": [
+    1488,
+    2448
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 184,
+   "chars": 184,
+   "dist_to_pymupdf_text": 0,
+   "p0_vision_lines": 0,
+   "same_text_lines_p0": 0
+  },
+  {
+   "page": 20,
+   "no_ink": true,
+   "text_source": "native_text",
+   "lines": 40,
+   "size": [
+    1503,
+    2457
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 523,
+   "chars": 520,
+   "dist_to_pymupdf_text": 13,
+   "p0_vision_lines": 0,
+   "same_text_lines_p0": 0
+  },
+  {
+   "page": 62,
+   "no_ink": true,
+   "text_source": "native_text",
+   "lines": 36,
+   "size": [
+    1503,
+    2457
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 665,
+   "chars": 665,
+   "dist_to_pymupdf_text": 6,
+   "p0_vision_lines": 0,
+   "same_text_lines_p0": 0
+  },
+  {
+   "page": 98,
+   "no_ink": true,
+   "text_source": "native_text",
+   "lines": 45,
+   "size": [
+    1505,
+    2456
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 580,
+   "chars": 580,
+   "dist_to_pymupdf_text": 90,
+   "p0_vision_lines": 0,
+   "same_text_lines_p0": 0
+  },
+  {
+   "page": 160,
+   "no_ink": true,
+   "text_source": "native_text",
+   "lines": 39,
+   "size": [
+    1505,
+    2456
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 800,
+   "chars": 800,
+   "dist_to_pymupdf_text": 2,
+   "p0_vision_lines": 0,
+   "same_text_lines_p0": 0
+  },
+  {
+   "page": 324,
+   "no_ink": true,
+   "text_source": "native_text",
+   "lines": 32,
+   "size": [
+    1512,
+    2515
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 518,
+   "chars": 518,
+   "dist_to_pymupdf_text": 10,
+   "p0_vision_lines": 0,
+   "same_text_lines_p0": 0
+  },
+  {
+   "page": 3,
+   "no_ink": false,
+   "text_source": null,
+   "lines": 19,
+   "size": [
+    1542,
+    2465
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 186,
+   "chars": 228,
+   "dist_to_pymupdf_text": null,
+   "p0_vision_lines": 19,
+   "same_text_lines_p0": 16
+  },
+  {
+   "page": 8,
+   "no_ink": false,
+   "text_source": null,
+   "lines": 15,
+   "size": [
+    1488,
+    2444
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 269,
+   "chars": 243,
+   "dist_to_pymupdf_text": null,
+   "p0_vision_lines": 15,
+   "same_text_lines_p0": 15
+  },
+  {
+   "page": 9,
+   "no_ink": false,
+   "text_source": null,
+   "lines": 19,
+   "size": [
+    1527,
+    2461
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 197,
+   "chars": 205,
+   "dist_to_pymupdf_text": null,
+   "p0_vision_lines": 19,
+   "same_text_lines_p0": 18
+  },
+  {
+   "page": 11,
+   "no_ink": false,
+   "text_source": null,
+   "lines": 30,
+   "size": [
+    1544,
+    2432
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 1371,
+   "chars": 1363,
+   "dist_to_pymupdf_text": null,
+   "p0_vision_lines": 30,
+   "same_text_lines_p0": 28
+  },
+  {
+   "page": 12,
+   "no_ink": false,
+   "text_source": null,
+   "lines": 38,
+   "size": [
+    1500,
+    2445
+   ],
+   "same_size_p0": true,
+   "native_chars_pymupdf": 1692,
+   "chars": 1691,
+   "dist_to_pymupdf_text": null,
+   "p0_vision_lines": 38,
+   "same_text_lines_p0": 35
+  }
+ ],
+ "en_scan": {
+  "pages": 328,
+  "below": [
+   {
+    "page": 325,
+    "dark": 1e-05,
+    "native_chars": 0
+   },
+   {
+    "page": 327,
+    "dark": 3e-05,
+    "native_chars": 0
+   },
+   {
+    "page": 248,
+    "dark": 4e-05,
+    "native_chars": 10
+   },
+   {
+    "page": 98,
+    "dark": 5e-05,
+    "native_chars": 816
+   },
+   {
+    "page": 62,
+    "dark": 5e-05,
+    "native_chars": 905
+   },
+   {
+    "page": 10,
+    "dark": 6e-05,
+    "native_chars": 264
+   },
+   {
+    "page": 202,
+    "dark": 6e-05,
+    "native_chars": 67
+   },
+   {
+    "page": 20,
+    "dark": 6e-05,
+    "native_chars": 713
+   },
+   {
+    "page": 326,
+    "dark": 7e-05,
+    "native_chars": 0
+   },
+   {
+    "page": 160,
+    "dark": 8e-05,
+    "native_chars": 1097
+   },
+   {
+    "page": 324,
+    "dark": 9e-05,
+    "native_chars": 691
+   },
+   {
+    "page": 2,
+    "dark": 0.00077,
+    "native_chars": 0
+   }
+  ],
+  "lowest_above": [
+   {
+    "page": 4,
+    "dark": 0.00411,
+    "native_chars": 145
+   },
+   {
+    "page": 201,
+    "dark": 0.01327,
+    "native_chars": 201
+   },
+   {
+    "page": 6,
+    "dark": 0.01394,
+    "native_chars": 167
+   },
+   {
+    "page": 7,
+    "dark": 0.01658,
+    "native_chars": 57
+   },
+   {
+    "page": 9,
+    "dark": 0.02079,
+    "native_chars": 241
+   },
+   {
+    "page": 8,
+    "dark": 0.02141,
+    "native_chars": 340
+   }
+  ]
+ },
+ "zh_scan": {
+  "pages": 373,
+  "below": [],
+  "lowest_above": [
+   {
+    "page": 372,
+    "dark": 0.00578,
+    "native_chars": 0
+   },
+   {
+    "page": 184,
+    "dark": 0.0061,
+    "native_chars": 0
+   },
+   {
+    "page": 112,
+    "dark": 0.00615,
+    "native_chars": 0
+   },
+   {
+    "page": 13,
+    "dark": 0.00633,
+    "native_chars": 0
+   },
+   {
+    "page": 23,
+    "dark": 0.00679,
+    "native_chars": 0
+   },
+   {
+    "page": 3,
+    "dark": 0.00786,
+    "native_chars": 0
+   }
+  ]
+ },
+ "en_other_below": [
+  {
+   "page": 2,
+   "dark": 0.00077,
+   "native_chars": 0,
+   "p0_vision_lines": 2,
+   "p0_rapidocr_lines": 2,
+   "p0_vision_chars": 4,
+   "p0_rapidocr_chars": 3,
+   "p0_fused_lines": 2
+  },
+  {
+   "page": 202,
+   "dark": 6e-05,
+   "native_chars": 67,
+   "p0_vision_lines": 0,
+   "p0_rapidocr_lines": 0,
+   "p0_vision_chars": 0,
+   "p0_rapidocr_chars": 0,
+   "p0_fused_lines": 0
+  },
+  {
+   "page": 248,
+   "dark": 4e-05,
+   "native_chars": 10,
+   "p0_vision_lines": 0,
+   "p0_rapidocr_lines": 0,
+   "p0_vision_chars": 0,
+   "p0_rapidocr_chars": 0,
+   "p0_fused_lines": 0
+  },
+  {
+   "page": 325,
+   "dark": 1e-05,
+   "native_chars": 0,
+   "p0_vision_lines": 0,
+   "p0_rapidocr_lines": 0,
+   "p0_vision_chars": 0,
+   "p0_rapidocr_chars": 0,
+   "p0_fused_lines": 0
+  },
+  {
+   "page": 326,
+   "dark": 7e-05,
+   "native_chars": 0,
+   "p0_vision_lines": 0,
+   "p0_rapidocr_lines": 0,
+   "p0_vision_chars": 0,
+   "p0_rapidocr_chars": 0,
+   "p0_fused_lines": 0
+  },
+  {
+   "page": 327,
+   "dark": 3e-05,
+   "native_chars": 0,
+   "p0_vision_lines": 0,
+   "p0_rapidocr_lines": 0,
+   "p0_vision_chars": 0,
+   "p0_rapidocr_chars": 0,
+   "p0_fused_lines": 0
+  }
+ ]
+}
