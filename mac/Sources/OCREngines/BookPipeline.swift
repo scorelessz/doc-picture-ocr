@@ -2,6 +2,7 @@
 import CoreGraphics
 import CoreML
 import Foundation
+import ImageIO
 import OCRCore
 import PDFKit
 
@@ -22,6 +23,9 @@ public struct BookOptions {
     public var coreml: URL?
     public var units: MLComputeUnits = .cpuAndNeuralEngine
     public var unitsLabel = "ane"
+    /// 本地 VLM（OpenAI 兼容接口）。只接受本机地址：默认不外传用户文件。
+    public var vlmURL: URL?
+    public var vlmModel = "local"
 
     public init(pdf: URL, outdir: URL, workdir: URL, python: String) {
         self.pdf = pdf; self.outdir = outdir; self.workdir = workdir; self.python = python
@@ -290,7 +294,41 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
 
     // ---- 融合 ----
     let flog = FuseLog()
-    let fused = try stage("fuse") { try fuse(vDoc, rDoc, log: flog) }
+    var fused = try stage("fuse") { try fuse(vDoc, rDoc, log: flog) }
+
+    // ---- VLM 第三票 ----
+    var vlmReports: [VLMPageReport] = []
+    if let url = o.vlmURL {
+        try stage("vlm") {
+            let doc2 = try PageRenderer.open(o.pdf)
+            for i in fused.pages.indices {
+                let pno = fused.pages[i].page
+                if fused.pages[i].noInk == true || fused.pages[i].textSource == "native_text" {
+                    let (p, r) = applyVLM(fused.pages[i], vlm: nil)
+                    fused.pages[i] = p
+                    vlmReports.append(r)
+                    continue
+                }
+                let t0 = Date()
+                do {
+                    let r0 = try PageRenderer.render(doc2, page: pno, dpi: slots[i].dpi)
+                    var img = r0.image
+                    if let rot = fused.pages[i].pageRotation, let p = paddle { img = try p.rotatedImage(img, rot) }
+                    let text = try vlmRead(img, url: url, model: o.vlmModel)
+                    let (p, r) = applyVLM(fused.pages[i], vlm: text)
+                    fused.pages[i] = p
+                    vlmReports.append(r)
+                    Log.shared.debug("vlm_page", ["page": .i(pno), "seconds": .d((Date().timeIntervalSince(t0) * 1000).rounded() / 1000),
+                                                  "raw_chars": .i(r.gate.rawChars), "kept_chars": .i(r.gate.keptChars),
+                                                  "truncated": .b(r.gate.truncatedByLength), "loop_cut": .b(r.gate.loopCut),
+                                                  "flips": .i(r.flips.count), "orphans": .i(r.orphans.count)])
+                } catch {
+                    degraded.append("第 \(pno) 页 VLM 失败: \(error)")
+                    Log.shared.error("engine_failed", ["page": .i(pno), "engine": .s("vlm"), "stage": .s("request"), "error": .s("\(error)")])
+                }
+            }
+        }
+    }
     try encodeJSON(fused).write(to: fURL)
     if Log.shared.enabled {
         let drops = Dictionary(grouping: flog.drops, by: \.page)
@@ -386,6 +424,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     ri.failedPages = bothFailed
     ri.singleEnginePages = single
     ri.srcPages = n
+    ri.vlm = vlmReports
     try buildReport(ri).write(to: reportURL, atomically: true, encoding: .utf8)
     res.outputs.append(reportURL.path)
 
@@ -397,6 +436,39 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     res.peakRSSSelfMB = (peakRSS(RUSAGE_SELF) * 10).rounded() / 10
     res.peakRSSChildrenMB = (peakRSS(RUSAGE_CHILDREN) * 10).rounded() / 10
     return res
+}
+
+/// 本地 OpenAI 兼容接口读一页。长边缩到 1792，提示词用 PaddleOCR-VL 的 "OCR:"。
+func vlmRead(_ image: CGImage, url: URL, model: String) throws -> String {
+    let g = try Gray(image)
+    let k = min(1, 1792.0 / Double(max(g.w, g.h)))
+    let small = k < 1 ? g.resized(Int(Double(g.w) * k), Int(Double(g.h) * k)) : g
+    guard let cg = small.cgImage, let data = CFDataCreateMutable(nil, 0),
+          let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else { throw PaddleError.badImage }
+    CGImageDestinationAddImage(dest, cg, nil)
+    guard CGImageDestinationFinalize(dest) else { throw PaddleError.badImage }
+    let b64 = (data as Data).base64EncodedString()
+    let body: [String: Any] = ["model": model, "temperature": 0, "max_tokens": 4096, "messages": [["role": "user", "content": [
+        ["type": "image_url", "image_url": ["url": "data:image/png;base64,\(b64)"]], ["type": "text", "text": "OCR:"]]]]]
+    var req = URLRequest(url: url.appendingPathComponent("chat/completions"))
+    req.httpMethod = "POST"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.httpBody = try JSONSerialization.data(withJSONObject: body)
+    req.timeoutInterval = 300
+    let sem = DispatchSemaphore(value: 0)
+    nonisolated(unsafe) var out: Result<String, Error> = .failure(BookError.failed("VLM 无响应"))
+    URLSession.shared.dataTask(with: req) { d, _, e in
+        defer { sem.signal() }
+        if let e { out = .failure(e); return }
+        guard let d, let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              let c = j["choices"] as? [[String: Any]], let m = c.first?["message"] as? [String: Any] else {
+            out = .failure(BookError.failed("VLM 响应无法解析"))
+            return
+        }
+        out = .success(m["content"] as? String ?? "")
+    }.resume()
+    sem.wait()
+    return try out.get()
 }
 
 private struct RapidOut: Decodable {

@@ -32,6 +32,7 @@ usage:
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
                [--paddle coreml|python] [--models-dir dir] [--units ane|all|cpu|gpu]
+               [--vlm-url http://127.0.0.1:端口/v1] [--vlm-model 名]
                [--python .venv/bin/python] [--result result.json]
 
 
@@ -306,6 +307,13 @@ do {
             guard let u = units[option(args, "--units") ?? "ane"] else { fail(usage) }
             o.units = u
             o.unitsLabel = option(args, "--units") ?? "ane"
+        }
+        if let v = option(args, "--vlm-url") {
+            guard let u = URL(string: v), ["127.0.0.1", "localhost", "::1"].contains(u.host ?? "") else {
+                fail("--vlm-url 只接受本机地址: 默认不外传用户文件", code: 2)
+            }
+            o.vlmURL = u
+            o.vlmModel = option(args, "--vlm-model") ?? "local"
         }
         do {
             let res = try runBook(o, log: warn)

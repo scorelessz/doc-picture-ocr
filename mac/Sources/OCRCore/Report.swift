@@ -33,6 +33,7 @@ public struct ReportInput: Sendable {
     public var failedPages: [Int] = []
     public var singleEnginePages: [Int] = []
     public var srcPages: Int?
+    public var vlm: [VLMPageReport] = []
 
     public init(source: String, sourceSize: Int, mdPath: String?, pdfPath: String?, fusedPath: String,
                 generatedAt: String, dpi: Double, fused: FusedDoc, log: FuseLog) {
@@ -212,6 +213,34 @@ public func buildReport(_ r: ReportInput) -> String {
         }
     }
     A()
+
+    // ---- VLM ----
+    if !r.vlm.isEmpty {
+        H("VLM 第三票")
+        let flips = r.vlm.flatMap { p in p.flips.map { (p.page, $0) } }
+        let orphans = r.vlm.flatMap { p in p.orphans.map { (p.page, $0) } }
+        let cut = r.vlm.filter { $0.gate.truncatedByLength || $0.gate.loopCut }.map(\.page)
+        A("| 项 | 值 |")
+        A("|---|---|")
+        A("| 调用页数 | \(r.vlm.filter { !$0.skippedNoInk && $0.gate.rawChars > 0 }.count) |")
+        A("| 无墨迹未调用 | \(r.vlm.filter(\.skippedNoInk).map(\.page)) |")
+        A("| 输出被截断(超长或循环) | \(cut.isEmpty ? "无" : "\(cut)") |")
+        A("| 翻转的分歧行 | \(flips.count) |")
+        A("| VLM 独有且未进正文的片段 | \(orphans.count) |")
+        A()
+        if !flips.isEmpty {
+            A("| 页 | 原读法 | 改为 | VLM 片段 |")
+            A("|---|---|---|---|")
+            for (p, f) in flips.prefix(30) { A("| \(p) | \(cell(f.from)) | \(cell(f.to)) | \(cell(f.vlm)) |") }
+            A()
+        }
+        if !orphans.isEmpty {
+            A("### VLM 独有的片段(没有对应的 OCR 行, 未进正文)")
+            A()
+            for (p, t) in orphans.prefix(20) { A("- p\(p) `\(cell(t, 80))`") }
+            A()
+        }
+    }
 
     // ---- Markdown ----
     if let m = r.md {

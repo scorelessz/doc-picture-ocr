@@ -30,6 +30,10 @@ macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE 
 | `md` | info | `paragraphs` `headings` `chars` `dropped`（理由 → 条数）`vertical_pages` `two_column_pages` |
 | `md_dropped` | debug | `page` `reason`；`--log-text` 时多 `text` |
 | `pdf` | info | `embedded` `skipped_native` `skipped_gate` `retrieval` `line_retrieval` `probe_found` `probe_checked` `size_in` `size_out` |
+| `vlm_page` | debug | `page` `seconds` `raw_chars` `kept_chars` `truncated` `loop_cut` `flips` `orphans` |
+| `orientation` | debug | `rotation` `conf0` `best` |
+| `tiled` | debug | `tiles` `width` `height` |
+| `models_fetched` | info | `dir` `sha256` |
 | `warning` | warn | `message`，有页号时带 `page` |
 | `pdf_warning` `degraded` | warn | `message` |
 | `engine_failed` | error | `page` `engine` `stage` `error` |
@@ -38,7 +42,7 @@ macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE 
 | `progress` | debug | `message` |
 | `end` | info | `command` `seconds` `peak_rss_mb` `peak_rss_children_mb` |
 
-`gate` 取值：`ocr`、`native_text`（有文字层，未做 OCR）、`no_ink_native_text`（无墨迹，改用文字层）、`no_ink_blank`（无墨迹，按白页处理）。
+`page` 另有 `page_rotation`。`gate` 取值：`ocr`、`native_text`（有文字层，未做 OCR）、`no_ink_native_text`（无墨迹，改用文字层）、`no_ink_blank`（无墨迹，按白页处理）。
 
 `peak_rss_children_mb` 在 `--paddle coreml` 下是 0，因为不再有 Python 子进程。
 
