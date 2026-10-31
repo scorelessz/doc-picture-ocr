@@ -1,0 +1,52 @@
+{
+ "phase": "p1",
+ "name": "ovisocr2-mlx8",
+ "mode": "line",
+ "prompt_id": "ovis",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:14:49",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  11,
+  12
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 3063,
+  "cer": 0.02971,
+  "ins_rate": 0.02383,
+  "del_rate": 0.00065,
+  "sub_rate": 0.00522,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 20.1,
+  "sec_per_page": 10.04,
+  "requests": 70,
+  "server_peak_rss_mb": 1852.0
+ },
+ "per_page": [
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1370,
+   "ins": 0,
+   "del": 1,
+   "sub": 6,
+   "requests": 31,
+   "seconds": 8.79,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1764,
+   "ins": 73,
+   "del": 1,
+   "sub": 10,
+   "requests": 39,
+   "seconds": 11.3,
+   "error": null
+  }
+ ]
+}
