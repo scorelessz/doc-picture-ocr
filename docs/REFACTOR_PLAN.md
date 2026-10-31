@@ -18,6 +18,7 @@
 | 7 | **输出 Markdown 可选** | 产物可勾选：可搜索 PDF / Markdown（至少选一个） |
 | 8 | **选 Markdown 时识别分页、去页眉页脚页码** | 见 §4 |
 | — | 剧本线 | **删除**。只支持书籍扫描件 |
+| — | **Mac 适配门槛** | 只收能用 MLX 或 llama.cpp（Metal）在本机跑通的模型；只能靠 vLLM/CUDA 或 transformers+MPS 的不加入（Phase 1 判定） |
 
 ## 1. 决策（已定）
 
