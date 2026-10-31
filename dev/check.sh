@@ -40,6 +40,14 @@ case "$stage" in
     need_vision
     caffeinate -i .venv/bin/python bench/p0_baseline.py "$@"
     ;;
+  p2)
+    [ $# -ge 1 ] || { echo "用法: ./dev/check.sh p2 <pdf> [--pages 11,12]"; exit 2; }
+    need_venv
+    need_vision
+    swift build -c release
+    swift test
+    .venv/bin/python bench/p2_parity.py "$@"
+    ;;
   *)
-    echo "用法: ./dev/check.sh p0 <pdf> [--pages A-B]"; exit 2 ;;
+    echo "用法: ./dev/check.sh p0|p2 <pdf> [...]"; exit 2 ;;
 esac

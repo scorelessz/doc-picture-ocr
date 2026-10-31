@@ -64,6 +64,9 @@ __pycache__/
 
 # ── 4. 打包产物（.spec 本身是源文件，要提交；它产出的东西不要）──────────────
 build/
+/.build/
+/.swiftpm/
+Package.resolved
 dist/
 *.app/
 *.dmg
