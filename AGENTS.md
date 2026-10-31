@@ -54,8 +54,11 @@ PaddleOCR-VL）+ 本地/在线双模式，流程与决策见 **`docs/REFACTOR_PL
 
 ## 基准与测试
 
-- 基准文件：`City of Broken Promises.pdf`（在用户 Mac 上，不进仓库）。基准只记**数字**
-  （`bench/baseline.json`），不记识别文本 —— 书的内容不进仓库，也不进云端对话。
+- 基准文件：`City of Broken Promises.pdf`（在用户 Mac 上，不进仓库）。它只是开发样本，用户已授权
+  （2026-10-31）：样本内容可以进云端对话、可以发给在线模型（如 Claude 多模态抽查）。
+  仓库里仍只提交**数字**（`bench/*.json`），识别原文留在 `work/`（仓库卫生，不是保密要求）。
+- 上面的授权**只限开发期的样本书**。最终 App 的边界不变：用户文件默认只在本地，
+  没有本次操作的明确授权，一个字节都不外发。
 - 本仓库在 Linux 云容器里开发；Vision / Core ML / Metal / PDFKit 的编译和实测通过 Remote Control 在用户 Mac 上跑。
 
 ## 多会话约定
