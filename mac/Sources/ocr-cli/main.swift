@@ -3,6 +3,7 @@ import OCRCore
 #if canImport(Vision)
 import CoreML
 import OCREngines
+import OCRVL
 #endif
 
 // Phase 2 命令行。子命令：
@@ -26,6 +27,7 @@ usage:
   ocr-cli pdf <源.pdf> <fused.json> --out x.searchable.pdf [--force] [--force-text] [--stats stats.json]
   ocr-cli paddle <image>... --models dir [--units ane|all|cpu|gpu] [--cls] --out lines.json
   ocr-cli vlm-fuse <fused.json> --vlm-dir dir --out fused.vlm.json [--report r.json]
+  ocr-cli vl <image>... --vl-model dir --out texts.json
   ocr-cli doctor [--models-dir dir] [--outdir output] [--out checks.json]
   ocr-cli models fetch [--models-dir dir] [--url u] [--sha256 h]
   ocr-cli paddle-plan --models dir --out plan.json
@@ -122,6 +124,31 @@ do {
             try JSONSerialization.data(withJSONObject: reports, options: [.prettyPrinted, .sortedKeys]).write(to: URL(fileURLWithPath: rp))
         }
         print("页 \(reports.count)  翻转 \(reports.map { $0["flips"] as! Int }.reduce(0, +))  VLM 独有片段 \(reports.map { $0["orphans"] as! Int }.reduce(0, +))")
+
+    case "vl":
+        // 进程内 PaddleOCR-VL：一批页图 → 文字，只用于对拍和度量
+        guard let dir = option(args, "--vl-model"), let out = option(args, "--out") else { fail(usage) }
+        let t0 = Date()
+        let vl = try PaddleVL(directory: URL(fileURLWithPath: dir, isDirectory: true))
+        var res: [String: String] = [:], secs: [Double] = []
+        var i = 0
+        while i < args.count {
+            if ["--vl-model", "--out"].contains(args[i]) { i += 2; continue }
+            let p = args[i]
+            i += 1
+            let img = try VisionEngine.loadImage(URL(fileURLWithPath: p))
+            let (px, w, h) = try grayPixels(img)
+            let t1 = Date()
+            let r = vl.read(px, w: w, h: h)
+            secs.append(Date().timeIntervalSince(t1))
+            res[p] = r.text
+            warn("\((p as NSString).lastPathComponent): \(r.tokens) tokens \(String(format: "%.1f", secs.last!))s")
+        }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try enc.encode(res).write(to: URL(fileURLWithPath: out))
+        print(String(format: "总 %.1fs  加载 %.2fs  均值 %.2fs/页  峰值内存 %.0f MB", Date().timeIntervalSince(t0), vl.loadSeconds,
+                     secs.reduce(0, +) / Double(max(1, secs.count)), peakRSSMB().own))
 
     case "models":
         guard args.first == "fetch" else { fail(usage) }

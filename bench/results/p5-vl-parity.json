@@ -1,0 +1,216 @@
+{
+ "phase": "p5",
+ "name": "vl-parity",
+ "criterion": "char_agreement >= 0.98",
+ "char_agreement": {
+  "en": 0.9948,
+  "zh": 1.0
+ },
+ "pages_identical": 22,
+ "pages": 25,
+ "load_seconds": 0.66,
+ "sec_per_page": 10.82,
+ "peak_rss_mb": 1149,
+ "per_page": [
+  {
+   "book": "en",
+   "page": 3,
+   "ref_chars": 243,
+   "got_chars": 243,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "en",
+   "page": 8,
+   "ref_chars": 249,
+   "got_chars": 249,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "en",
+   "page": 9,
+   "ref_chars": 213,
+   "got_chars": 213,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "en",
+   "page": 11,
+   "ref_chars": 1326,
+   "got_chars": 1375,
+   "edits": 49,
+   "identical": false
+  },
+  {
+   "book": "en",
+   "page": 12,
+   "ref_chars": 1686,
+   "got_chars": 1687,
+   "edits": 1,
+   "identical": false
+  },
+  {
+   "book": "en",
+   "page": 50,
+   "ref_chars": 1530,
+   "got_chars": 1530,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "en",
+   "page": 120,
+   "ref_chars": 1458,
+   "got_chars": 1458,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "en",
+   "page": 185,
+   "ref_chars": 1071,
+   "got_chars": 1071,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "en",
+   "page": 236,
+   "ref_chars": 1162,
+   "got_chars": 1165,
+   "edits": 3,
+   "identical": false
+  },
+  {
+   "book": "en",
+   "page": 300,
+   "ref_chars": 1279,
+   "got_chars": 1279,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 7,
+   "ref_chars": 643,
+   "got_chars": 643,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 15,
+   "ref_chars": 620,
+   "got_chars": 620,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 18,
+   "ref_chars": 600,
+   "got_chars": 600,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 27,
+   "ref_chars": 591,
+   "got_chars": 591,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 30,
+   "ref_chars": 597,
+   "got_chars": 597,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 113,
+   "ref_chars": 490,
+   "got_chars": 490,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 164,
+   "ref_chars": 599,
+   "got_chars": 599,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 258,
+   "ref_chars": 567,
+   "got_chars": 567,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 50,
+   "ref_chars": 528,
+   "got_chars": 528,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 100,
+   "ref_chars": 620,
+   "got_chars": 620,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 150,
+   "ref_chars": 589,
+   "got_chars": 589,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 200,
+   "ref_chars": 479,
+   "got_chars": 479,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 250,
+   "ref_chars": 575,
+   "got_chars": 575,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 300,
+   "ref_chars": 522,
+   "got_chars": 522,
+   "edits": 0,
+   "identical": true
+  },
+  {
+   "book": "zh",
+   "page": 350,
+   "ref_chars": 552,
+   "got_chars": 552,
+   "edits": 0,
+   "identical": true
+  }
+ ]
+}

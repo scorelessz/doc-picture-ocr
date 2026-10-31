@@ -401,6 +401,12 @@ func sortedBoxes(_ b: [DetBox]) -> [DetBox] {
     return keyed.sorted { ($0.0, $0.1, $0.2) < ($1.0, $1.1, $1.2) }.map(\.3)
 }
 
+/// 页图 → 8 位灰度像素（给进程内 VLM 用）。
+public func grayPixels(_ img: CGImage) throws -> (px: [UInt8], w: Int, h: Int) {
+    let g = try Gray(img)
+    return (g.px, g.w, g.h)
+}
+
 // MARK: - 设备规划
 
 public struct DevicePlan: Encodable, Sendable {
