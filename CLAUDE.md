@@ -67,6 +67,9 @@ PaddleOCR-VL-1.6 / MinerU2.5-Pro / OvisOCR2）+ 本地/在线双模式，流程�
   没有本次操作的明确授权，一个字节都不外发。
 - 本仓库在 Linux 云容器里开发；Vision / Core ML / Metal / PDFKit 的编译和实测通过 Remote Control 在用户 Mac 上跑。
 
+- **诊断日志**：要在其他 Mac 上测试，所有入口都必须能开详细日志（`--log-level` / `--log-file` / `DOCOCR_LOG`）
+  和 `ocr-cli doctor` 环境自检；默认不写正文。细则见 `docs/REFACTOR_PLAN.md` §5.1。新增功能要同步补日志。
+
 ## 多会话约定
 
 - 书籍线模块（`book_md` / `book_pdf` / `run_books`）产物已存在就拒绝写，`--force` 才覆盖，读不到归属标记还要 `--clobber`。
