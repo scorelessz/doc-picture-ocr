@@ -1,0 +1,64 @@
+{
+ "phase": "p1",
+ "name": "ctc-baseline",
+ "date": "2026-10-31T20:51:58",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  3,
+  8,
+  9,
+  10,
+  11,
+  12,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "ref_chars": 6912,
+ "engines": {
+  "vision": {
+   "cer": 0.4958,
+   "ins_rate": 0.01013,
+   "del_rate": 0.47063,
+   "sub_rate": 0.01505,
+   "empty_pages": [
+    10,
+    20,
+    62,
+    98,
+    160,
+    324
+   ]
+  },
+  "rapidocr": {
+   "cer": 0.50579,
+   "ins_rate": 0.01374,
+   "del_rate": 0.4783,
+   "sub_rate": 0.01374,
+   "empty_pages": [
+    10,
+    20,
+    62,
+    98,
+    160,
+    324
+   ]
+  },
+  "fused": {
+   "cer": 0.4987,
+   "ins_rate": 0.01794,
+   "del_rate": 0.46933,
+   "sub_rate": 0.01143,
+   "empty_pages": [
+    10,
+    20,
+    62,
+    98,
+    160,
+    324
+   ]
+  }
+ }
+}
