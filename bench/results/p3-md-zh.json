@@ -1,0 +1,40 @@
+{
+ "phase": "p3",
+ "source": "失约之城",
+ "fused": "python legacy fused.json",
+ "with_page_marks": {
+  "py_chars": 212781,
+  "swift_chars": 212781,
+  "md_identical": true,
+  "stats_mismatch": {},
+  "dropped_detail_equal": true,
+  "dropped_lines_py": 369,
+  "dropped_lines_swift": 369,
+  "dropped_lines_equal": true,
+  "dropped_detail": {
+   "孤立标点或无文字碎块": 3,
+   "页码": 352,
+   "页码(框略高于正文, 凭跨页证据)": 14
+  },
+  "dropped_lines_diff": 0,
+  "identical": true
+ },
+ "no_page_marks": {
+  "py_chars": 206252,
+  "swift_chars": 206252,
+  "md_identical": true,
+  "stats_mismatch": {},
+  "dropped_detail_equal": true,
+  "dropped_lines_py": 369,
+  "dropped_lines_swift": 369,
+  "dropped_lines_equal": true,
+  "dropped_detail": {
+   "孤立标点或无文字碎块": 3,
+   "页码": 352,
+   "页码(框略高于正文, 凭跨页证据)": 14
+  },
+  "dropped_lines_diff": 0,
+  "identical": true
+ },
+ "identical": true
+}

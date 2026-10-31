@@ -1,0 +1,42 @@
+{
+ "phase": "p3",
+ "source": "City of Broken Promises",
+ "fused": "python legacy fused.json",
+ "with_page_marks": {
+  "py_chars": 571739,
+  "swift_chars": 571739,
+  "md_identical": true,
+  "stats_mismatch": {},
+  "dropped_detail_equal": true,
+  "dropped_lines_py": 314,
+  "dropped_lines_swift": 314,
+  "dropped_lines_equal": true,
+  "dropped_detail": {
+   "微小碎块": 5,
+   "孤立标点或无文字碎块": 7,
+   "页码": 290,
+   "页码(框略高于正文, 凭跨页证据)": 12
+  },
+  "dropped_lines_diff": 0,
+  "identical": true
+ },
+ "no_page_marks": {
+  "py_chars": 566099,
+  "swift_chars": 566099,
+  "md_identical": true,
+  "stats_mismatch": {},
+  "dropped_detail_equal": true,
+  "dropped_lines_py": 314,
+  "dropped_lines_swift": 314,
+  "dropped_lines_equal": true,
+  "dropped_detail": {
+   "微小碎块": 5,
+   "孤立标点或无文字碎块": 7,
+   "页码": 290,
+   "页码(框略高于正文, 凭跨页证据)": 12
+  },
+  "dropped_lines_diff": 0,
+  "identical": true
+ },
+ "identical": true
+}

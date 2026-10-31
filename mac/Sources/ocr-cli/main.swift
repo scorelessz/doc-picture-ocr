@@ -16,6 +16,7 @@ usage:
   ocr-cli render <pdf> --page N [--dpi 300] --out page.png
   ocr-cli recognize <pdf> [--pages A-B] [--dpi 300] --out doc.vision.json
   ocr-cli fuse <vision.json> <rapidocr.json> --out fused.json [--legacy] [--force]
+  ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
 
 """
 
@@ -105,6 +106,25 @@ do {
         let st = fused.stats
         print("页 \(st.pages)  行 \(st.lines)  双引擎 \(st.both)  分歧 \(st.divergent)  "
               + "仅vision \(st.onlyVision)  仅rapidocr \(st.onlyRapidocr)  丢弃重影 \(st.droppedContained)")
+
+    case "md":
+        guard let path = args.first, let out = option(args, "--out") else { fail(usage) }
+        // output/ 下的 md 可能是别的流程的输入：已存在就拒绝写
+        if FileManager.default.fileExists(atPath: out), !args.contains("--force") {
+            fail("拒绝覆盖已存在的文件: \(out)（要覆盖请加 --force）", code: 3)
+        }
+        let doc = try JSONDecoder().decode(MDDoc.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        var o = MDOptions()
+        o.pageMarks = !args.contains("--no-page-marks")
+        let (md, st) = toMarkdown(doc, options: o)
+        try withMark(md).write(to: URL(fileURLWithPath: out), atomically: true, encoding: .utf8)
+        if let sp = option(args, "--stats") {
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            try enc.encode(st).write(to: URL(fileURLWithPath: sp))
+        }
+        print("页 \(st.pages)  原始行 \(st.linesIn)  合行后 \(st.rows)  正文行 \(st.keptRows)  "
+              + "丢弃 \(st.dropped)  标题 \(st.headings)  段落 \(st.paragraphs)  正文 \(st.chars) 字")
 
     default:
         fail(usage)
