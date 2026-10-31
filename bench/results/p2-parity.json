@@ -1,0 +1,47 @@
+{
+ "phase": "p2",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  {
+   "page": 11,
+   "old_lines": 30,
+   "new_lines": 30,
+   "identical_lines": 30,
+   "identical_text": 30,
+   "identical": true
+  },
+  {
+   "page": 12,
+   "old_lines": 38,
+   "new_lines": 38,
+   "identical_lines": 38,
+   "identical_text": 38,
+   "identical": true
+  },
+  {
+   "page": 50,
+   "old_lines": 39,
+   "new_lines": 39,
+   "identical_lines": 39,
+   "identical_text": 39,
+   "identical": true
+  },
+  {
+   "page": 120,
+   "old_lines": 37,
+   "new_lines": 37,
+   "identical_lines": 37,
+   "identical_text": 37,
+   "identical": true
+  },
+  {
+   "page": 185,
+   "old_lines": 39,
+   "new_lines": 39,
+   "identical_lines": 39,
+   "identical_text": 39,
+   "identical": true
+  }
+ ],
+ "all_identical": true
+}

@@ -1,0 +1,84 @@
+{
+ "phase": "p2",
+ "name": "render-compare",
+ "source": "City of Broken Promises.pdf",
+ "baseline": "P0 vision.json (pymupdf gray @360dpi)",
+ "runs": {
+  "360": [
+   {
+    "page": 11,
+    "old_lines": 30,
+    "new_lines": 30,
+    "same_text_lines": 28,
+    "same_pos_lines": 28,
+    "edit_distance": 3,
+    "old_chars": 1634,
+    "new_chars": 1634,
+    "new_size": [
+     1544,
+     2432
+    ],
+    "old_size": [
+     1544,
+     2432
+    ]
+   },
+   {
+    "page": 12,
+    "old_lines": 38,
+    "new_lines": 38,
+    "same_text_lines": 35,
+    "same_pos_lines": 35,
+    "edit_distance": 3,
+    "old_chars": 2040,
+    "new_chars": 2041,
+    "new_size": [
+     1500,
+     2445
+    ],
+    "old_size": [
+     1500,
+     2445
+    ]
+   }
+  ],
+  "300": [
+   {
+    "page": 11,
+    "old_lines": 30,
+    "new_lines": 30,
+    "same_text_lines": 20,
+    "same_pos_lines": 20,
+    "edit_distance": 20,
+    "old_chars": 1634,
+    "new_chars": 1635,
+    "new_size": [
+     1287,
+     2027
+    ],
+    "old_size": [
+     1544,
+     2432
+    ]
+   },
+   {
+    "page": 12,
+    "old_lines": 38,
+    "new_lines": 38,
+    "same_text_lines": 31,
+    "same_pos_lines": 31,
+    "edit_distance": 8,
+    "old_chars": 2040,
+    "new_chars": 2039,
+    "new_size": [
+     1250,
+     2038
+    ],
+    "old_size": [
+     1500,
+     2445
+    ]
+   }
+  ]
+ }
+}
