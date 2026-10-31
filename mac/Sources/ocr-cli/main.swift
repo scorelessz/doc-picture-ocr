@@ -25,6 +25,7 @@ usage:
   ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
   ocr-cli pdf <源.pdf> <fused.json> --out x.searchable.pdf [--force] [--force-text] [--stats stats.json]
   ocr-cli paddle <image>... --models dir [--units ane|all|cpu|gpu] [--cls] --out lines.json
+  ocr-cli vlm-fuse <fused.json> --vlm-dir dir --out fused.vlm.json [--report r.json]
   ocr-cli doctor [--models-dir dir] [--outdir output] [--out checks.json]
   ocr-cli models fetch [--models-dir dir] [--url u] [--sha256 h]
   ocr-cli paddle-plan --models dir --out plan.json
@@ -97,6 +98,30 @@ defer {
 }
 do {
     switch cmd {
+    case "vlm-fuse":
+        guard let path = args.first, let dir = option(args, "--vlm-dir"), let out = option(args, "--out") else { fail(usage) }
+        var doc = try JSONDecoder().decode(FusedDoc.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        var reports: [[String: Any]] = []
+        for i in doc.pages.indices {
+            let f = URL(fileURLWithPath: dir).appendingPathComponent(String(format: "p%04d.txt", doc.pages[i].page))
+            guard let t = try? String(contentsOf: f, encoding: .utf8) else { continue }
+            let (p, r) = applyVLM(doc.pages[i], vlm: t)
+            doc.pages[i] = p
+            reports.append(["page": r.page, "skipped_no_ink": r.skippedNoInk, "raw_chars": r.gate.rawChars, "kept_chars": r.gate.keptChars,
+                            "truncated": r.gate.truncatedByLength, "loop_cut": r.gate.loopCut, "flips": r.flips.count, "orphans": r.orphans.count,
+                            "orphan_chars": r.orphans.map(\.unicodeScalars.count).reduce(0, +)])
+            Log.shared.debug("vlm_page", ["page": .i(r.page), "raw_chars": .i(r.gate.rawChars), "kept_chars": .i(r.gate.keptChars),
+                                          "truncated": .b(r.gate.truncatedByLength), "loop_cut": .b(r.gate.loopCut), "flips": .i(r.flips.count),
+                                          "orphans": .i(r.orphans.count), "skipped_no_ink": .b(r.skippedNoInk)])
+        }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try enc.encode(doc).write(to: URL(fileURLWithPath: out))
+        if let rp = option(args, "--report") {
+            try JSONSerialization.data(withJSONObject: reports, options: [.prettyPrinted, .sortedKeys]).write(to: URL(fileURLWithPath: rp))
+        }
+        print("页 \(reports.count)  翻转 \(reports.map { $0["flips"] as! Int }.reduce(0, +))  VLM 独有片段 \(reports.map { $0["orphans"] as! Int }.reduce(0, +))")
+
     case "models":
         guard args.first == "fetch" else { fail(usage) }
         let dir = URL(fileURLWithPath: defaultModels, isDirectory: true)

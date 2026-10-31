@@ -222,3 +222,52 @@ final class LogTests: XCTestCase {
         XCTAssertThrowsError(try Log().configure(["--log-level", "loud"], env: [:]))
     }
 }
+
+final class VLMFuseTests: XCTestCase {
+    func page(_ lines: [FusedLine], noInk: Bool? = nil) -> FusedPage {
+        FusedPage(page: 1, width: 1000, height: 1000, pdfWidth: 200, pdfHeight: 200, zoom: 5, rotation: 0, image: nil,
+                  nativeText: false, lines: lines, noInk: noInk)
+    }
+
+    func line(_ y: Double, _ t: String, alt: String? = nil) -> FusedLine {
+        FusedLine(x: 0, y: y, w: 500, h: 30, text: t, conf: 0.9, src: "both", alt: alt, flag: alt == nil ? "ok" : "divergent")
+    }
+
+    func testThirdVoteFlipsToLoser() {
+        let (p, r) = applyVLM(page([line(0, "the cat sal down", alt: "the cat sat down")]), vlm: "the cat sat down")
+        XCTAssertEqual(p.lines[0].text, "the cat sat down")
+        XCTAssertEqual(r.flips.count, 1)
+    }
+
+    func testNoFlipWithoutDivergence() {
+        let (p, r) = applyVLM(page([line(0, "the cat sal down")]), vlm: "the cat sat down")
+        XCTAssertEqual(p.lines[0].text, "the cat sal down")     // 字形信 CTC
+        XCTAssertEqual(r.flips.count, 0)
+    }
+
+    func testVLMOnlyTextStaysOutOfBody() {
+        let (p, r) = applyVLM(page([line(0, "real line of text")]), vlm: "real line of text and a whole invented sentence")
+        XCTAssertEqual(p.lines.map(\.text), ["real line of text"])
+        XCTAssertEqual(r.orphans.count, 1)
+    }
+
+    func testNoInkPageNotCalled() {
+        let (p, r) = applyVLM(page([], noInk: true), vlm: "fabricated")
+        XCTAssertTrue(r.skippedNoInk)
+        XCTAssertTrue(p.lines.isEmpty)
+    }
+
+    func testLoopCut() {
+        let g = gateVLM(String(repeating: "abcdefghijklmnopqrstuvwxyz", count: 12), estimate: 10000)
+        XCTAssertTrue(g.loopCut)
+        XCTAssertLessThan(g.keptChars, 60)
+    }
+
+    func testLengthCap() {
+        var s = ""
+        for i in 0..<400 { s += "\(i)," }
+        let g = gateVLM(s, estimate: 100)
+        XCTAssertTrue(g.truncatedByLength)
+        XCTAssertEqual(g.keptChars, 200)
+    }
+}

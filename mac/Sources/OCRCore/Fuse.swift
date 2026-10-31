@@ -442,3 +442,12 @@ public func fuse(_ vision: EngineDoc, _ rapid: EngineDoc, rules: FuseRules = Fus
                     dpi: vision.dpi != 0 ? vision.dpi : rapid.dpi,
                     engines: ["vision", "rapidocr"], pages: outPages, stats: stats)
 }
+
+extension FusedPage {
+    public init(page: Int, width: Int, height: Int, pdfWidth: Double, pdfHeight: Double, zoom: Double, rotation: Int,
+                image: String?, nativeText: Bool, lines: [FusedLine], noInk: Bool? = nil) {
+        self.page = page; self.width = width; self.height = height; self.pdfWidth = pdfWidth; self.pdfHeight = pdfHeight
+        self.zoom = zoom; self.rotation = rotation; self.image = image; self.nativeText = nativeText; self.lines = lines
+        self.noInk = noInk
+    }
+}
