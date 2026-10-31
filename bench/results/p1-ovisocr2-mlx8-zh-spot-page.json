@@ -1,0 +1,208 @@
+{
+ "phase": "p1",
+ "name": "ovisocr2-mlx8-zh-spot",
+ "mode": "page",
+ "prompt_id": "ovis",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T23:33:49",
+ "source": "失约之城.pdf",
+ "pages": [
+  7,
+  15,
+  18,
+  27,
+  30,
+  113,
+  164,
+  258,
+  50,
+  100,
+  150,
+  200,
+  250,
+  300,
+  350
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 1,
+  "cer": 0.0,
+  "ins_rate": 0.0,
+  "del_rate": 0.0,
+  "sub_rate": 0.0,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 80.7,
+  "sec_per_page": 5.38,
+  "requests": 15,
+  "server_peak_rss_mb": 1708.8
+ },
+ "per_page": [
+  {
+   "page": 7,
+   "ref_chars": 0,
+   "hyp_chars": 646,
+   "ins": 646,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.59,
+   "error": null
+  },
+  {
+   "page": 15,
+   "ref_chars": 0,
+   "hyp_chars": 618,
+   "ins": 618,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.72,
+   "error": null
+  },
+  {
+   "page": 18,
+   "ref_chars": 0,
+   "hyp_chars": 603,
+   "ins": 603,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.72,
+   "error": null
+  },
+  {
+   "page": 27,
+   "ref_chars": 0,
+   "hyp_chars": 592,
+   "ins": 592,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.32,
+   "error": null
+  },
+  {
+   "page": 30,
+   "ref_chars": 0,
+   "hyp_chars": 598,
+   "ins": 598,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.49,
+   "error": null
+  },
+  {
+   "page": 113,
+   "ref_chars": 0,
+   "hyp_chars": 490,
+   "ins": 490,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 4.8,
+   "error": null
+  },
+  {
+   "page": 164,
+   "ref_chars": 0,
+   "hyp_chars": 599,
+   "ins": 599,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.63,
+   "error": null
+  },
+  {
+   "page": 258,
+   "ref_chars": 0,
+   "hyp_chars": 567,
+   "ins": 567,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.34,
+   "error": null
+  },
+  {
+   "page": 50,
+   "ref_chars": 0,
+   "hyp_chars": 531,
+   "ins": 531,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.02,
+   "error": null
+  },
+  {
+   "page": 100,
+   "ref_chars": 0,
+   "hyp_chars": 620,
+   "ins": 620,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.64,
+   "error": null
+  },
+  {
+   "page": 150,
+   "ref_chars": 0,
+   "hyp_chars": 592,
+   "ins": 592,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.57,
+   "error": null
+  },
+  {
+   "page": 200,
+   "ref_chars": 0,
+   "hyp_chars": 482,
+   "ins": 482,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 4.91,
+   "error": null
+  },
+  {
+   "page": 250,
+   "ref_chars": 0,
+   "hyp_chars": 575,
+   "ins": 575,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.11,
+   "error": null
+  },
+  {
+   "page": 300,
+   "ref_chars": 0,
+   "hyp_chars": 522,
+   "ins": 522,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.45,
+   "error": null
+  },
+  {
+   "page": 350,
+   "ref_chars": 0,
+   "hyp_chars": 552,
+   "ins": 552,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.4,
+   "error": null
+  }
+ ]
+}

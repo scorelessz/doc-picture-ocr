@@ -1,0 +1,208 @@
+{
+ "phase": "p1",
+ "name": "online-bailian-qwen35ocr-zh",
+ "mode": "page",
+ "prompt_id": "generic",
+ "base_url_host": "dashscope.aliyuncs.com",
+ "date": "2026-10-31T23:23:53",
+ "source": "失约之城.pdf",
+ "pages": [
+  7,
+  15,
+  18,
+  27,
+  30,
+  113,
+  164,
+  258,
+  50,
+  100,
+  150,
+  200,
+  250,
+  300,
+  350
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 1,
+  "cer": 0.0,
+  "ins_rate": 0.0,
+  "del_rate": 0.0,
+  "sub_rate": 0.0,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 37.2,
+  "sec_per_page": 2.48,
+  "requests": 15,
+  "server_peak_rss_mb": null
+ },
+ "per_page": [
+  {
+   "page": 7,
+   "ref_chars": 0,
+   "hyp_chars": 643,
+   "ins": 643,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.73,
+   "error": null
+  },
+  {
+   "page": 15,
+   "ref_chars": 0,
+   "hyp_chars": 614,
+   "ins": 614,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.8,
+   "error": null
+  },
+  {
+   "page": 18,
+   "ref_chars": 0,
+   "hyp_chars": 600,
+   "ins": 600,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.3,
+   "error": null
+  },
+  {
+   "page": 27,
+   "ref_chars": 0,
+   "hyp_chars": 589,
+   "ins": 589,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.58,
+   "error": null
+  },
+  {
+   "page": 30,
+   "ref_chars": 0,
+   "hyp_chars": 594,
+   "ins": 594,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.67,
+   "error": null
+  },
+  {
+   "page": 113,
+   "ref_chars": 0,
+   "hyp_chars": 496,
+   "ins": 496,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.21,
+   "error": null
+  },
+  {
+   "page": 164,
+   "ref_chars": 0,
+   "hyp_chars": 596,
+   "ins": 596,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.51,
+   "error": null
+  },
+  {
+   "page": 258,
+   "ref_chars": 0,
+   "hyp_chars": 564,
+   "ins": 564,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.38,
+   "error": null
+  },
+  {
+   "page": 50,
+   "ref_chars": 0,
+   "hyp_chars": 528,
+   "ins": 528,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.1,
+   "error": null
+  },
+  {
+   "page": 100,
+   "ref_chars": 0,
+   "hyp_chars": 619,
+   "ins": 619,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 3.26,
+   "error": null
+  },
+  {
+   "page": 150,
+   "ref_chars": 0,
+   "hyp_chars": 589,
+   "ins": 589,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.52,
+   "error": null
+  },
+  {
+   "page": 200,
+   "ref_chars": 0,
+   "hyp_chars": 479,
+   "ins": 479,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.27,
+   "error": null
+  },
+  {
+   "page": 250,
+   "ref_chars": 0,
+   "hyp_chars": 571,
+   "ins": 571,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.24,
+   "error": null
+  },
+  {
+   "page": 300,
+   "ref_chars": 0,
+   "hyp_chars": 519,
+   "ins": 519,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.29,
+   "error": null
+  },
+  {
+   "page": 350,
+   "ref_chars": 0,
+   "hyp_chars": 549,
+   "ins": 549,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.29,
+   "error": null
+  }
+ ]
+}
