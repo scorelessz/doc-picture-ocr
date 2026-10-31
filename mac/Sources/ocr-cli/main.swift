@@ -23,6 +23,9 @@ usage:
   ocr-cli fuse <vision.json> <rapidocr.json> --out fused.json [--legacy] [--force]
   ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
   ocr-cli pdf <源.pdf> <fused.json> --out x.searchable.pdf [--force] [--force-text] [--stats stats.json]
+  ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
+               [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
+               [--python .venv/bin/python] [--result result.json]
 
 """
 
@@ -200,6 +203,38 @@ do {
         print("嵌字 \(st.pagesEmbedded)/\(st.pages) 页  行 \(st.linesWritten)  取回率 \(st.retrieval.map { "\($0)" } ?? "无")"
               + "  行级 \(st.lineRetrieval.map { "\($0)" } ?? "无")  \(st.sizeIn) → \(st.sizeOut)")
         for w in st.warnings.prefix(12) { warn("⚠ \(w)") }
+
+    case "book":
+        guard let path = args.first else { fail(usage) }
+        var o = BookOptions(pdf: URL(fileURLWithPath: path).standardizedFileURL,
+                            outdir: URL(fileURLWithPath: option(args, "--outdir") ?? "output", isDirectory: true),
+                            workdir: URL(fileURLWithPath: option(args, "--workdir") ?? "work", isDirectory: true),
+                            python: option(args, "--python") ?? ".venv/bin/python")
+        o.md = !args.contains("--no-md")
+        o.searchable = !args.contains("--no-pdf")
+        o.pageMarks = option(args, "--page-marks") ?? "comment"
+        guard ["none", "comment", "rule"].contains(o.pageMarks) else { fail(usage) }
+        o.force = args.contains("--force")
+        o.clobber = args.contains("--clobber")
+        o.forceOCR = args.contains("--force-ocr")
+        o.keepPages = args.contains("--keep-pages")
+        do {
+            let res = try runBook(o, log: warn)
+            if let rp = option(args, "--result") {
+                let enc = JSONEncoder()
+                enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+                try enc.encode(res).write(to: URL(fileURLWithPath: rp))
+            }
+            print(String(format: "完成 %d 页  %.1fs (%.3fs/页)  峰值内存 %.0f / 子进程 %.0f MB",
+                         res.pages, res.totalSeconds, res.secPerPage, res.peakRSSSelfMB, res.peakRSSChildrenMB))
+            for f in res.outputs { print("-> \(f)") }
+            if !res.degraded.isEmpty {
+                for d in res.degraded { warn("⚠ 已降级: \(d)") }
+                exit(3)
+            }
+        } catch let e as BookError {
+            fail("\(e)", code: 3)
+        }
 
     default:
         fail(usage)

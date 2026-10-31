@@ -69,6 +69,8 @@ public struct MDDoc: Decodable, Sendable {
 
 public struct MDOptions: Sendable {
     public var pageMarks = true
+    /// 页标记用分隔线 `---` 而不是注释。段落内部不插（分隔线会打断段落），所以跨页段落里看不到页界。
+    public var pageRule = false
     public var indentChars = 1.5
     public var shortEnd = 0.85
     public init() {}
@@ -880,7 +882,7 @@ public func toMarkdown(_ doc: MDDoc, options o: MDOptions = MDOptions()) -> (md:
 
     for (i, pb) in pageBodies.enumerated() {
         let pno = pageNo(pb.page, i + 1)
-        if o.pageMarks, pb.mark { pending.append("<!-- page \(pno) -->") }
+        if o.pageMarks, pb.mark { pending.append(o.pageRule ? "---" : "<!-- page \(pno) -->") }
         if pb.warn != nil || !pb.mark {
             // 双栏：告警是块级 HTML，本来就该打断；右栏同样断开，左栏末行和右栏首行毫无关系
             flush()
@@ -922,7 +924,7 @@ public func toMarkdown(_ doc: MDDoc, options o: MDOptions = MDOptions()) -> (md:
             } else {
                 // 续行的页标记留在行内：单独成行的 HTML 注释会把跨页段落切断
                 let (a, sep, b) = splice(cur ?? "", text)
-                cur = a + sep + pending.joined() + b
+                cur = a + sep + (o.pageRule ? "" : pending.joined()) + b
                 pending = []
             }
             prev = Prev(heading: false, r: r, pm: pb.pm)

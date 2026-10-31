@@ -107,6 +107,29 @@ public struct FusedDoc: Codable, Equatable, Sendable {
     public var stats: FuseStats
 }
 
+/// 融合过程的明细，供质量报告用；不进 fused.json。
+public final class FuseLog: @unchecked Sendable {
+    public struct Drop: Sendable {
+        public let page: Int
+        public let src: String
+        public let text: String
+        public let kept: String
+        public let distance: Int
+        public var newRuleOnly: Bool { distance > 0 }    // 距离 0 是旧规则也会去掉的
+    }
+
+    public struct Arbitration: Sendable {
+        public let page: Int
+        public let winner: String
+        public let vision: String
+        public let rapidocr: String
+    }
+
+    public var drops: [Drop] = []
+    public var arbitrations: [Arbitration] = []
+    public init() {}
+}
+
 public enum FuseError: Error, CustomStringConvertible {
     case wrongEngine(want: String, got: String)
     case sizeMismatch(page: Int, key: String, vision: Int, rapidocr: Int)
@@ -338,7 +361,8 @@ private func replaceAll(_ text: String, _ wrong: String, _ right: String) -> (St
     return (parts.joined(separator: right), parts.count - 1)
 }
 
-public func fuse(_ vision: EngineDoc, _ rapid: EngineDoc, rules: FuseRules = FuseRules()) throws -> FusedDoc {
+public func fuse(_ vision: EngineDoc, _ rapid: EngineDoc, rules: FuseRules = FuseRules(),
+                 log: FuseLog? = nil) throws -> FusedDoc {
     for (doc, want) in [(vision, "vision"), (rapid, "rapidocr")] where !doc.engine.isEmpty && doc.engine != want {
         throw FuseError.wrongEngine(want: want, got: doc.engine)
     }
@@ -361,7 +385,11 @@ public func fuse(_ vision: EngineDoc, _ rapid: EngineDoc, rules: FuseRules = Fus
             let (l, divergent) = fusePair(vlines[i], rlines[j], rules)
             fused.append(l)
             stats.both += 1
-            if divergent { stats.divergent += 1 }
+            if divergent {
+                stats.divergent += 1
+                log?.arbitrations.append(.init(page: pno, winner: pyEq(l.text, pyStrip(vlines[i].text)) ? "vision" : "rapidocr",
+                                               vision: pyStrip(vlines[i].text), rapidocr: pyStrip(rlines[j].text)))
+            }
         }
 
         // 单源行必须收录。唯一的例外是碎片重影：并进 both 行的 alt，并计数。
@@ -371,6 +399,9 @@ public func fuse(_ vision: EngineDoc, _ rapid: EngineDoc, rules: FuseRules = Fus
                 let ln = lines[i]
                 let txt = pyStrip(ln.text)
                 if let host = containedHost(ln, fused, bothIdx: bothIdx, rules) {
+                    log?.drops.append(.init(page: pno, src: isRapid ? "rapidocr" : "vision", text: txt, kept: fused[host].text,
+                                            distance: localEditDistance(Array(norm(txt).unicodeScalars),
+                                                                        Array(norm(fused[host].text).unicodeScalars))))
                     mergeAlt(&fused[host], txt)
                     stats.droppedContained += 1
                     continue
