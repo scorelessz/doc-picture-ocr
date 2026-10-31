@@ -42,8 +42,20 @@ func fail(_ msg: String, code: Int32 = 2) -> Never {
     exit(code)
 }
 
+/// 给人看的提示走 stderr；同一条也进诊断日志。⚠ 记 warn 并带页号，其余是进度，记 debug。
 func warn(_ msg: String) {
     FileHandle.standardError.write((msg + "\n").data(using: .utf8)!)
+    guard Log.shared.enabled else { return }
+    if msg.hasPrefix("⚠") {
+        var f: [String: LogValue] = ["message": .s(msg)]
+        if let r = msg.range(of: #"第 \d+ 页"#, options: .regularExpression),
+           let n = Int(msg[r].filter(\.isNumber)) {
+            f["page"] = .i(n)
+        }
+        Log.shared.warn("warning", f)
+    } else {
+        Log.shared.debug("progress", ["message": .s(msg)])
+    }
 }
 
 func option(_ args: [String], _ name: String) -> String? {

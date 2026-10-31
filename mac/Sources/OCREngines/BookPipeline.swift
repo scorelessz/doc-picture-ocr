@@ -230,6 +230,12 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         timing.append(("ppocr-coreml", paddleSeconds))
         res.seconds["render+vision"] = (timing[0].1 * 100).rounded() / 100
         res.seconds["ppocr-coreml"] = (paddleSeconds * 100).rounded() / 100
+        let rss = peakRSSMB()
+        Log.shared.info("stage", ["name": .s("ppocr-coreml"), "seconds": .d((paddleSeconds * 1000).rounded() / 1000),
+                                  "peak_rss_mb": .d(rss.own), "peak_rss_children_mb": .d(rss.children),
+                                  "units": .s(o.unitsLabel), "load_seconds": .d((paddle!.loadSeconds * 1000).rounded() / 1000),
+                                  "det": .d(paddle!.timing.det), "post": .d(paddle!.timing.post), "crop": .d(paddle!.timing.crop),
+                                  "rec": .d(paddle!.timing.rec), "canvas_fallbacks": .i(paddle!.canvasFallbacks)])
     } else {
       try stage("rapidocr") {
         let manifest = slots.enumerated().compactMap { (i, s) -> [String: String]? in
