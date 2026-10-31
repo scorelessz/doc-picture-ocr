@@ -44,13 +44,24 @@ def main() -> int:
             continue
         by = {p["page"]: p for p in json.loads(src.read_text("utf-8"))["pages"]}
         cnt = {"insert": 0, "delete": 0, "replace": 0}
-        empty = []
+        empty, per = [], []
         for p in gt:
             hyp = canon("".join(l["text"] for l in by.get(p, {}).get("lines", [])))
             if not hyp:
                 empty.append(p)
+            pc = {"insert": 0, "delete": 0, "replace": 0}
             for op in Levenshtein.editops(refs[p], hyp):
-                cnt[op.tag] += 1
+                pc[op.tag] += 1
+            for k in cnt:
+                cnt[k] += pc[k]
+            per.append({"page": p, "ref_chars": len(refs[p]), "hyp_chars": len(hyp),
+                        "ins": pc["insert"], "del": pc["delete"], "sub": pc["replace"],
+                        "requests": 0, "seconds": 0.0, "error": None})
+        #  逐页明细另存一份, 口径与 p1_vlm 一致, 供 p1_summary 汇总
+        dst = Path(a.out).with_name(f"p1-ctc-{eng}.json")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(json.dumps({"phase": "p1", "name": f"ctc-{eng}", "per_page": per},
+                                  ensure_ascii=False, indent=1) + "\n", "utf-8")
         res[eng] = {"cer": round(sum(cnt.values()) / N, 5),
                     "ins_rate": round(cnt["insert"] / N, 5),
                     "del_rate": round(cnt["delete"] / N, 5),
