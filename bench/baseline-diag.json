@@ -1,0 +1,215 @@
+{
+  "phase": "p0",
+  "pipeline": "python-books",
+  "date": "2026-10-31T18:52:09",
+  "machine": {
+    "chip": "Apple M4",
+    "ram_gb": 16.0,
+    "macos": "27.0.1",
+    "python": "3.13.18"
+  },
+  "source": {
+    "file": "City of Broken Promises.pdf",
+    "pages_total": 328,
+    "pages_run": 328,
+    "native_text_pages": 319,
+    "ground_truth": "native_text_layer"
+  },
+  "accuracy": {
+    "pages": 319,
+    "chars": 469747,
+    "edits": 12161,
+    "cer": 0.02589,
+    "cer_excl_empty": 0.01906,
+    "empty_ocr_pages": [
+      {
+        "page": 10,
+        "ref_chars": 184,
+        "vision_lines": 0,
+        "rapidocr_lines": 0
+      },
+      {
+        "page": 20,
+        "ref_chars": 523,
+        "vision_lines": 0,
+        "rapidocr_lines": 0
+      },
+      {
+        "page": 62,
+        "ref_chars": 665,
+        "vision_lines": 0,
+        "rapidocr_lines": 0
+      },
+      {
+        "page": 98,
+        "ref_chars": 580,
+        "vision_lines": 0,
+        "rapidocr_lines": 0
+      },
+      {
+        "page": 160,
+        "ref_chars": 800,
+        "vision_lines": 0,
+        "rapidocr_lines": 0
+      },
+      {
+        "page": 324,
+        "ref_chars": 518,
+        "vision_lines": 0,
+        "rapidocr_lines": 0
+      }
+    ],
+    "worst_pages": [
+      {
+        "page": 10,
+        "cer": 1.0,
+        "ref_chars": 184,
+        "ocr_chars": 0,
+        "ocr_lines": 0,
+        "native_text": false
+      },
+      {
+        "page": 20,
+        "cer": 1.0,
+        "ref_chars": 523,
+        "ocr_chars": 0,
+        "ocr_lines": 0,
+        "native_text": false
+      },
+      {
+        "page": 62,
+        "cer": 1.0,
+        "ref_chars": 665,
+        "ocr_chars": 0,
+        "ocr_lines": 0,
+        "native_text": false
+      },
+      {
+        "page": 98,
+        "cer": 1.0,
+        "ref_chars": 580,
+        "ocr_chars": 0,
+        "ocr_lines": 0,
+        "native_text": false
+      },
+      {
+        "page": 160,
+        "cer": 1.0,
+        "ref_chars": 800,
+        "ocr_chars": 0,
+        "ocr_lines": 0,
+        "native_text": false
+      },
+      {
+        "page": 324,
+        "cer": 1.0,
+        "ref_chars": 518,
+        "ocr_chars": 0,
+        "ocr_lines": 0,
+        "native_text": false
+      },
+      {
+        "page": 3,
+        "cer": 0.5108,
+        "ref_chars": 186,
+        "ocr_chars": 243,
+        "ocr_lines": 21,
+        "native_text": false
+      },
+      {
+        "page": 9,
+        "cer": 0.2234,
+        "ref_chars": 197,
+        "ocr_chars": 205,
+        "ocr_lines": 19,
+        "native_text": false
+      },
+      {
+        "page": 8,
+        "cer": 0.2185,
+        "ref_chars": 270,
+        "ocr_chars": 249,
+        "ocr_lines": 14,
+        "native_text": false
+      },
+      {
+        "page": 185,
+        "cer": 0.0868,
+        "ref_chars": 1072,
+        "ocr_chars": 1119,
+        "ocr_lines": 42,
+        "native_text": false
+      },
+      {
+        "page": 76,
+        "cer": 0.0846,
+        "ref_chars": 1335,
+        "ocr_chars": 1408,
+        "ocr_lines": 40,
+        "native_text": false
+      },
+      {
+        "page": 169,
+        "cer": 0.0817,
+        "ref_chars": 1445,
+        "ocr_chars": 1461,
+        "ocr_lines": 40,
+        "native_text": false
+      },
+      {
+        "page": 104,
+        "cer": 0.0801,
+        "ref_chars": 1174,
+        "ocr_chars": 1214,
+        "ocr_lines": 40,
+        "native_text": false
+      },
+      {
+        "page": 236,
+        "cer": 0.0788,
+        "ref_chars": 1168,
+        "ocr_chars": 1204,
+        "ocr_lines": 38,
+        "native_text": false
+      },
+      {
+        "page": 254,
+        "cer": 0.0725,
+        "ref_chars": 1213,
+        "ocr_chars": 1248,
+        "ocr_lines": 40,
+        "native_text": false
+      }
+    ]
+  },
+  "fusion": {
+    "lines": 11632,
+    "both": 11481,
+    "divergent_rate": 0.3683,
+    "single_source_rate": 0.013,
+    "only_vision": 66,
+    "only_rapidocr": 85,
+    "dropped_empty": 0,
+    "dropped_contained": 32
+  },
+  "markdown": {
+    "paragraphs": 2499,
+    "headings": 10,
+    "chars": 561021,
+    "dropped": 314,
+    "dropped_detail": {
+      "微小碎块": 5,
+      "孤立标点或无文字碎块": 7,
+      "页码": 290,
+      "页码(框略高于正文, 凭跨页证据)": 12
+    },
+    "vertical_pages": 0,
+    "two_column_pages": 0
+  },
+  "searchable_pdf": {
+    "retrieval": null
+  },
+  "status": "reused",
+  "degraded": null,
+  "perf": null
+}
