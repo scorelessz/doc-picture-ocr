@@ -64,3 +64,29 @@ line 模式请求数 ≈ 行数（每页约 40），先只跑 `--pages 11,12` �
 - 提交 `bench/results/p1-*.json` 并推送。
 - 每个模型记：模型文件来源（HF repo + 文件名 + sha256 前 12 位）、量化、运行时版本、是否跑通。
 - 跑不通的组合写清报错原文（不含书的内容），不要为跑通而改仓库代码。
+
+## 5. Claude 多模态抽查（用户 2026-10-31 明确要求）
+
+目的：PDF 原生文字层不一定是对的（第 8、9 页上多个引擎错得一模一样），需要一个独立的「看图读字」真值。
+**这一步会把抽查页的图片发给 Anthropic（由 Mac 上的 Claude 会话看图）**，是经用户授权的例外；
+转写原文只留在本机 `work/bench/spot/`，仓库里只提交 `bench/results/p1-spotcheck.json` 里的数字。
+
+页集：`3 8 9 11 12 50 120 185 236 300`（正文/书前页）+ `10 20 62 98 160 324`（白页）。
+
+```bash
+.venv/bin/python bench/spot_prep.py "$PDF" 3 8 9 11 12 50 120 185 236 300 10 20 62 98 160 324
+# 各模型 page / line 两种模式各重跑一遍, 加 --save-text 留原文(只在本机)
+.venv/bin/python bench/p1_vlm.py "$PDF" ... --pages 3,8,9,11,12,50,120,185,236,300,10,20,62,98,160,324 --save-text
+```
+
+Claude 看图转写的规则：
+1. **先转写、后看文字层**：转写时不打开 `pNNNN.native.json`，避免被锚定。
+2. 逐张看条带图 `pNNNN-sKK.png`，按图上原样逐字转写（繁简、标点、全半角都照印刷），不纠错、不补全；
+   看不清就把条带再裁小放大看，不要猜。整页转写写进 `work/bench/spot/claude/pNNNN.txt`。
+3. 白页看整页图 `pNNNN.png`：图上没有正文就写空文件。
+4. 转写完再与 `pNNNN.native.json` 逐行比；每处不一致回到图上裁决，计数写进
+   `work/bench/spot/adjudication.json`：`{"页": {"diffs": n, "native": 文字层对, "claude": 转写对, "neither": 都不对, "unclear": 看不清}}`。
+
+```bash
+.venv/bin/python bench/spot_score.py "$PDF"     # → bench/results/p1-spotcheck.json
+```

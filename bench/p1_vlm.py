@@ -152,6 +152,8 @@ def main() -> int:
     ap.add_argument("--timeout", type=float, default=600)
     ap.add_argument("--server-pid", type=int)
     ap.add_argument("--out")
+    ap.add_argument("--save-text", action="store_true",
+                    help="把识别原文存到 work/bench/vlm-text/<name>-<mode>/pNNNN.txt(仅本机, 已被 .gitignore 挡住), 供抽查比对")
     a = ap.parse_args()
 
     pdf = Path(a.pdf).expanduser().resolve()
@@ -204,6 +206,10 @@ def main() -> int:
         dt = time.time() - t0
         t_all += dt
         hyp = canon("".join(outs))
+        if a.save_text:
+            tdir = ROOT / "work" / "bench" / "vlm-text" / f"{a.name}-{a.mode}"
+            tdir.mkdir(parents=True, exist_ok=True)
+            (tdir / f"p{pno:04d}.txt").write_text("\n".join(outs), "utf-8")
         ops = Levenshtein.editops(ref, hyp)
         cnt = {"insert": 0, "delete": 0, "replace": 0}
         for op in ops:
