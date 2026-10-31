@@ -16,5 +16,6 @@ let package = Package(
         .executableTarget(name: "ocr-cli", dependencies: ["OCRCore", "OCREngines"],
                           path: "mac/Sources/ocr-cli"),
         .testTarget(name: "OCRCoreTests", dependencies: ["OCRCore"], path: "mac/Tests/OCRCoreTests"),
+        .testTarget(name: "OCREnginesTests", dependencies: ["OCREngines", "OCRCore"], path: "mac/Tests/OCREnginesTests"),
     ]
 )

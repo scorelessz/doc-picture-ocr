@@ -1,11 +1,12 @@
 #if canImport(PDFKit)
 import CoreGraphics
+import CoreML
 import Foundation
 import OCRCore
 import PDFKit
 
 // 总流程：渲染 → Vision + RapidOCR → 融合 → md / 可搜索 PDF / 报告。
-// RapidOCR 暂时走 src/rapid_pages.py，Phase 4 换 Core ML。
+// PP-OCR 默认走 Core ML（PaddleEngine），src/rapid_pages.py 只留作对照。
 // 规矩与 run_books 相同：已存在就拒绝写；--force 只覆盖带本线归属标记的产物，别人的文件还要 --clobber。
 
 public struct BookOptions {
@@ -17,6 +18,9 @@ public struct BookOptions {
     public var pageMarks = "comment"          // none | comment | rule
     public var force = false, clobber = false, forceOCR = false, keepPages = false
     public var jobs = max(2, ProcessInfo.processInfo.activeProcessorCount - 2)
+    /// PP-OCR 用哪条路：Core ML 模型目录；为 nil 时走 src/rapid_pages.py（只留作对照）
+    public var coreml: URL?
+    public var units: MLComputeUnits = .cpuAndNeuralEngine
 
     public init(pdf: URL, outdir: URL, workdir: URL, python: String) {
         self.pdf = pdf; self.outdir = outdir; self.workdir = workdir; self.python = python
@@ -118,8 +122,12 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         var failed = false
         var error: String?
         var image: CGImage?
+        var paddle: [Line] = []
     }
     var slots: [Slot] = []
+    var paddleFailed: [Int] = []
+    var paddleSeconds = 0.0
+    let paddle: PaddleEngine? = try o.coreml.map { try PaddleEngine(directory: $0, units: o.units) }
     var dpis = Set<Double>()
     try stage("render+vision") {
         for start in stride(from: 1, through: n, by: o.jobs) {
@@ -162,15 +170,30 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                         s.failed = true
                         s.error = "\(error)"
                     }
-                    let png = pagesDir.appendingPathComponent(String(format: "p%04d.png", pno))
+                    if o.coreml == nil {
+                        let png = pagesDir.appendingPathComponent(String(format: "p%04d.png", pno))
+                        do {
+                            try PageRenderer.writePNG(s.image!, to: png)
+                            s.png = png
+                        } catch {
+                            s.error = "\(error)"
+                        }
+                        s.image = nil
+                    }
+                }
+            }
+            if let paddle {
+                let t0 = Date()
+                for (pno, s) in work {
                     do {
-                        try PageRenderer.writePNG(s.image!, to: png)
-                        s.png = png
+                        s.paddle = try paddle.recognize(s.image!)
                     } catch {
-                        s.error = "\(error)"
+                        paddleFailed.append(pno)
+                        log("⚠ 第 \(pno) 页 PP-OCR 失败: \(error)")
                     }
                     s.image = nil
                 }
+                paddleSeconds += Date().timeIntervalSince(t0)
             }
             if start % (o.jobs * 10) == 1 { log("渲染+Vision \(min(n, start + o.jobs - 1))/\(n)") }
         }
@@ -183,7 +206,15 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     var rDoc = EngineDoc(source: o.pdf.path, engine: "rapidocr", dpi: vDoc.dpi,
                          pages: vDoc.pages.map { var p = $0; p.lines = []; return p })
     var rapidFailed: [Int] = []
-    try stage("rapidocr") {
+    if paddle != nil {
+        for (i, s) in slots.enumerated() { rDoc.pages[i].lines = s.paddle }
+        rapidFailed = paddleFailed
+        timing[0].1 -= paddleSeconds
+        timing.append(("ppocr-coreml", paddleSeconds))
+        res.seconds["render+vision"] = (timing[0].1 * 100).rounded() / 100
+        res.seconds["ppocr-coreml"] = (paddleSeconds * 100).rounded() / 100
+    } else {
+      try stage("rapidocr") {
         let manifest = slots.enumerated().compactMap { (i, s) -> [String: String]? in
             s.png.map { ["page": "\(i + 1)", "png": $0.path] }
         }.map { d -> [String: AnyCodable] in ["page": .int(Int(d["page"]!)!), "png": .string(d["png"]!)] }
@@ -210,6 +241,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         for i in rDoc.pages.indices { rDoc.pages[i].lines = out.lines["\(rDoc.pages[i].page)"] ?? [] }
         try? fm.removeItem(at: mf)
         try? fm.removeItem(at: of)
+      }
     }
     if !o.keepPages { try? fm.removeItem(at: pagesDir) }
     try encodeJSON(vDoc).write(to: vURL)
@@ -258,7 +290,10 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
 
     // ---- 报告 ----
     if !visionFailed.isEmpty { degraded.append("Vision 在第 \(visionFailed) 页失败") }
-    if !rapidFailed.isEmpty { degraded.append("RapidOCR 在第 \(rapidFailed) 页失败") }
+    if !rapidFailed.isEmpty { degraded.append("PP-OCR 在第 \(rapidFailed) 页失败") }
+    if let paddle, paddle.canvasFallbacks > 0 {
+        degraded.append("\(paddle.canvasFallbacks) 页没有尺寸正好的检测模型, 用大画布补白识别, 精度偏低: 用 tools/convert_paddle.py 转这个尺寸")
+    }
     let bothFailed = Array(Set(visionFailed).intersection(rapidFailed)).sorted()
     let single = Array(Set(visionFailed).symmetricDifference(rapidFailed)).sorted()
     let df = DateFormatter()

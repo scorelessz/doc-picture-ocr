@@ -1,6 +1,7 @@
 import Foundation
 import OCRCore
 #if canImport(Vision)
+import CoreML
 import OCREngines
 #endif
 
@@ -23,8 +24,11 @@ usage:
   ocr-cli fuse <vision.json> <rapidocr.json> --out fused.json [--legacy] [--force]
   ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
   ocr-cli pdf <源.pdf> <fused.json> --out x.searchable.pdf [--force] [--force-text] [--stats stats.json]
+  ocr-cli paddle <image>... --models dir [--units ane|all|cpu|gpu] [--cls] --out lines.json
+  ocr-cli paddle-plan --models dir --out plan.json
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
+               [--paddle coreml|python] [--models dir] [--units ane|all|cpu|gpu]
                [--python .venv/bin/python] [--result result.json]
 
 """
@@ -218,6 +222,16 @@ do {
         o.clobber = args.contains("--clobber")
         o.forceOCR = args.contains("--force-ocr")
         o.keepPages = args.contains("--keep-pages")
+        if (option(args, "--paddle") ?? "coreml") == "coreml" {
+            let dir = option(args, "--models") ?? (NSHomeDirectory() + "/Desktop/Ignore/models/coreml")
+            guard FileManager.default.fileExists(atPath: dir + "/keys.txt") else {
+                fail("找不到 Core ML 模型: \(dir)（先跑 tools/convert_paddle.py，或用 --models 指定）", code: 2)
+            }
+            o.coreml = URL(fileURLWithPath: dir, isDirectory: true)
+            let units: [String: MLComputeUnits] = ["ane": .cpuAndNeuralEngine, "all": .all, "cpu": .cpuOnly, "gpu": .cpuAndGPU]
+            guard let u = units[option(args, "--units") ?? "ane"] else { fail(usage) }
+            o.units = u
+        }
         do {
             let res = try runBook(o, log: warn)
             if let rp = option(args, "--result") {
@@ -235,6 +249,61 @@ do {
         } catch let e as BookError {
             fail("\(e)", code: 3)
         }
+
+    case "paddle-plan":
+        guard let dir = option(args, "--models"), let out = option(args, "--out") else { fail(usage) }
+        let e = try PaddleEngine(directory: URL(fileURLWithPath: dir, isDirectory: true), units: .all)
+        let items = try e.allCompiled()
+        nonisolated(unsafe) var plans: [DevicePlan] = []
+        nonisolated(unsafe) var failure: Error?
+        let sem = DispatchSemaphore(value: 0)
+        Task {
+            do {
+                for (name, url) in items {
+                    for (label, u) in [("ane", MLComputeUnits.cpuAndNeuralEngine), ("all", .all)] {
+                        if #available(macOS 14.4, *) {
+                            plans.append(try await computePlan(url, name: name, units: u, label: label))
+                        }
+                    }
+                }
+            } catch { failure = error }
+            sem.signal()
+        }
+        sem.wait()
+        if let failure { throw failure }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try enc.encode(plans).write(to: URL(fileURLWithPath: out))
+
+    case "paddle":
+        guard let dir = option(args, "--models"), let out = option(args, "--out") else { fail(usage) }
+        let units: [String: MLComputeUnits] = ["ane": .cpuAndNeuralEngine, "all": .all, "cpu": .cpuOnly, "gpu": .cpuAndGPU]
+        guard let u = units[option(args, "--units") ?? "all"] else { fail(usage) }
+        let skip = ["--models", "--units", "--out"]
+        var images: [String] = [], i = 0
+        while i < args.count {
+            if skip.contains(args[i]) { i += 2; continue }
+            if args[i] != "--cls" { images.append(args[i]) }
+            i += 1
+        }
+        let t0 = Date()
+        let e = try PaddleEngine(directory: URL(fileURLWithPath: dir, isDirectory: true), units: u)
+        e.useCls = args.contains("--cls")
+        var res: [String: [Line]] = [:]
+        var seconds: [Double] = []
+        for p in images {
+            let img = try VisionEngine.loadImage(URL(fileURLWithPath: p))
+            let t1 = Date()
+            res[p] = try e.recognize(img)
+            seconds.append(Date().timeIntervalSince(t1))
+        }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try enc.encode(res).write(to: URL(fileURLWithPath: out))
+        print(String(format: "总 %.1fs  载入 %.1fs  首页 %.2fs  其余均值 %.2fs/页 | det %.2f post %.2f crop %.2f cls %.2f rec %.2f",
+                     Date().timeIntervalSince(t0), e.loadSeconds, seconds.first ?? 0,
+                     seconds.count > 1 ? seconds.dropFirst().reduce(0, +) / Double(seconds.count - 1) : 0,
+                     e.timing.det, e.timing.post, e.timing.crop, e.timing.cls, e.timing.rec))
 
     default:
         fail(usage)

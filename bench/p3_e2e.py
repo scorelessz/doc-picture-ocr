@@ -21,6 +21,7 @@ import pymupdf                                   # noqa: E402
 
 CLI = ROOT / ".build" / "release" / "ocr-cli"
 HOME = Path.home() / "Desktop" / "Ignore"
+OUTDIR, EXTRA = "e2e", []
 BOOKS = {"en": ("City of Broken Promises", ["--force-ocr"], "baseline.json"),
          "zh": ("失约之城", [], "baseline-zh.json")}
 
@@ -36,7 +37,8 @@ def md_compare(a: str, b: str) -> dict:
 
 def run(tag: str) -> dict:
     stem, extra, base = BOOKS[tag]
-    w = ROOT / "work" / "bench" / "e2e" / tag
+    extra = extra + EXTRA
+    w = ROOT / "work" / "bench" / OUTDIR / tag
     (w / "work").mkdir(parents=True, exist_ok=True)
     src = HOME / f"{stem}.pdf"
     res_f = w / "result.json"
@@ -68,8 +70,13 @@ def run(tag: str) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=sorted(BOOKS))
+    ap.add_argument("--paddle", choices=("coreml", "python"), default="coreml")
+    ap.add_argument("--result", default="p3-e2e.json")
+    ap.add_argument("--workdir", default="e2e")
     a = ap.parse_args()
-    dst = ROOT / "bench" / "results" / "p3-e2e.json"
+    global OUTDIR, EXTRA
+    OUTDIR, EXTRA = a.workdir, ["--paddle", a.paddle]
+    dst = ROOT / "bench" / "results" / a.result
     out = json.loads(dst.read_text("utf-8")) if dst.exists() else {"phase": "p3", "name": "e2e"}
     for tag in ([a.only] if a.only else BOOKS):
         out[tag] = run(tag)

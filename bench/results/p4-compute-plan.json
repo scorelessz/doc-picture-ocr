@@ -1,0 +1,308 @@
+[
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1184x1984-f16",
+    "ops" : 190,
+    "units" : "ane"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1184x1984-f16",
+    "ops" : 190,
+    "units" : "all"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1216x1984-f16",
+    "ops" : 190,
+    "units" : "ane"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1216x1984-f16",
+    "ops" : 190,
+    "units" : "all"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1248x1984-f16",
+    "ops" : 190,
+    "units" : "ane"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1248x1984-f16",
+    "ops" : 190,
+    "units" : "all"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1280x1984-f16",
+    "ops" : 190,
+    "units" : "ane"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1280x1984-f16",
+    "ops" : 190,
+    "units" : "all"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1536x1984-f16",
+    "ops" : 190,
+    "units" : "ane"
+  },
+  {
+    "ane" : 190,
+    "aneSupported" : 190,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "det-1536x1984-f16",
+    "ops" : 190,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-320-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-320-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-480-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-480-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-640-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-640-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-800-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-800-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-960-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-960-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1120-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1120-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1280-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1280-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1440-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1440-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1600-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1600-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1920-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-1920-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-2400-f16",
+    "ops" : 211,
+    "units" : "ane"
+  },
+  {
+    "ane" : 211,
+    "aneSupported" : 211,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "rec-2400-f16",
+    "ops" : 211,
+    "units" : "all"
+  },
+  {
+    "ane" : 181,
+    "aneSupported" : 181,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "cls-f16",
+    "ops" : 181,
+    "units" : "ane"
+  },
+  {
+    "ane" : 181,
+    "aneSupported" : 181,
+    "cpu" : 0,
+    "gpu" : 0,
+    "model" : "cls-f16",
+    "ops" : 181,
+    "units" : "all"
+  }
+]
