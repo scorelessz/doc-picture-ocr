@@ -1,0 +1,283 @@
+{
+ "phase": "p3",
+ "source": "City of Broken Promises",
+ "legacy_vs_python": {
+  "pages_py": 328,
+  "pages_swift": 328,
+  "stats_equal": true,
+  "page_line_count_mismatch": [],
+  "text": 0,
+  "src": 0,
+  "flag": 0,
+  "alt": 0,
+  "coord": 0,
+  "conf": 0,
+  "max_coord_diff": 0.0,
+  "max_conf_diff": 0.0,
+  "page_field_mismatch": 0,
+  "lines_compared": 11632,
+  "pages_with_diff": [],
+  "identical": true
+ },
+ "new_vs_legacy": {
+  "stats_legacy": {
+   "both": 11481,
+   "divergent": 4229,
+   "dropped_contained": 32,
+   "dropped_empty": 0,
+   "glossary_hits": 0,
+   "lines": 11632,
+   "low_conf": 3,
+   "only_rapidocr": 85,
+   "only_vision": 66,
+   "pages": 328
+  },
+  "stats_new": {
+   "both": 11481,
+   "divergent": 4229,
+   "dropped_contained": 64,
+   "dropped_empty": 0,
+   "glossary_hits": 0,
+   "lines": 11600,
+   "low_conf": 3,
+   "only_rapidocr": 75,
+   "only_vision": 44,
+   "pages": 328
+  },
+  "newly_dropped": 32,
+  "pages": [
+   {
+    "page": 12,
+    "lines_removed": 1
+   },
+   {
+    "page": 35,
+    "lines_removed": 1
+   },
+   {
+    "page": 51,
+    "lines_removed": 1
+   },
+   {
+    "page": 59,
+    "lines_removed": 1
+   },
+   {
+    "page": 102,
+    "lines_removed": 1
+   },
+   {
+    "page": 119,
+    "lines_removed": 1
+   },
+   {
+    "page": 122,
+    "lines_removed": 1
+   },
+   {
+    "page": 123,
+    "lines_removed": 1
+   },
+   {
+    "page": 124,
+    "lines_removed": 1
+   },
+   {
+    "page": 158,
+    "lines_removed": 1
+   },
+   {
+    "page": 169,
+    "lines_removed": 1
+   },
+   {
+    "page": 185,
+    "lines_removed": 2
+   },
+   {
+    "page": 189,
+    "lines_removed": 1
+   },
+   {
+    "page": 207,
+    "lines_removed": 1
+   },
+   {
+    "page": 209,
+    "lines_removed": 1
+   },
+   {
+    "page": 221,
+    "lines_removed": 1
+   },
+   {
+    "page": 229,
+    "lines_removed": 1
+   },
+   {
+    "page": 235,
+    "lines_removed": 1
+   },
+   {
+    "page": 238,
+    "lines_removed": 1
+   },
+   {
+    "page": 247,
+    "lines_removed": 1
+   },
+   {
+    "page": 254,
+    "lines_removed": 1
+   },
+   {
+    "page": 256,
+    "lines_removed": 1
+   },
+   {
+    "page": 261,
+    "lines_removed": 1
+   },
+   {
+    "page": 263,
+    "lines_removed": 1
+   },
+   {
+    "page": 268,
+    "lines_removed": 1
+   },
+   {
+    "page": 269,
+    "lines_removed": 1
+   },
+   {
+    "page": 272,
+    "lines_removed": 1
+   },
+   {
+    "page": 274,
+    "lines_removed": 1
+   },
+   {
+    "page": 284,
+    "lines_removed": 1
+   },
+   {
+    "page": 285,
+    "lines_removed": 1
+   },
+   {
+    "page": 308,
+    "lines_removed": 1
+   }
+  ]
+ },
+ "cer": {
+  "pages": [
+   3,
+   8,
+   9,
+   11,
+   12,
+   50,
+   120,
+   185,
+   236,
+   300
+  ],
+  "legacy": {
+   "chars": 10173,
+   "edits": 307,
+   "cer": 0.03018,
+   "ins": 0.02536,
+   "del": 0.00167,
+   "sub": 0.00315,
+   "edits_by_page": {
+    "3": 128,
+    "8": 5,
+    "9": 0,
+    "11": 6,
+    "12": 39,
+    "50": 24,
+    "120": 5,
+    "185": 48,
+    "236": 44,
+    "300": 8
+   }
+  },
+  "new": {
+   "chars": 10173,
+   "edits": 229,
+   "cer": 0.02251,
+   "ins": 0.01769,
+   "del": 0.00167,
+   "sub": 0.00315,
+   "edits_by_page": {
+    "3": 128,
+    "8": 5,
+    "9": 0,
+    "11": 6,
+    "12": 5,
+    "50": 24,
+    "120": 5,
+    "185": 4,
+    "236": 44,
+    "300": 8
+   }
+  }
+ },
+ "cer_excl": {
+  "excluded": [
+   3
+  ],
+  "pages": [
+   8,
+   9,
+   11,
+   12,
+   50,
+   120,
+   185,
+   236,
+   300
+  ],
+  "legacy": {
+   "chars": 10016,
+   "edits": 179,
+   "cer": 0.01787,
+   "ins": 0.01607,
+   "del": 0.0006,
+   "sub": 0.0012,
+   "edits_by_page": {
+    "8": 5,
+    "9": 0,
+    "11": 6,
+    "12": 39,
+    "50": 24,
+    "120": 5,
+    "185": 48,
+    "236": 44,
+    "300": 8
+   }
+  },
+  "new": {
+   "chars": 10016,
+   "edits": 101,
+   "cer": 0.01008,
+   "ins": 0.00829,
+   "del": 0.0006,
+   "sub": 0.0012,
+   "edits_by_page": {
+    "8": 5,
+    "9": 0,
+    "11": 6,
+    "12": 5,
+    "50": 24,
+    "120": 5,
+    "185": 4,
+    "236": 44,
+    "300": 8
+   }
+  }
+ }
+}

@@ -15,6 +15,7 @@ usage:
   ocr-cli vision <image> [--nocorrect]
   ocr-cli render <pdf> --page N [--dpi 300] --out page.png
   ocr-cli recognize <pdf> [--pages A-B] [--dpi 300] --out doc.vision.json
+  ocr-cli fuse <vision.json> <rapidocr.json> --out fused.json [--legacy] [--force]
 
 """
 
@@ -78,6 +79,32 @@ do {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try enc.encode(result).write(to: URL(fileURLWithPath: out))
+
+    case "fuse":
+        guard args.count >= 2, let out = option(args, "--out") else { fail(usage) }
+        let outURL = URL(fileURLWithPath: out)
+        // 已存在就拒绝写：work/ 下的旧文件可能是别的会话的输入
+        if FileManager.default.fileExists(atPath: out), !args.contains("--force") {
+            fail("输出已存在, 拒绝覆盖: \(out)（要覆盖请加 --force）", code: 1)
+        }
+        let dec = JSONDecoder()
+        var docs: [String: EngineDoc] = [:]
+        for p in args[0...1] {
+            let d = try dec.decode(EngineDoc.self, from: Data(contentsOf: URL(fileURLWithPath: p)))
+            docs[d.engine] = d
+        }
+        guard let v = docs["vision"], let r = docs["rapidocr"] else {
+            fail("需要 vision 与 rapidocr 各一份", code: 1)
+        }
+        var rules = FuseRules()
+        rules.legacyContain = args.contains("--legacy")
+        let fused = try fuse(v, r, rules: rules)
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try enc.encode(fused).write(to: outURL)
+        let st = fused.stats
+        print("页 \(st.pages)  行 \(st.lines)  双引擎 \(st.both)  分歧 \(st.divergent)  "
+              + "仅vision \(st.onlyVision)  仅rapidocr \(st.onlyRapidocr)  丢弃重影 \(st.droppedContained)")
 
     default:
         fail(usage)

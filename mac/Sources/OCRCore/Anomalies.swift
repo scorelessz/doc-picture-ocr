@@ -64,7 +64,7 @@ private let plausibleExtra = Set(
 func isPlausible(_ c: Unicode.Scalar) -> Bool {
     let v = c.value
     return isCJK(c) || (0x3000...0x303F).contains(v) || (0xFF00...0xFFEF).contains(v)
-        || c.properties.isWhitespace || plausibleExtra.contains(c)
+        || isPySpace(c) || plausibleExtra.contains(c)
 }
 
 func noiseCount(_ text: String) -> Int {
@@ -72,7 +72,7 @@ func noiseCount(_ text: String) -> Int {
 }
 
 func cjkRatio(_ text: String) -> Double {
-    let core = text.unicodeScalars.filter { !$0.properties.isWhitespace }
+    let core = text.unicodeScalars.filter { !isPySpace($0) }
     guard !core.isEmpty else { return 0 }
     return Double(core.filter(isCJK).count) / Double(core.count)
 }

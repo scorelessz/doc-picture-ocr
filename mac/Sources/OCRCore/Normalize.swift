@@ -44,7 +44,7 @@ public func norm(_ text: String) -> String {
             i += 1
             continue
         }
-        if !c.properties.isWhitespace { out.append(c) }
+        if !isPySpace(c) { out.append(c) }
         i += 1
     }
     return String(out)
@@ -53,7 +53,34 @@ public func norm(_ text: String) -> String {
 /// Python len()：码点数。
 @inlinable public func codePointCount(_ s: String) -> Int { s.unicodeScalars.count }
 
+/// Python str.isspace() / 正则 `\\s`（str 模式）认的空白。比 Unicode White_Space 多 \\x1c-\\x1f。
+public func isPySpace(_ c: Unicode.Scalar) -> Bool {
+    switch c.value {
+    case 0x09...0x0D, 0x1C...0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A,
+         0x2028, 0x2029, 0x202F, 0x205F, 0x3000:
+        return true
+    default:
+        return false
+    }
+}
+
 /// Python str.strip()：去掉两端空白。
 public func pyStrip(_ s: String) -> String {
-    s.trimmingCharacters(in: .whitespacesAndNewlines)
+    let u = Array(s.unicodeScalars)
+    var a = 0, b = u.count
+    while a < b, isPySpace(u[a]) { a += 1 }
+    while b > a, isPySpace(u[b - 1]) { b -= 1 }
+    var out = String.UnicodeScalarView()
+    out.append(contentsOf: u[a..<b])
+    return String(out)
+}
+
+/// Python 的字符串相等：逐码点比。Swift 的 `==` 按规范等价，会把不同码点序列判成相等。
+@inlinable public func pyEq(_ a: String, _ b: String) -> Bool {
+    a.unicodeScalars.elementsEqual(b.unicodeScalars)
+}
+
+/// Python round(x, n)：对 double 的精确值做十进制舍入，恰好一半时取偶。printf 系同样如此。
+public func pyRound(_ x: Double, _ digits: Int) -> Double {
+    Double(String(format: "%.\(digits)f", x)) ?? x
 }
