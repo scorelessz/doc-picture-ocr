@@ -24,7 +24,7 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 from coremltools.converters.mil import Builder as mb
-from coremltools.converters.mil.mil import types
+from coremltools.converters.mil.mil import get_new_symbol, types
 from onnx import numpy_helper
 
 DET, CLS, REC = "PP-OCRv6_det_small", "ch_ppocr_mobile_v2.0_cls_mobile", "PP-OCRv6_rec_small"
@@ -47,8 +47,10 @@ def pads(a: dict, kernel, strides, dil=(1, 1)) -> list[int]:
     return [p[0], p[2], p[1], p[3]]
 
 
-def translate(model: onnx.ModelProto, shape: tuple[int, ...]):
-    """把 ONNX 图翻译成 MIL 函数体。值要么是 numpy(常量, 能折叠就折叠), 要么是 MIL Var。"""
+def translate(model: onnx.ModelProto, shape: tuple):
+    """把 ONNX 图翻译成 MIL 函数体。值要么是 numpy(常量, 能折叠就折叠), 要么是 MIL Var。
+
+    shape 里可以有 get_new_symbol() 产生的符号维: 检测图没有 Shape/Reshape, 能做成可变尺寸。"""
     g = model.graph
     init = {i.name: numpy_helper.to_array(i) for i in g.initializer}
 
@@ -195,6 +197,26 @@ def convert_one(onnx_path: Path, shape: tuple[int, ...], out: Path, precision: s
             "max_abs_diff": float(np.abs(ref - got).max()), "mean_abs_diff": float(np.abs(ref - got).mean())}
 
 
+def convert_flex_det(onnx_path: Path, out: Path, precision: str) -> dict:
+    """可变尺寸检测模型: Core ML 不把可变形状放上 ANE, 走 CPU/GPU, 换来任意尺寸都是精确输入。"""
+    m = onnx.load(onnx_path)
+    prog = translate(m, (1, 3, get_new_symbol(), get_new_symbol()))
+    rd = ct.RangeDim(lower_bound=32, upper_bound=8192)
+    ml = ct.convert(prog, convert_to="mlprogram", minimum_deployment_target=ct.target.macOS14,
+                    compute_precision=ct.precision.FLOAT16 if precision == "float16" else ct.precision.FLOAT32,
+                    inputs=[ct.TensorType(name="x", shape=(1, 3, rd, ct.RangeDim(lower_bound=32, upper_bound=8192)))])
+    ml.save(str(out))
+    res = []
+    rng = np.random.default_rng(0)
+    sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+    for h, w in ((640, 480), (736, 1312), (2016, 896)):
+        x = (rng.random((1, 3, h, w), dtype=np.float32) * 2 - 1).astype(np.float32)
+        ref = sess.run(None, {"x": x})[0]
+        got = np.asarray(next(iter(ml.predict({"x": x}).values())))
+        res.append({"shape": [h, w], "got": list(got.shape), "max_abs_diff": float(np.abs(ref - got).max())})
+    return {"file": out.name, "flex_checks": res}
+
+
 def sha_dir(p: Path) -> str:
     h = hashlib.sha256()
     for f in sorted(q for q in p.rglob("*") if q.is_file()):
@@ -210,6 +232,7 @@ def main() -> int:
     ap.add_argument("--det", default="", help="逗号分隔的 宽x高")
     ap.add_argument("--rec", default="", help="逗号分隔的宽度")
     ap.add_argument("--cls", action="store_true")
+    ap.add_argument("--det-flex", action="store_true", help="可变尺寸检测模型, 兜底任意页面")
     ap.add_argument("--precision", choices=("float16", "float32"), default="float16")
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
@@ -228,6 +251,13 @@ def main() -> int:
     src = {n: hashlib.sha256((a.models / f"{n}.onnx").read_bytes()).hexdigest() for n in (DET, CLS, REC)}
     manifest["onnx_sha256"] = src
     (a.out / "keys.txt").write_text("\n".join(rec_keys(onnx.load(a.models / f"{REC}.onnx"))), "utf-8")
+    if a.det_flex:
+        out = a.out / f"det-flex-{tag}.mlpackage"
+        t0 = time.time()
+        r = convert_flex_det(a.models / f"{DET}.onnx", out, a.precision)
+        r.update(source=DET, seconds=round(time.time() - t0, 1), sha256=sha_dir(out))
+        manifest["models"][out.name] = r
+        print(json.dumps(r), flush=True)
     for name, shape, out in jobs:
         t0 = time.time()
         r = convert_one(a.models / f"{name}.onnx", shape, out, a.precision)

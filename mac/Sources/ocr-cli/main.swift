@@ -322,16 +322,18 @@ do {
         guard let dir = option(args, "--models"), let out = option(args, "--out") else { fail(usage) }
         let units: [String: MLComputeUnits] = ["ane": .cpuAndNeuralEngine, "all": .all, "cpu": .cpuOnly, "gpu": .cpuAndGPU]
         guard let u = units[option(args, "--units") ?? "all"] else { fail(usage) }
-        let skip = ["--models", "--units", "--out"]
+        let skip = ["--models", "--units", "--out", "--batch"]
         var images: [String] = [], i = 0
         while i < args.count {
             if skip.contains(args[i]) { i += 2; continue }
-            if args[i] != "--cls" { images.append(args[i]) }
+            if args[i] != "--cls", args[i] != "--no-orient" { images.append(args[i]) }
             i += 1
         }
         let t0 = Date()
         let e = try PaddleEngine(directory: URL(fileURLWithPath: dir, isDirectory: true), units: u)
         e.useCls = args.contains("--cls")
+        e.useOrientation = !args.contains("--no-orient")
+        if let b = option(args, "--batch").flatMap(Int.init) { e.batchSize = b }
         var res: [String: [Line]] = [:]
         var seconds: [Double] = []
         for p in images {
@@ -347,6 +349,7 @@ do {
                      Date().timeIntervalSince(t0), e.loadSeconds, seconds.first ?? 0,
                      seconds.count > 1 ? seconds.dropFirst().reduce(0, +) / Double(seconds.count - 1) : 0,
                      e.timing.det, e.timing.post, e.timing.crop, e.timing.cls, e.timing.rec))
+        print("flex_pages \(e.flexPages) canvas_pages \(e.canvasFallbacks)")
 
     default:
         fail(usage)

@@ -11,8 +11,8 @@ import OCRCore
 //   - findContours 只取外轮廓：minAreaRect 只看凸包，这里直接求连通域的凸包；内孔轮廓不要；
 //   - pyclipper 的圆角外扩：矩形圆角外扩后的最小外接矩形就是四边各外扩 d，直接这么算；
 //   - 灰度线性插值用浮点，OpenCV 用定点，个别像素差 1。
-// 模型固定形状（才能上 ANE）：检测按画布尺寸选模型，识别按行宽分桶，宽出来的部分补 0，
-// 这和 RapidOCR 批内对齐到最宽那行的做法相同。
+// 检测：常见尺寸用固定形状模型（才能上 ANE）；其余走可变尺寸模型（CPU/GPU），输入始终是精确尺寸，不补白。
+// 识别按行宽分桶，宽出来的部分补 0，这和 RapidOCR 批内对齐到最宽那行的做法相同。
 
 public enum PaddleError: Error, CustomStringConvertible {
     case noModels(String), badImage, badOutput(String)
@@ -76,6 +76,37 @@ struct Gray {
         }
         return Gray(w: dw, h: dh, px: out)
     }
+}
+
+extension Gray {
+    /// 顺时针旋转 deg（90/180/270）。
+    func rotated(_ deg: Int) -> Gray {
+        switch deg {
+        case 180: return Gray(w: w, h: h, px: px.reversed())
+        case 90:
+            var o = [UInt8](repeating: 0, count: w * h)
+            for y in 0..<h { for x in 0..<w { o[x * h + (h - 1 - y)] = px[y * w + x] } }
+            return Gray(w: h, h: w, px: o)
+        case 270:
+            var o = [UInt8](repeating: 0, count: w * h)
+            for y in 0..<h { for x in 0..<w { o[(w - 1 - x) * h + y] = px[y * w + x] } }
+            return Gray(w: h, h: w, px: o)
+        default: return self
+        }
+    }
+}
+
+/// 转正后的图（顺时针转过 deg）上的框映射回原图。w/h 是原图尺寸。
+public func rotateBack(_ l: Line, _ deg: Int, w: Int, h: Int) -> Line {
+    var r = l
+    let W = Double(w), H = Double(h)
+    switch deg {
+    case 180: r.x = W - l.x - l.w; r.y = H - l.y - l.h
+    case 90: r.x = l.y; r.y = H - l.x - l.w; r.w = l.h; r.h = l.w
+    case 270: r.x = W - l.y - l.h; r.y = l.x; r.w = l.h; r.h = l.w
+    default: break
+    }
+    return r
 }
 
 // MARK: - 几何
@@ -403,14 +434,23 @@ public final class PaddleEngine {
     let dir: URL
     let config: MLModelConfiguration
     var detModels: [(w: Int, h: Int, url: URL, model: MLModel?)] = []
+    var flexURL: URL?, flexModel: MLModel?
     var recModels: [(w: Int, url: URL, model: MLModel?)] = []
     var clsModel: MLModel?
     let keys: [String]
     /// 逐行方向分类。默认关：书页的行本来就是正的，分类器却会把正常长行判成 180°，翻过来读出乱码。
     public var useCls = false
+    /// 整页方向判定：只有判为倒置/横置的页才翻转重跑
+    public var useOrientation = true
+    public var orientSample = 3, orientMargin = 0.10
+    /// 识别批大小（一个宽度桶内）
+    public var batchSize = 16
     public var timing = PaddleTiming()
     /// 用了大画布补白的页数。补白会让结果变差（实测逐行一致率 98.1% → 93.4%），要进报告。
     public private(set) var canvasFallbacks = 0
+    /// 走可变尺寸检测模型的页数（CPU/GPU，比 ANE 慢）
+    public private(set) var flexPages = 0
+    public var flexUnits: MLComputeUnits = .cpuAndGPU
     public private(set) var loadSeconds = 0.0
 
     public init(directory: URL, units: MLComputeUnits) throws {
@@ -421,7 +461,9 @@ public final class PaddleEngine {
         for n in names where n.hasSuffix(".mlpackage") {
             let parts = n.replacingOccurrences(of: ".mlpackage", with: "").split(separator: "-")
             let u = directory.appendingPathComponent(n)
-            if parts[0] == "det" {
+            if parts[0] == "det", parts[1] == "flex" {
+                flexURL = u
+            } else if parts[0] == "det" {
                 let wh = parts[1].split(separator: "x").compactMap { Int($0) }
                 detModels.append((wh[0], wh[1], u, nil))
             } else if parts[0] == "rec", let w = Int(parts[1]) {
@@ -430,7 +472,7 @@ public final class PaddleEngine {
         }
         detModels.sort { ($0.h, $0.w) < ($1.h, $1.w) }
         recModels.sort { $0.w < $1.w }
-        guard !detModels.isEmpty, !recModels.isEmpty else { throw PaddleError.noModels(directory.path) }
+        guard !detModels.isEmpty || flexURL != nil, !recModels.isEmpty else { throw PaddleError.noModels(directory.path) }
         keys = try String(contentsOf: directory.appendingPathComponent("keys.txt"), encoding: .utf8).components(separatedBy: "\n")
     }
 
@@ -446,7 +488,7 @@ public final class PaddleEngine {
 
     /// 模型目录里全部 mlpackage 的编译路径（规划用）。
     public func allCompiled() throws -> [(String, URL)] {
-        var names = detModels.map(\.url) + recModels.map(\.url)
+        var names = detModels.map(\.url) + recModels.map(\.url) + (flexURL.map { [$0] } ?? [])
         if let c = try FileManager.default.contentsOfDirectory(atPath: dir.path)
             .first(where: { $0.hasPrefix("cls-") && $0.hasSuffix(".mlpackage") }) {
             names.append(dir.appendingPathComponent(c))
@@ -460,11 +502,25 @@ public final class PaddleEngine {
         return try MLModel(contentsOf: compiled(url), configuration: config)
     }
 
+    /// 尺寸正好的固定模型优先；否则可变尺寸模型；都没有才用大画布补白（精度差，要报降级）。
     private func detModel(_ w: Int, _ h: Int) throws -> (MLModel, Int, Int) {
-        // 优先尺寸正好的；否则取能装下的最小画布，多出来的部分补白
-        guard let i = detModels.firstIndex(where: { $0.w == w && $0.h == h })
-                ?? detModels.indices.filter({ detModels[$0].w >= w && detModels[$0].h >= h })
-                    .min(by: { detModels[$0].w * detModels[$0].h < detModels[$1].w * detModels[$1].h })
+        if let i = detModels.firstIndex(where: { $0.w == w && $0.h == h }) {
+            if detModels[i].model == nil { detModels[i].model = try load(detModels[i].url) }
+            return (detModels[i].model!, w, h)
+        }
+        if let u = flexURL {
+            if flexModel == nil {
+                let t0 = Date()
+                let cfg = MLModelConfiguration()
+                cfg.computeUnits = flexUnits
+                flexModel = try MLModel(contentsOf: compiled(u), configuration: cfg)
+                loadSeconds += Date().timeIntervalSince(t0)
+            }
+            flexPages += 1
+            return (flexModel!, w, h)
+        }
+        guard let i = detModels.indices.filter({ detModels[$0].w >= w && detModels[$0].h >= h })
+            .min(by: { detModels[$0].w * detModels[$0].h < detModels[$1].w * detModels[$1].h })
         else { throw PaddleError.noModels("没有能装下 \(w)×\(h) 的检测模型") }
         if detModels[i].model == nil { detModels[i].model = try load(detModels[i].url) }
         return (detModels[i].model!, detModels[i].w, detModels[i].h)
@@ -539,23 +595,46 @@ public final class PaddleEngine {
         return v
     }
 
-    /// 一页：返回与 _rapid_normalize 相同形状的行（坐标是原图像素）。
-    public func recognize(_ image: CGImage) throws -> [Line] {
-        let src = try Gray(image)
-        // resize_image_within_bounds：长边超 2000 就缩，对齐 32。比值用缩放前后的整数尺寸
+    private struct Prepared {
+        var img: Gray
+        var ratioW: Double, ratioH: Double, top: Int
+    }
+
+    /// resize_image_within_bounds + apply_vertical_padding。
+    private func prepare(_ src: Gray) -> Prepared {
+        func align(_ v: Double) -> Int { Int((Double(Int(v)) / 32).rounded(.toNearestOrEven)) * 32 }
         var img = src
         var ratioW = 1.0, ratioH = 1.0
-        if max(src.w, src.h) > 2000 {
-            let r = 2000.0 / Double(max(src.w, src.h))
-            let rw = Int((Double(Int(Double(src.w) * r)) / 32).rounded(.toNearestOrEven)) * 32
-            let rh = Int((Double(Int(Double(src.h) * r)) / 32).rounded(.toNearestOrEven)) * 32
-            img = src.resized(rw, rh)
-            ratioW = Double(src.w) / Double(rw)
-            ratioH = Double(src.h) / Double(rh)
+        if max(img.w, img.h) > 2000 {
+            let r = 2000.0 / Double(max(img.w, img.h))
+            let rw = align(Double(img.w) * r), rh = align(Double(img.h) * r)
+            let (ow, oh) = (img.w, img.h)
+            img = img.resized(rw, rh)
+            ratioW = Double(ow) / Double(rw)
+            ratioH = Double(oh) / Double(rh)
         }
-        // DetPreProcess：短边不足 736 放大，对齐 32
+        if min(img.w, img.h) < 30 {
+            let r = 30.0 / Double(min(img.w, img.h))
+            let rw = align(Double(img.w) * r), rh = align(Double(img.h) * r)
+            let (ow, oh) = (img.w, img.h)
+            img = img.resized(rw, rh)
+            ratioW = Double(ow) / Double(rw)
+            ratioH = Double(oh) / Double(rh)
+        }
+        var top = 0
+        if img.h <= 30 || Double(img.w) / Double(img.h) > 8 {
+            let newH = max(Int(Double(img.w) / 8), 30) * 2
+            top = abs(newH - img.h) / 2
+            var px = [UInt8](repeating: 0, count: img.w * (img.h + 2 * top))
+            px.replaceSubrange((top * img.w)..<((top + img.h) * img.w), with: img.px)
+            img = Gray(w: img.w, h: img.h + 2 * top, px: px)
+        }
+        return Prepared(img: img, ratioW: ratioW, ratioH: ratioH, top: top)
+    }
+
+    private func detect(_ img: Gray) throws -> [DetBox] {
         var dw = img.w, dh = img.h
-        if min(dw, dh) < 736 {
+        if min(dw, dh) < 736 {                 // DetPreProcess：短边不足 736 放大
             let r = 736.0 / Double(min(dw, dh))
             dw = Int(Double(dw) * r)
             dh = Int(Double(dh) * r)
@@ -581,13 +660,100 @@ public final class PaddleEngine {
         }
         let boxes = prob.withUnsafeBufferPointer { dbPostprocess($0, w: dw, h: dh, destW: img.w, destH: img.h) }
         timing.post += Date().timeIntervalSince(t0)
-        if boxes.isEmpty { return [] }
+        return boxes
+    }
 
-        t0 = Date()
-        var crops = boxes.map { cropLine(img, $0.pts) }
+    /// 批量识别。同一宽度桶的行一起送 predictions(fromBatch:)，返回与输入同序的 (文字, 置信度)。
+    private func readLines(_ crops: [Gray]) throws -> [(String, Double)] {
+        var out = [(String, Double)](repeating: ("", 0), count: crops.count)
+        var buckets: [Int: [Int]] = [:]
+        for (i, g) in crops.enumerated() {
+            let need = Int(48 * max(320.0 / 48, Double(g.w) / Double(g.h)))
+            let w = recModels.first { $0.w >= need }?.w ?? recModels.last!.w
+            buckets[w, default: []].append(i)
+        }
+        for w in buckets.keys.sorted() {
+            let idx = buckets[w]!
+            let (rm, bw) = try recModel(w)
+            var start = 0
+            while start < idx.count {
+                let part = Array(idx[start..<min(start + batchSize, idx.count)])
+                start += batchSize
+                let inputs: [MLFeatureProvider] = try part.map { i in
+                    let g = crops[i]
+                    let rw = min(Int((48 * Double(g.w) / Double(g.h)).rounded(.up)), bw)
+                    let a = try tensor(48, bw)
+                    fill(a, g.resized(max(rw, 1), 48), canvasW: bw, canvasH: 48, pad: 0)
+                    return try MLDictionaryFeatureProvider(dictionary: ["x": a])
+                }
+                let res = try rm.predictions(fromBatch: MLArrayBatchProvider(array: inputs))
+                for (k, i) in part.enumerated() {
+                    let f = res.features(at: k)
+                    guard let n = f.featureNames.first, let v = f.featureValue(for: n)?.multiArrayValue else {
+                        throw PaddleError.badOutput("批量输出缺失")
+                    }
+                    out[i] = decode(v)
+                }
+            }
+        }
+        return out
+    }
+
+    /// 整页方向。行本身的朝向看框：竖框占多数才考虑 90/270，否则只比 0/180。
+    /// 非 0 方向必须比 0 明显好才算，书页绝大多数是正的，不能因为个别行的噪声翻页。
+    private func orientation(_ crops: [Gray]) throws -> (deg: Int, conf0: Double, best: Double) {
+        let usable = crops.filter { max($0.w, $0.h) >= 3 * min($0.w, $0.h) }
+        if usable.count < 2 { return (0, 0, 0) }
+        let sample = Array(usable.sorted { max($0.w, $0.h) > max($1.w, $1.h) }.prefix(orientSample))
+        let tall = sample.filter { $0.h > $0.w }.count * 2 > sample.count
+        func score(_ deg: Int) throws -> Double {
+            let c = try readLines(sample.map { $0.rotated(deg) }).map(\.1)
+            return c.reduce(0, +) / Double(c.count)
+        }
+        // cropLine 已经把竖框转过一次（逆时针 90°），所以这里的 deg 是相对裁好的行
+        let base = try score(0)
+        let alt = try score(180)
+        var (deg, best) = (0, base)
+        if alt > best + orientMargin { (deg, best) = (180, alt) }
+        return (deg == 0 ? 0 : (tall ? (deg == 180 ? 90 : 270) : 180), base, best)
+    }
+
+    /// 一页：返回与 _rapid_normalize 相同形状的行（坐标是原图像素）。
+    public func recognize(_ image: CGImage) throws -> [Line] {
+        try recognize(try Gray(image)).lines
+    }
+
+    public func recognizeOriented(_ image: CGImage) throws -> (lines: [Line], rotation: Int) {
+        try recognize(try Gray(image))
+    }
+
+    private func recognize(_ src: Gray) throws -> (lines: [Line], rotation: Int) {
+        var p = prepare(src)
+        var boxes = try detect(p.img)
+        if boxes.isEmpty { return ([], 0) }
+
+        var t0 = Date()
+        var crops = boxes.map { cropLine(p.img, $0.pts) }
         timing.crop += Date().timeIntervalSince(t0)
 
-        // 方向分类
+        var rotation = 0
+        if useOrientation {
+            t0 = Date()
+            let o = try orientation(crops)
+            timing.cls += Date().timeIntervalSince(t0)
+            if o.deg != 0 {
+                rotation = o.deg
+                Log.shared.debug("orientation", ["rotation": .i(o.deg), "conf0": .d(o.conf0), "best": .d(o.best)])
+                p = prepare(src.rotated(o.deg))
+                boxes = try detect(p.img)
+                if boxes.isEmpty { return ([], rotation) }
+                t0 = Date()
+                crops = boxes.map { cropLine(p.img, $0.pts) }
+                timing.crop += Date().timeIntervalSince(t0)
+            }
+        }
+
+        // 逐行方向分类（只留作与 RapidOCR 对照，默认关）
         t0 = Date()
         if useCls, let cm = try clsLoaded() {
             for i in crops.indices {
@@ -595,52 +761,66 @@ public final class PaddleEngine {
                 let rw = min(Int((48.0 * Double(g.w) / Double(g.h)).rounded(.up)), 192)
                 let a = try tensor(48, 192)
                 fill(a, g.resized(max(rw, 1), 48), canvasW: 192, canvasH: 48, pad: 0)
-                let p = floats(try predict(cm, a))
-                if p.count >= 2, p[1] > p[0], p[1] > 0.9 {
+                let q = floats(try predict(cm, a))
+                if q.count >= 2, q[1] > q[0], q[1] > 0.9 {
                     crops[i] = Gray(w: g.w, h: g.h, px: g.px.reversed())
                 }
             }
         }
         timing.cls += Date().timeIntervalSince(t0)
 
-        // 识别 + CTC 解码
         t0 = Date()
         var lines: [Line] = []
-        for (i, g) in crops.enumerated() {
-            let ratio = Double(g.w) / Double(g.h)
-            let need = Int(48 * max(320.0 / 48, ratio))
-            let (rm, bw) = try recModel(need)
-            let rw = min(Int((48 * ratio).rounded(.up)), bw)
-            let a = try tensor(48, bw)
-            fill(a, g.resized(max(rw, 1), 48), canvasW: bw, canvasH: 48, pad: 0)
-            let o = try predict(rm, a)
-            let (text, score) = decode(o)
+        let read = batchSize > 0 ? try readLines(crops) : try crops.map { try readLines([$0])[0] }
+        for i in crops.indices {
+            let (text, score) = read[i]
             if pyStrip(text).unicodeScalars.isEmpty || score < 0.5 { continue }
-            let xs = boxes[i].pts.map { $0.x * ratioW }, ys = boxes[i].pts.map { $0.y * ratioH }
+            let xs = boxes[i].pts.map { $0.x * p.ratioW }
+            let ys = boxes[i].pts.map { max(0, $0.y - Double(p.top)) * p.ratioH }
             let x0 = xs.min()!, y0 = ys.min()!
-            lines.append(Line(x: pyRound(x0, 1), y: pyRound(y0, 1), w: pyRound(xs.max()! - x0, 1),
-                              h: pyRound(ys.max()! - y0, 1), conf: pyRound(score, 4), text: text))
+            var l = Line(x: pyRound(x0, 1), y: pyRound(y0, 1), w: pyRound(xs.max()! - x0, 1),
+                         h: pyRound(ys.max()! - y0, 1), conf: pyRound(score, 4), text: text)
+            if rotation != 0 { l = rotateBack(l, rotation, w: src.w, h: src.h) }
+            lines.append(l)
         }
         timing.rec += Date().timeIntervalSince(t0)
-        return sortReadingOrder(lines)
+        return (sortReadingOrder(lines), rotation)
     }
 
     /// CTC：相邻去重 + 去 blank；置信度取保留下来的字的均值。
     private func decode(_ o: MLMultiArray) -> (String, Double) {
         let T = o.shape[1].intValue, K = o.shape[2].intValue
-        let v = floats(o)
+        let st = o.strides[1].intValue, sk = o.strides[2].intValue
+        var idx = [Int](repeating: 0, count: T), val = [Float](repeating: 0, count: T)
+        // 输出每行 T×K（K≈1.9 万），不能先拷成 [Float]：直接在缓冲区上取 argmax，并跳过 strides 的行填充
+        o.withUnsafeBytes { raw in
+            func scan<V: BinaryFloatingPoint>(_ p: UnsafePointer<V>) {
+                for t in 0..<T {
+                    let base = t * st
+                    var bi = 0, bv = p[base]
+                    var off = base + sk
+                    for k in 1..<K {
+                        let v = p[off]
+                        if v > bv { bv = v; bi = k }
+                        off += sk
+                    }
+                    idx[t] = bi
+                    val[t] = Float(bv)
+                }
+            }
+            switch o.dataType {
+            case .float16: scan(raw.bindMemory(to: Float16.self).baseAddress!)
+            case .float32: scan(raw.bindMemory(to: Float.self).baseAddress!)
+            case .double: scan(raw.bindMemory(to: Double.self).baseAddress!)
+            default: break
+            }
+        }
         var prev = -1, text = "", confs: [Double] = []
         for t in 0..<T {
-            var bi = 0
-            var bv = -Float.infinity
-            let base = t * K
-            for k in 0..<K where v[base + k] > bv {
-                bv = v[base + k]
-                bi = k
-            }
+            let bi = idx[t]
             if bi != 0, bi != prev, bi < keys.count {
                 text += keys[bi]
-                confs.append((Double(bv) * 100_000).rounded() / 100_000)
+                confs.append((Double(val[t]) * 100_000).rounded() / 100_000)
             }
             prev = bi
         }
