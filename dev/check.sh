@@ -48,6 +48,19 @@ case "$stage" in
     swift test
     .venv/bin/python bench/p2_parity.py "$@"
     ;;
+  p3)
+    # 依赖 P0 跑出的 work/bench/<名>.{vision,rapidocr,fused}.json 和 P1 v2 真值
+    need_venv
+    need_vision
+    swift build -c release
+    swift test
+    .venv/bin/python bench/p3_fuse_parity.py "City of Broken Promises" --tag en --spot work/bench/spot-en2 --exclude 3 > /dev/null
+    .venv/bin/python bench/p3_fuse_parity.py "失约之城" --tag zh --spot work/bench/spot-zh > /dev/null
+    .venv/bin/python bench/p3_md_parity.py "City of Broken Promises" --tag en > /dev/null
+    .venv/bin/python bench/p3_md_parity.py "失约之城" --tag zh > /dev/null
+    .venv/bin/python bench/p3_md_synth.py "$@"
+    echo "P3 对拍全部通过"
+    ;;
   *)
-    echo "用法: ./dev/check.sh p0|p2 <pdf> [...]"; exit 2 ;;
+    echo "用法: ./dev/check.sh p0|p2 <pdf> [...] | p3 [--docs N]"; exit 2 ;;
 esac
