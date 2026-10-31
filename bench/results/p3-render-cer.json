@@ -55,7 +55,8 @@
     "300": 8
    }
   },
-  "delta_pct_points": 0.36
+  "delta_pct_points": 0.36,
+  "finding": "0.36 个百分点几乎全来自第 12 页一行: RapidOCR 读成乱码, 融合打分在英文上区分力弱, conf 微差使胜者翻转, 丢 37 字。Vision 渲染差异仅 3 行。非系统性变差。"
  },
  "zh": {
   "pages": [
