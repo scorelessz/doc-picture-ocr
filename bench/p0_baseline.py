@@ -9,6 +9,7 @@
 
 用法:
   .venv/bin/python bench/p0_baseline.py <pdf> [--pages N|A-B] [--out bench/baseline.json]
+  加 --reuse: 不重跑 OCR, 直接用 work/bench/ 里上次的 fused.json 重算指标(perf 记 null)。
 产物(中间文件和 md/pdf)落在 work/bench/, 已被 .gitignore 挡住。
 """
 from __future__ import annotations
@@ -85,6 +86,7 @@ def main() -> int:
     ap.add_argument("pdf")
     ap.add_argument("--pages")
     ap.add_argument("--out", default=str(ROOT / "bench" / "baseline.json"))
+    ap.add_argument("--reuse", action="store_true")
     a = ap.parse_args()
 
     pdf = Path(a.pdf).expanduser().resolve()
@@ -99,13 +101,16 @@ def main() -> int:
                            pages=a.pages, force=True, clobber=True,
                            force_ocr=has_gt)
     cfg.outdir.mkdir(parents=True, exist_ok=True)
-    t0 = time.time()
-    res = run_books.run_batch(cfg, [pdf])
-    seconds = time.time() - t0
-    rec = (res.get("records") or [{}])[0]
-    if rec.get("status") not in ("ok", "degraded"):
-        print(f"运行失败: {rec.get('status')} {rec.get('error')}", file=sys.stderr)
-        return 1
+    if a.reuse:
+        seconds, rec = None, {"status": "reused"}
+    else:
+        t0 = time.time()
+        res = run_books.run_batch(cfg, [pdf])
+        seconds = time.time() - t0
+        rec = (res.get("records") or [{}])[0]
+        if rec.get("status") not in ("ok", "degraded"):
+            print(f"运行失败: {rec.get('status')} {rec.get('error')}", file=sys.stderr)
+            return 1
 
     fused = json.loads((work / f"{pdf.stem}.fused.json").read_text("utf-8"))
     st = fused["stats"]
@@ -115,18 +120,37 @@ def main() -> int:
 
     cer = None
     if has_gt:
-        ocr = {p["page"]: "".join(l["text"] for l in p["lines"]) for p in fused["pages"]}
-        per = []
+        fpages = {p["page"]: p for p in fused["pages"]}
+        eng_lines = {}                             # 各引擎原始输出每页几行: 分清「没认出来」和「融合丢了」
+        for e in ("vision", "rapidocr"):
+            ep = work / f"{pdf.stem}.{e}.json"
+            if ep.exists():
+                eng_lines[e] = {p["page"]: len(p.get("lines", []))
+                                for p in json.loads(ep.read_text("utf-8"))["pages"]}
+        per = []                                   # (页, 编辑距离, 真值字数, 识别字数, 识别行数)
         for p in gt_pages:
-            ref, hyp = canon(native[p]), canon(ocr.get(p, ""))
-            per.append((p, distance(ref, hyp), len(ref)))
-        tot_d = sum(d for _, d, _ in per)
-        tot_n = sum(n for _, _, n in per)
-        worst = sorted(per, key=lambda x: -x[1] / max(1, x[2]))[:10]
+            fp = fpages.get(p, {})
+            ref = canon(native[p])
+            hyp = canon("".join(l["text"] for l in fp.get("lines", [])))
+            per.append((p, distance(ref, hyp), len(ref), len(hyp), len(fp.get("lines", []))))
+        tot_d = sum(x[1] for x in per)
+        tot_n = sum(x[2] for x in per)
+        #  识别结果为空的页单独拎出来: 它们的 CER 恒为 1.0, 是「整页漏识别」而不是「读错字」,
+        #  混在一起会把读字精度的数字整体拉坏, 也会把漏页问题藏进一个平均数里。
+        empty = [x for x in per if x[3] == 0]
+        rest = [x for x in per if x[3] > 0]
+        worst = sorted(per, key=lambda x: -x[1] / max(1, x[2]))[:15]
         cer = {"pages": len(per), "chars": tot_n, "edits": tot_d,
                "cer": round(tot_d / max(1, tot_n), 5),
-               "worst_pages": [{"page": p, "cer": round(d / max(1, n), 4)}
-                               for p, d, n in worst]}
+               "cer_excl_empty": round(sum(x[1] for x in rest) / max(1, sum(x[2] for x in rest)), 5),
+               "empty_ocr_pages": [{"page": x[0], "ref_chars": x[2],
+                                    **{f"{e}_lines": eng_lines.get(e, {}).get(x[0])
+                                       for e in ("vision", "rapidocr")}}
+                                   for x in empty],
+               "worst_pages": [{"page": p, "cer": round(d / max(1, n), 4), "ref_chars": n,
+                                "ocr_chars": h, "ocr_lines": nl,
+                                "native_text": fpages.get(p, {}).get("native_text")}
+                               for p, d, n, h, nl in worst]}
 
     ru_self = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     ru_kids = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
@@ -156,7 +180,8 @@ def main() -> int:
         "searchable_pdf": {"retrieval": rec.get("retrieval")},
         "status": rec.get("status"),
         "degraded": rec.get("degraded"),
-        "perf": {"seconds": round(seconds, 1),
+        "perf": None if seconds is None else {
+                 "seconds": round(seconds, 1),
                  "sec_per_page": round(seconds / max(1, len(pages)), 3),
                  "peak_rss_mb": round(ru_self * scale / 2**20, 1),
                  "peak_rss_children_mb": round(ru_kids * scale / 2**20, 1)},
