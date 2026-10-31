@@ -1,0 +1,53 @@
+{
+  "phase": "p0",
+  "pipeline": "python-books",
+  "date": "2026-10-31T22:55:39",
+  "machine": {
+    "chip": "Apple M4",
+    "ram_gb": 16.0,
+    "macos": "27.0.1",
+    "python": "3.13.18"
+  },
+  "source": {
+    "file": "失约之城.pdf",
+    "pages_total": 373,
+    "pages_run": 20,
+    "native_text_pages": 0,
+    "ground_truth": null
+  },
+  "accuracy": null,
+  "fusion": {
+    "lines": 518,
+    "both": 507,
+    "divergent_rate": 0.3176,
+    "single_source_rate": 0.0212,
+    "only_vision": 2,
+    "only_rapidocr": 9,
+    "dropped_empty": 0,
+    "dropped_contained": 4
+  },
+  "markdown": {
+    "paragraphs": 100,
+    "headings": 11,
+    "chars": 10210,
+    "dropped": 16,
+    "dropped_detail": {
+      "孤立标点或无文字碎块": 1,
+      "页码": 14,
+      "页码(框略高于正文, 凭跨页证据)": 1
+    },
+    "vertical_pages": 0,
+    "two_column_pages": 1
+  },
+  "searchable_pdf": {
+    "retrieval": 1.0
+  },
+  "status": "ok",
+  "degraded": [],
+  "perf": {
+    "seconds": 27.1,
+    "sec_per_page": 1.355,
+    "peak_rss_mb": 1668.6,
+    "peak_rss_children_mb": 144.3
+  }
+}
