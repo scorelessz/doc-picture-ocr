@@ -143,7 +143,7 @@ def main() -> int:
     ap.add_argument("--name", required=True, help="结果文件名用, 如 xiaomi-ocr-0-q8-llamacpp")
     ap.add_argument("--base-url", required=True)
     ap.add_argument("--model", default="local")
-    ap.add_argument("--api-key")
+    ap.add_argument("--api-key-file", help="从文件读 key(取第一行非空内容), 避免 key 出现在命令行/进程列表里")
     ap.add_argument("--prompt-id", choices=sorted(PROMPTS), default="generic")
     ap.add_argument("--mode", choices=("page", "line"), default="page")
     ap.add_argument("--pages", default="3,8-12,20,62,98,160,324")
@@ -156,6 +156,10 @@ def main() -> int:
                     help="把识别原文存到 work/bench/vlm-text/<name>-<mode>/pNNNN.txt(仅本机, 已被 .gitignore 挡住), 供抽查比对")
     a = ap.parse_args()
 
+    a.api_key = None
+    if a.api_key_file:
+        a.api_key = next((l.strip() for l in Path(a.api_key_file).expanduser().read_text().splitlines()
+                          if l.strip()), None)
     pdf = Path(a.pdf).expanduser().resolve()
     doc = pymupdf.open(pdf)
     pages = parse_pages(a.pages, doc.page_count)
