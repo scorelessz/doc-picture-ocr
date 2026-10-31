@@ -1,0 +1,227 @@
+{
+ "phase": "p4",
+ "name": "any-size",
+ "seed": 1,
+ "units": "ane",
+ "images": 30,
+ "total": {
+  "ref": 1110,
+  "text_equal": 1055,
+  "paired": 1110,
+  "only_ref": 0,
+  "only_got": 2,
+  "edits": 63,
+  "chars": 32216
+ },
+ "text_equal_rate": 0.9505,
+ "char_agreement": 0.998,
+ "groups": {
+  "band": {
+   "images": 3,
+   "ref": 4,
+   "got": 4,
+   "paired": 4,
+   "text_equal": 2,
+   "only_ref": 0,
+   "only_got": 0,
+   "edits": 4,
+   "chars": 141,
+   "rate": 0.5,
+   "char_agreement": 0.9716,
+   "mean_iou": 0.9772
+  },
+  "huge": {
+   "images": 2,
+   "ref": 55,
+   "got": 55,
+   "paired": 55,
+   "text_equal": 54,
+   "only_ref": 0,
+   "only_got": 0,
+   "edits": 1,
+   "chars": 1140,
+   "rate": 0.9818,
+   "char_agreement": 0.9991,
+   "mean_iou": 0.9917
+  },
+  "long": {
+   "images": 3,
+   "ref": 373,
+   "got": 375,
+   "paired": 373,
+   "text_equal": 347,
+   "only_ref": 0,
+   "only_got": 2,
+   "edits": 30,
+   "chars": 11909,
+   "rate": 0.9303,
+   "char_agreement": 0.9975,
+   "mean_iou": 0.9415
+  },
+  "paper": {
+   "images": 5,
+   "ref": 136,
+   "got": 136,
+   "paired": 136,
+   "text_equal": 133,
+   "only_ref": 0,
+   "only_got": 0,
+   "edits": 3,
+   "chars": 3715,
+   "rate": 0.9779,
+   "char_agreement": 0.9992,
+   "mean_iou": 0.9967
+  },
+  "scale": {
+   "images": 8,
+   "ref": 240,
+   "got": 240,
+   "paired": 240,
+   "text_equal": 231,
+   "only_ref": 0,
+   "only_got": 0,
+   "edits": 10,
+   "chars": 7421,
+   "rate": 0.9625,
+   "char_agreement": 0.9987,
+   "mean_iou": 0.9953
+  },
+  "small": {
+   "images": 4,
+   "ref": 23,
+   "got": 23,
+   "paired": 23,
+   "text_equal": 20,
+   "only_ref": 0,
+   "only_got": 0,
+   "edits": 3,
+   "chars": 368,
+   "rate": 0.8696,
+   "char_agreement": 0.9918,
+   "mean_iou": 0.9996
+  },
+  "spread": {
+   "images": 5,
+   "ref": 279,
+   "got": 279,
+   "paired": 279,
+   "text_equal": 268,
+   "only_ref": 0,
+   "only_got": 0,
+   "edits": 12,
+   "chars": 7522,
+   "rate": 0.9606,
+   "char_agreement": 0.9984,
+   "mean_iou": 0.9926
+  }
+ },
+ "worst": [
+  [
+   0.0,
+   "band-026.png",
+   1,
+   1,
+   [
+    2481,
+    96
+   ]
+  ],
+  [
+   0.5,
+   "band-027.png",
+   2,
+   2,
+   [
+    1503,
+    123
+   ]
+  ],
+  [
+   0.75,
+   "small-021.png",
+   8,
+   8,
+   [
+    800,
+    555
+   ]
+  ],
+  [
+   0.75,
+   "small-024.png",
+   4,
+   4,
+   [
+    951,
+    659
+   ]
+  ],
+  [
+   0.864,
+   "scale-005.png",
+   22,
+   22,
+   [
+    2095,
+    3302
+   ]
+  ],
+  [
+   0.9,
+   "paper-009.png",
+   20,
+   20,
+   [
+    1748,
+    2480
+   ]
+  ],
+  [
+   0.924,
+   "long-018.png",
+   119,
+   121,
+   [
+    1512,
+    11612
+   ]
+  ],
+  [
+   0.924,
+   "long-020.png",
+   157,
+   157,
+   [
+    1505,
+    17571
+   ]
+  ]
+ ],
+ "timing": "总 9.0s  载入 0.2s  首页 0.24s  其余均值 0.30s/页 | det 4.45 post 0.56 crop 0.34 cls 0.00 rec 2.70\nflex_pages 36 canvas_pages 0 tiled_pages 3",
+ "orientation": {
+  "0": {
+   "pages": 8,
+   "pages_recovered": 8,
+   "line_recovery": 0.9806,
+   "timing": "总 1.4s  载入 0.2s  首页 0.23s  其余均值 0.16s/页 | det 0.40 post 0.10 crop 0.05 cls 0.18 rec 0.50\nflex_pages 0 canvas_pages 0 til"
+  },
+  "90": {
+   "pages": 8,
+   "pages_recovered": 8,
+   "line_recovery": 0.9806,
+   "timing": "总 2.7s  载入 0.1s  首页 0.39s  其余均值 0.32s/页 | det 1.40 post 0.23 crop 0.11 cls 0.19 rec 0.49\nflex_pages 8 canvas_pages 0 til"
+  },
+  "180": {
+   "pages": 8,
+   "pages_recovered": 8,
+   "line_recovery": 0.9806,
+   "timing": "总 1.9s  载入 0.1s  首页 0.27s  其余均值 0.23s/页 | det 0.68 post 0.20 crop 0.10 cls 0.17 rec 0.50\nflex_pages 0 canvas_pages 0 til"
+  },
+  "270": {
+   "pages": 8,
+   "pages_recovered": 8,
+   "line_recovery": 0.9806,
+   "timing": "总 2.7s  载入 0.1s  首页 0.38s  其余均值 0.33s/页 | det 1.40 post 0.24 crop 0.11 cls 0.18 rec 0.51\nflex_pages 8 canvas_pages 0 til"
+  }
+ }
+}

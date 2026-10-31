@@ -25,11 +25,12 @@ usage:
   ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
   ocr-cli pdf <源.pdf> <fused.json> --out x.searchable.pdf [--force] [--force-text] [--stats stats.json]
   ocr-cli paddle <image>... --models dir [--units ane|all|cpu|gpu] [--cls] --out lines.json
-  ocr-cli doctor [--models dir] [--outdir output] [--out checks.json]
+  ocr-cli doctor [--models-dir dir] [--outdir output] [--out checks.json]
+  ocr-cli models fetch [--models-dir dir] [--url u] [--sha256 h]
   ocr-cli paddle-plan --models dir --out plan.json
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
-               [--paddle coreml|python] [--models dir] [--units ane|all|cpu|gpu]
+               [--paddle coreml|python] [--models-dir dir] [--units ane|all|cpu|gpu]
                [--python .venv/bin/python] [--result result.json]
 
 
@@ -85,7 +86,8 @@ args.removeFirst()
 let startedAt = Date()
 
 #if canImport(Vision)
-let defaultModels = option(args, "--models") ?? (NSHomeDirectory() + "/Desktop/Ignore/models/coreml")
+// --models-dir 优先，--models 是旧写法
+let defaultModels = option(args, "--models-dir") ?? option(args, "--models") ?? ModelStore.defaultDirectory.path
 logEnvironment(args: [cmd] + args, models: URL(fileURLWithPath: defaultModels, isDirectory: true))
 Log.shared.info("start", ["command": .s(cmd), "log_text": .b(Log.shared.withText)])
 defer {
@@ -95,6 +97,12 @@ defer {
 }
 do {
     switch cmd {
+    case "models":
+        guard args.first == "fetch" else { fail(usage) }
+        let dir = URL(fileURLWithPath: defaultModels, isDirectory: true)
+        try ModelStore.fetch(url: option(args, "--url"), sha: option(args, "--sha256"), into: dir, log: warn)
+        print("-> \(dir.path)")
+
     case "doctor":
         let checks = runDoctor(models: URL(fileURLWithPath: defaultModels, isDirectory: true),
                                outdir: URL(fileURLWithPath: option(args, "--outdir") ?? "output", isDirectory: true))
@@ -266,7 +274,7 @@ do {
         if (option(args, "--paddle") ?? "coreml") == "coreml" {
             let dir = defaultModels
             guard FileManager.default.fileExists(atPath: dir + "/keys.txt") else {
-                fail("找不到 Core ML 模型: \(dir)（先跑 tools/convert_paddle.py，或用 --models 指定）", code: 2)
+                fail("找不到 Core ML 模型: \(dir)（先跑 ocr-cli models fetch，或用 --models-dir 指定）", code: 2)
             }
             o.coreml = URL(fileURLWithPath: dir, isDirectory: true)
             let units: [String: MLComputeUnits] = ["ane": .cpuAndNeuralEngine, "all": .all, "cpu": .cpuOnly, "gpu": .cpuAndGPU]
@@ -349,7 +357,7 @@ do {
                      Date().timeIntervalSince(t0), e.loadSeconds, seconds.first ?? 0,
                      seconds.count > 1 ? seconds.dropFirst().reduce(0, +) / Double(seconds.count - 1) : 0,
                      e.timing.det, e.timing.post, e.timing.crop, e.timing.cls, e.timing.rec))
-        print("flex_pages \(e.flexPages) canvas_pages \(e.canvasFallbacks)")
+        print("flex_pages \(e.flexPages) canvas_pages \(e.canvasFallbacks) tiled_pages \(e.tiledPages)")
 
     default:
         fail(usage)

@@ -31,11 +31,13 @@ public struct PageDoc: Codable, Equatable, Sendable {
     public var noInk: Bool?
     /// lines 的来源。闸门命中且有原生文字层时是 "native_text"，不是识别结果。
     public var textSource: String?
+    /// 这页判定为倒置/横置，已顺时针转这么多度再识别；坐标仍是原页的。只在非 0 时写。
+    public var pageRotation: Int?
 
     enum CodingKeys: String, CodingKey {
         case page, width, height, zoom, rotation, image, lines
         case pdfWidth = "pdf_width", pdfHeight = "pdf_height", nativeText = "native_text"
-        case noInk = "no_ink", textSource = "text_source"
+        case noInk = "no_ink", textSource = "text_source", pageRotation = "page_rotation"
     }
 
     public init(page: Int, width: Int, height: Int, pdfWidth: Double, pdfHeight: Double,

@@ -79,6 +79,13 @@ struct Gray {
 }
 
 extension Gray {
+    var cgImage: CGImage? {
+        guard let prov = CGDataProvider(data: Data(px) as CFData) else { return nil }
+        return CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: w,
+                       space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                       provider: prov, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+    }
+
     /// 顺时针旋转 deg（90/180/270）。
     func rotated(_ deg: Int) -> Gray {
         switch deg {
@@ -442,7 +449,9 @@ public final class PaddleEngine {
     public var useCls = false
     /// 整页方向判定：只有判为倒置/横置的页才翻转重跑
     public var useOrientation = true
-    public var orientSample = 3, orientMargin = 0.10
+    public var orientSample = 3, orientMargin = 0.10, orientMinConf = 0.80
+    /// 高宽比超过它的页要分块：长边缩到 2000 后字太小，RapidOCR 在这种页上读出的是乱码
+    public var tileAspect = 3.0
     /// 识别批大小（一个宽度桶内）
     public var batchSize = 16
     public var timing = PaddleTiming()
@@ -450,6 +459,7 @@ public final class PaddleEngine {
     public private(set) var canvasFallbacks = 0
     /// 走可变尺寸检测模型的页数（CPU/GPU，比 ANE 慢）
     public private(set) var flexPages = 0
+    public private(set) var tiledPages = 0
     public var flexUnits: MLComputeUnits = .cpuAndGPU
     public private(set) var loadSeconds = 0.0
 
@@ -701,21 +711,28 @@ public final class PaddleEngine {
 
     /// 整页方向。行本身的朝向看框：竖框占多数才考虑 90/270，否则只比 0/180。
     /// 非 0 方向必须比 0 明显好才算，书页绝大多数是正的，不能因为个别行的噪声翻页。
-    private func orientation(_ crops: [Gray]) throws -> (deg: Int, conf0: Double, best: Double) {
-        let usable = crops.filter { max($0.w, $0.h) >= 3 * min($0.w, $0.h) }
+    private func orientation(_ crops: [Gray], _ boxes: [DetBox]) throws -> (deg: Int, conf0: Double, best: Double) {
+        // 朝向看检测框：cropLine 已经把竖框转平了，看裁好的图看不出来
+        let isTall = boxes.map { dist($0.pts[0], $0.pts[3]) > dist($0.pts[0], $0.pts[1]) }
+        let usable = crops.indices.filter { max(crops[$0].w, crops[$0].h) >= 3 * min(crops[$0].w, crops[$0].h) }
         if usable.count < 2 { return (0, 0, 0) }
-        let sample = Array(usable.sorted { max($0.w, $0.h) > max($1.w, $1.h) }.prefix(orientSample))
-        let tall = sample.filter { $0.h > $0.w }.count * 2 > sample.count
+        let picked = Array(usable.sorted { crops[$0].w > crops[$1].w }.prefix(orientSample))
+        let sample = picked.map { crops[$0] }
+        let tall = picked.filter { isTall[$0] }.count * 2 > picked.count
         func score(_ deg: Int) throws -> Double {
             let c = try readLines(sample.map { $0.rotated(deg) }).map(\.1)
             return c.reduce(0, +) / Double(c.count)
         }
-        // cropLine 已经把竖框转过一次（逆时针 90°），所以这里的 deg 是相对裁好的行
         let base = try score(0)
         let alt = try score(180)
-        var (deg, best) = (0, base)
-        if alt > best + orientMargin { (deg, best) = (180, alt) }
-        return (deg == 0 ? 0 : (tall ? (deg == 180 ? 90 : 270) : 180), base, best)
+        if tall {
+            // cropLine 已把竖框逆时针转过一次。转完读得好，说明整页要顺时针 270°；倒着才读得好，就是 90°。
+            // 两种都读不好时多半是竖排，不动。
+            let best = max(base, alt)
+            if best < orientMinConf { return (0, base, best) }
+            return (base >= alt ? 270 : 90, base, best)
+        }
+        return alt > base + orientMargin ? (180, base, alt) : (0, base, base)
     }
 
     /// 一页：返回与 _rapid_normalize 相同形状的行（坐标是原图像素）。
@@ -727,7 +744,37 @@ public final class PaddleEngine {
         try recognize(try Gray(image))
     }
 
+    /// 把页图按判定结果转正（给 Vision 用）。
+    public func rotatedImage(_ image: CGImage, _ deg: Int) throws -> CGImage {
+        guard let c = try Gray(image).rotated(deg).cgImage else { throw PaddleError.badImage }
+        return c
+    }
+
+    /// 高瘦页切成重叠的块分别识别，每行只算给中心所在的块。只切竖向：横向切会把行切断。
     private func recognize(_ src: Gray) throws -> (lines: [Line], rotation: Int) {
+        guard Double(src.h) / Double(src.w) > tileAspect else { return try recognizePage(src) }
+        let tile = src.w * 2, overlap = src.w / 4
+        var y = 0, out: [Line] = [], k = 0
+        while y < src.h {
+            let end = min(src.h, y + tile)
+            let part = Gray(w: src.w, h: end - y, px: Array(src.px[(y * src.w)..<(end * src.w)]))
+            let lo = y == 0 ? 0.0 : Double(y) + Double(overlap) / 2
+            let hi = end == src.h ? Double(src.h) : Double(end) - Double(overlap) / 2
+            for var l in try recognizePage(part).lines {
+                l.y += Double(y)
+                let c = l.y + l.h / 2
+                if c >= lo, c < hi { out.append(l) }
+            }
+            k += 1
+            if end == src.h { break }
+            y = end - overlap
+        }
+        tiledPages += 1
+        Log.shared.debug("tiled", ["tiles": .i(k), "width": .i(src.w), "height": .i(src.h)])
+        return (sortReadingOrder(out), 0)
+    }
+
+    private func recognizePage(_ src: Gray) throws -> (lines: [Line], rotation: Int) {
         var p = prepare(src)
         var boxes = try detect(p.img)
         if boxes.isEmpty { return ([], 0) }
@@ -739,7 +786,7 @@ public final class PaddleEngine {
         var rotation = 0
         if useOrientation {
             t0 = Date()
-            let o = try orientation(crops)
+            let o = try orientation(crops, boxes)
             timing.cls += Date().timeIntervalSince(t0)
             if o.deg != 0 {
                 rotation = o.deg

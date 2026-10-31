@@ -153,7 +153,7 @@ public func runDoctor(models: URL, outdir: URL) -> [DoctorCheck] {
     }
 
     guard FileManager.default.fileExists(atPath: models.appendingPathComponent("keys.txt").path) else {
-        add("models", false, "\(models.path) 没有模型（先跑 tools/convert_paddle.py）")
+        add("models", false, "\(models.path) 没有模型（先跑 ocr-cli models fetch）")
         return r
     }
     let manifest = modelManifest(models)

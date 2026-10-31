@@ -129,6 +129,8 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         var paddle: [Line] = []
         var dpi = 0.0, dark = 0.0, visionSec = 0.0, paddleSec = 0.0
         var gate = "ocr"
+        var rotation = 0
+        var upright: CGImage?
     }
     var slots: [Slot] = []
     var paddleFailed: [Int] = []
@@ -172,18 +174,48 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                 batch.append((pno, slot))
             }
             let work = batch.filter { $0.1.image != nil }
+            // PP-OCR 先跑：整页方向要由它判，Vision 用转正后的图
+            if let paddle {
+                let t0 = Date()
+                for (pno, s) in work {
+                    let tp = Date()
+                    do {
+                        let r = try paddle.recognizeOriented(s.image!)
+                        s.paddle = r.lines
+                        s.rotation = r.rotation
+                        if r.rotation != 0 {
+                            s.doc!.pageRotation = r.rotation
+                            s.upright = try paddle.rotatedImage(s.image!, r.rotation)
+                            log("⚠ 第 \(pno) 页判定为转了方向: 已顺时针转 \(r.rotation)° 再识别")
+                        }
+                    } catch {
+                        paddleFailed.append(pno)
+                        log("⚠ 第 \(pno) 页 PP-OCR 失败: \(error)")
+                        Log.shared.error("engine_failed", ["page": .i(pno), "engine": .s("ppocr"), "stage": .s("recognize"), "error": .s("\(error)")])
+                    }
+                    s.paddleSec = Date().timeIntervalSince(tp)
+                }
+                paddleSeconds += Date().timeIntervalSince(t0)
+            }
             DispatchQueue.concurrentPerform(iterations: work.count) { i in
                 let (pno, s) = work[i]
                 autoreleasepool {
                     let tv = Date()
                     do {
-                        s.doc!.lines = sortReadingOrder(try VisionEngine.recognize(s.image!))
+                        var ls = try VisionEngine.recognize(s.upright ?? s.image!)
+                        if s.rotation != 0 {
+                            let (w, h) = (s.image!.width, s.image!.height)
+                            ls = ls.map { rotateBack($0, s.rotation, w: w, h: h) }
+                        }
+                        s.doc!.lines = sortReadingOrder(ls)
                     } catch {
                         s.failed = true
                         s.error = "\(error)"
                         Log.shared.error("engine_failed", ["page": .i(pno), "engine": .s("vision"), "stage": .s("recognize"), "error": .s("\(error)")])
                     }
                     s.visionSec = Date().timeIntervalSince(tv)
+                    s.upright = nil
+                    if o.coreml != nil { s.image = nil }
                     if o.coreml == nil {
                         let png = pagesDir.appendingPathComponent(String(format: "p%04d.png", pno))
                         do {
@@ -195,22 +227,6 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                         s.image = nil
                     }
                 }
-            }
-            if let paddle {
-                let t0 = Date()
-                for (pno, s) in work {
-                    let tp = Date()
-                    do {
-                        s.paddle = try paddle.recognize(s.image!)
-                    } catch {
-                        paddleFailed.append(pno)
-                        log("⚠ 第 \(pno) 页 PP-OCR 失败: \(error)")
-                        Log.shared.error("engine_failed", ["page": .i(pno), "engine": .s("ppocr"), "stage": .s("recognize"), "error": .s("\(error)")])
-                    }
-                    s.paddleSec = Date().timeIntervalSince(tp)
-                    s.image = nil
-                }
-                paddleSeconds += Date().timeIntervalSince(t0)
             }
             if start % (o.jobs * 10) == 1 { log("渲染+Vision \(min(n, start + o.jobs - 1))/\(n)") }
         }
@@ -290,6 +306,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                 "divergent": .i(fp?.lines.filter { $0.flag == "divergent" }.count ?? 0),
                 "only_vision": .i(fp?.lines.filter { $0.src == "vision" }.count ?? 0),
                 "only_ppocr": .i(fp?.lines.filter { $0.src == "rapidocr" }.count ?? 0),
+                "page_rotation": .i(s.rotation),
                 "dedup": .i(drops[pno]?.count ?? 0),
                 "dedup_new_rule": .i(drops[pno]?.filter(\.newRuleOnly).count ?? 0),
             ]

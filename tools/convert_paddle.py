@@ -201,10 +201,10 @@ def convert_flex_det(onnx_path: Path, out: Path, precision: str) -> dict:
     """可变尺寸检测模型: Core ML 不把可变形状放上 ANE, 走 CPU/GPU, 换来任意尺寸都是精确输入。"""
     m = onnx.load(onnx_path)
     prog = translate(m, (1, 3, get_new_symbol(), get_new_symbol()))
-    rd = ct.RangeDim(lower_bound=32, upper_bound=8192)
+    rd = ct.RangeDim(lower_bound=32, upper_bound=16384)
     ml = ct.convert(prog, convert_to="mlprogram", minimum_deployment_target=ct.target.macOS14,
                     compute_precision=ct.precision.FLOAT16 if precision == "float16" else ct.precision.FLOAT32,
-                    inputs=[ct.TensorType(name="x", shape=(1, 3, rd, ct.RangeDim(lower_bound=32, upper_bound=8192)))])
+                    inputs=[ct.TensorType(name="x", shape=(1, 3, rd, ct.RangeDim(lower_bound=32, upper_bound=16384)))])
     ml.save(str(out))
     res = []
     rng = np.random.default_rng(0)

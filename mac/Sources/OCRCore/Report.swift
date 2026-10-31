@@ -104,6 +104,7 @@ public func buildReport(_ r: ReportInput) -> String {
     let gateBlank = f.pages.filter { $0.noInk == true && $0.textSource != "native_text" }.map(\.page)
     let nativeUsed = f.pages.filter { $0.noInk != true && $0.textSource == "native_text" }.map(\.page)
     let empty = f.pages.filter { $0.lines.isEmpty }.map(\.page)
+    let rotated = f.pages.compactMap { p in p.pageRotation.map { "第 \(p.page) 页 \($0)°" } }
     let newDrops = r.log.drops.filter(\.newRuleOnly)
 
     H("识别与融合")
@@ -151,6 +152,11 @@ public func buildReport(_ r: ReportInput) -> String {
         }
     }
     A()
+
+    if !rotated.isEmpty {
+        A("> ⚠ 这些页判定为转了方向, 已转正后识别: \(rotated.joined(separator: "、"))。Markdown 按转正后的文字走, 可搜索 PDF 的文字层框位置仍在原页上, 朝向不对。")
+        A()
+    }
 
     // ---- 优先复核 ----
     H("优先复核的页")
