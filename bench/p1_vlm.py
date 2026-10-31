@@ -51,15 +51,25 @@ from book_render import choose_dpi              # noqa: E402
 #  提示词按模型族配置。page 模式要整页纯文本; line 模式只要这一行的字。
 #  Xiaomi-OCR-0 的区域提示词取自官方模型卡; 其余是通用写法, 实测后再调。
 PROMPTS = {
-    "xiaomi": {"page": "Extract the text in the image.",
+    #  page 是模型卡 Task prompts 表的 Document 任务提示词; line 是 Text region 提示词
+    "xiaomi": {"page": ("Extract all information from the main body of the document image and represent it "
+                        "in markdown format, ignoring headers and footers. Tables should be expressed in OTSL "
+                        "format, formulas in the document should be represented using LATEX format, and the "
+                        "parsing should be organized according to the reading order."),
                "line": "Extract the text in the image."},
     "minicpm": {"page": "逐字识别图片中的全部文字，按阅读顺序输出纯文本。不要翻译、不要改写、不要补全、不要加任何解释。",
                 "line": "逐字识别图片中的文字，只输出这些文字本身。"},
     "paddlevl": {"page": "OCR:", "line": "OCR:"},
-    #  MinerU2.5 的任务提示词(待按模型卡核对): 整页这里只测「文本识别」, 两阶段版面在 Phase 5
+    #  MinerU2.5 提示词取自 mineru-vl-utils 的 DEFAULT_PROMPTS["[default]"], 与模型卡配套;
+    #  整页这里只测「文本识别」, 两阶段版面在 Phase 5
     "mineru": {"page": "\nText Recognition:", "line": "\nText Recognition:"},
-    #  OvisOCR2 整页出 Markdown; 提示词待按模型卡核对
-    "ovis": {"page": "Convert this document page to Markdown in reading order.",
+    #  OvisOCR2 page 提示词取自 ATH-MaaS/OvisOCR2 模型卡示例代码; line 模型卡没有, 仍是通用写法
+    "ovis": {"page": ("\nExtract all readable content from the image in natural human reading order and output "
+                      "the result as a single Markdown document. For charts or images, represent them using an "
+                      "HTML image tag: <img src=\"images/bbox_{left}_{top}_{right}_{bottom}.jpg\" />, where left, "
+                      "top, right, bottom are bounding box coordinates scaled to [0, 1000). Format formulas as "
+                      "LaTeX. Format tables as HTML: <table>...</table>. Transcribe all other text as standard "
+                      "Markdown. Preserve the original text without translation or paraphrasing."),
              "line": "Transcribe the text in this image exactly. Output the text only."},
     "generic": {"page": "Transcribe all text in this image exactly as written, in reading order. Output plain text only.",
                 "line": "Transcribe the text in this image exactly. Output the text only."},
