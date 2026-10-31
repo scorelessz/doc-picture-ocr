@@ -1,0 +1,577 @@
+{
+ "phase": "p1",
+ "name": "claude-spotcheck",
+ "source": "City of Broken Promises.pdf",
+ "text_pages": [
+  3,
+  8,
+  9,
+  11,
+  12,
+  50,
+  120,
+  185,
+  236,
+  300
+ ],
+ "blank_pages": [
+  10,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "claude_chars": 10305,
+ "native_chars": 10221,
+ "native_vs_claude": {
+  "cer": 0.04338,
+  "ins_rate": 0.00194,
+  "del_rate": 0.01009,
+  "sub_rate": 0.03134
+ },
+ "native_vs_claude_by_page": {
+  "3": {
+   "cer": 0.35391,
+   "ins_rate": 0.01646,
+   "del_rate": 0.25103,
+   "sub_rate": 0.08642
+  },
+  "8": {
+   "cer": 0.24719,
+   "ins_rate": 0.02622,
+   "del_rate": 0.02996,
+   "sub_rate": 0.19101
+  },
+  "9": {
+   "cer": 0.19545,
+   "ins_rate": 0.0,
+   "del_rate": 0.10455,
+   "sub_rate": 0.09091
+  },
+  "11": {
+   "cer": 0.00655,
+   "ins_rate": 0.0,
+   "del_rate": 0.00291,
+   "sub_rate": 0.00364
+  },
+  "12": {
+   "cer": 0.0071,
+   "ins_rate": 0.00118,
+   "del_rate": 0.0,
+   "sub_rate": 0.00592
+  },
+  "50": {
+   "cer": 0.0307,
+   "ins_rate": 0.0,
+   "del_rate": 0.00261,
+   "sub_rate": 0.02809
+  },
+  "120": {
+   "cer": 0.01299,
+   "ins_rate": 0.00068,
+   "del_rate": 0.0,
+   "sub_rate": 0.0123
+  },
+  "185": {
+   "cer": 0.04664,
+   "ins_rate": 0.0,
+   "del_rate": 0.00093,
+   "sub_rate": 0.04571
+  },
+  "236": {
+   "cer": 0.04464,
+   "ins_rate": 0.00258,
+   "del_rate": 0.0,
+   "sub_rate": 0.04206
+  },
+  "300": {
+   "cer": 0.04926,
+   "ins_rate": 0.00235,
+   "del_rate": 0.00235,
+   "sub_rate": 0.04457
+  }
+ },
+ "claude_blank_page_chars": {
+  "10": 0,
+  "20": 0,
+  "62": 0,
+  "98": 0,
+  "160": 0,
+  "324": 0
+ },
+ "adjudication": {
+  "total": {
+   "diffs": 231,
+   "native": 190,
+   "claude": 34,
+   "neither": 7,
+   "unclear": 0
+  },
+  "by_page": {
+   "3": {
+    "diffs": 7,
+    "native": 1,
+    "claude": 4,
+    "neither": 2,
+    "unclear": 0
+   },
+   "8": {
+    "diffs": 12,
+    "native": 3,
+    "claude": 8,
+    "neither": 1,
+    "unclear": 0
+   },
+   "9": {
+    "diffs": 13,
+    "native": 2,
+    "claude": 7,
+    "neither": 4,
+    "unclear": 0
+   },
+   "11": {
+    "diffs": 5,
+    "native": 5,
+    "claude": 0,
+    "neither": 0,
+    "unclear": 0
+   },
+   "12": {
+    "diffs": 12,
+    "native": 11,
+    "claude": 1,
+    "neither": 0,
+    "unclear": 0
+   },
+   "50": {
+    "diffs": 38,
+    "native": 34,
+    "claude": 4,
+    "neither": 0,
+    "unclear": 0
+   },
+   "120": {
+    "diffs": 18,
+    "native": 18,
+    "claude": 0,
+    "neither": 0,
+    "unclear": 0
+   },
+   "185": {
+    "diffs": 40,
+    "native": 37,
+    "claude": 3,
+    "neither": 0,
+    "unclear": 0
+   },
+   "236": {
+    "diffs": 38,
+    "native": 34,
+    "claude": 4,
+    "neither": 0,
+    "unclear": 0
+   },
+   "300": {
+    "diffs": 48,
+    "native": 45,
+    "claude": 3,
+    "neither": 0,
+    "unclear": 0
+   }
+  }
+ },
+ "engines": {
+  "ctc-vision": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.03833,
+    "ins_rate": 0.00417,
+    "del_rate": 0.01164,
+    "sub_rate": 0.02251
+   },
+   "vs_native": {
+    "cer": 0.03307,
+    "ins_rate": 0.00763,
+    "del_rate": 0.00695,
+    "sub_rate": 0.01849
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "ctc-rapidocr": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.02387,
+    "ins_rate": 0.00621,
+    "del_rate": 0.01446,
+    "sub_rate": 0.0032
+   },
+   "vs_native": {
+    "cer": 0.05225,
+    "ins_rate": 0.01115,
+    "del_rate": 0.01125,
+    "sub_rate": 0.02984
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "ctc-fused": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.02979,
+    "ins_rate": 0.01883,
+    "del_rate": 0.00825,
+    "sub_rate": 0.00272
+   },
+   "vs_native": {
+    "cer": 0.05635,
+    "ins_rate": 0.02368,
+    "del_rate": 0.00479,
+    "sub_rate": 0.02788
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "mineru25pro-mlx8-spot-line": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.1277,
+    "ins_rate": 0.11946,
+    "del_rate": 0.00417,
+    "sub_rate": 0.00408
+   },
+   "vs_native": {
+    "cer": 0.16202,
+    "ins_rate": 0.12885,
+    "del_rate": 0.0044,
+    "sub_rate": 0.02876
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "mineru25pro-mlx8-spot-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.01737,
+    "ins_rate": 0.00446,
+    "del_rate": 0.01048,
+    "sub_rate": 0.00243
+   },
+   "vs_native": {
+    "cer": 0.04442,
+    "ins_rate": 0.00841,
+    "del_rate": 0.00626,
+    "sub_rate": 0.02974
+   },
+   "blank_page_chars": {
+    "10": 2731,
+    "20": 1,
+    "62": 94,
+    "98": 2731,
+    "160": 94,
+    "324": 6150
+   }
+  },
+  "minicpm47-1b-q8-llamacpp-spot-line": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.1018,
+    "ins_rate": 0.05725,
+    "del_rate": 0.02484,
+    "sub_rate": 0.0197
+   },
+   "vs_native": {
+    "cer": 0.10909,
+    "ins_rate": 0.06242,
+    "del_rate": 0.02152,
+    "sub_rate": 0.02514
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "minicpm47-1b-q8-llamacpp-spot-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.04221,
+    "ins_rate": 0.01232,
+    "del_rate": 0.01048,
+    "sub_rate": 0.01941
+   },
+   "vs_native": {
+    "cer": 0.03688,
+    "ins_rate": 0.01614,
+    "del_rate": 0.00607,
+    "sub_rate": 0.01468
+   },
+   "blank_page_chars": {
+    "10": 278,
+    "20": 0,
+    "62": 3,
+    "98": 0,
+    "160": 1,
+    "324": 1
+   }
+  },
+  "online-bailian-qwen35ocr-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.01737,
+    "ins_rate": 0.00582,
+    "del_rate": 0.00893,
+    "sub_rate": 0.00262
+   },
+   "vs_native": {
+    "cer": 0.04598,
+    "ins_rate": 0.01037,
+    "del_rate": 0.00528,
+    "sub_rate": 0.03033
+   },
+   "blank_page_chars": {
+    "10": 32,
+    "20": 10,
+    "62": 10,
+    "98": 9,
+    "160": 10,
+    "324": 9
+   }
+  },
+  "online-bailian-qwen38max-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.01708,
+    "ins_rate": 0.0065,
+    "del_rate": 0.00873,
+    "sub_rate": 0.00184
+   },
+   "vs_native": {
+    "cer": 0.04549,
+    "ins_rate": 0.01086,
+    "del_rate": 0.00489,
+    "sub_rate": 0.02974
+   },
+   "blank_page_chars": {
+    "10": 25,
+    "20": 31,
+    "62": 25,
+    "98": 14,
+    "160": 21,
+    "324": 32
+   }
+  },
+  "online-siliconflow-paddlevl15-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.05172,
+    "ins_rate": 0.00932,
+    "del_rate": 0.01921,
+    "sub_rate": 0.02319
+   },
+   "vs_native": {
+    "cer": 0.03483,
+    "ins_rate": 0.01203,
+    "del_rate": 0.0138,
+    "sub_rate": 0.009
+   },
+   "blank_page_chars": {
+    "10": 1,
+    "20": 1,
+    "62": 2,
+    "98": 0,
+    "160": 2,
+    "324": 2
+   }
+  },
+  "online-siliconflow-qwen3vl32b-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.03668,
+    "ins_rate": 0.00573,
+    "del_rate": 0.00912,
+    "sub_rate": 0.02183
+   },
+   "vs_native": {
+    "cer": 0.02329,
+    "ins_rate": 0.01057,
+    "del_rate": 0.00577,
+    "sub_rate": 0.00695
+   },
+   "blank_page_chars": {
+    "10": 204,
+    "20": 87,
+    "62": 4096,
+    "98": 143,
+    "160": 113,
+    "324": 179
+   }
+  },
+  "ovisocr2-mlx8-spot-line": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.92091,
+    "ins_rate": 0.9114,
+    "del_rate": 0.00505,
+    "sub_rate": 0.00446
+   },
+   "vs_native": {
+    "cer": 0.95891,
+    "ins_rate": 0.92701,
+    "del_rate": 0.00499,
+    "sub_rate": 0.02691
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "ovisocr2-mlx8-spot-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.02698,
+    "ins_rate": 0.00689,
+    "del_rate": 0.0097,
+    "sub_rate": 0.01038
+   },
+   "vs_native": {
+    "cer": 0.03767,
+    "ins_rate": 0.01135,
+    "del_rate": 0.00597,
+    "sub_rate": 0.02035
+   },
+   "blank_page_chars": {
+    "10": 2048,
+    "20": 1,
+    "62": 1,
+    "98": 2048,
+    "160": 2048,
+    "324": 2
+   }
+  },
+  "paddlevl16-mlx-spot-line": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.04309,
+    "ins_rate": 0.02533,
+    "del_rate": 0.00805,
+    "sub_rate": 0.0097
+   },
+   "vs_native": {
+    "cer": 0.05557,
+    "ins_rate": 0.03033,
+    "del_rate": 0.0047,
+    "sub_rate": 0.02055
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "paddlevl16-mlx-spot-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.04231,
+    "ins_rate": 0.00524,
+    "del_rate": 0.01456,
+    "sub_rate": 0.02251
+   },
+   "vs_native": {
+    "cer": 0.02994,
+    "ins_rate": 0.01018,
+    "del_rate": 0.01135,
+    "sub_rate": 0.00841
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "xiaomi-q8-llamacpp-spot-line": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.03154,
+    "ins_rate": 0.02329,
+    "del_rate": 0.00427,
+    "sub_rate": 0.00398
+   },
+   "vs_native": {
+    "cer": 0.06496,
+    "ins_rate": 0.03199,
+    "del_rate": 0.0046,
+    "sub_rate": 0.02837
+   },
+   "blank_page_chars": {
+    "10": 0,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  },
+  "xiaomi-q8-llamacpp-spot-page": {
+   "pages": 10,
+   "vs_claude": {
+    "cer": 0.02513,
+    "ins_rate": 0.0001,
+    "del_rate": 0.01989,
+    "sub_rate": 0.00514
+   },
+   "vs_native": {
+    "cer": 0.05058,
+    "ins_rate": 0.00313,
+    "del_rate": 0.01487,
+    "sub_rate": 0.03258
+   },
+   "blank_page_chars": {
+    "10": 1971,
+    "20": 0,
+    "62": 0,
+    "98": 0,
+    "160": 0,
+    "324": 0
+   }
+  }
+ }
+}
