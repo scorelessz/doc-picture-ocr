@@ -1,0 +1,72 @@
+{
+ "phase": "p3",
+ "source": "失约之城.pdf",
+ "pages": 373,
+ "source_prefix_identical": true,
+ "images_identical_swift": true,
+ "image_pages_differ_swift": 0,
+ "images_identical_python": true,
+ "image_count": 372,
+ "size_in": 47560910,
+ "size_python": 49855292,
+ "size_swift": 48210406,
+ "delta_python": 2294382,
+ "delta_swift": 649496,
+ "seconds_python": 6.8,
+ "seconds_swift": 0.7,
+ "producer_swift": "ocr-book-line",
+ "python": {
+  "pages_embedded": 372,
+  "lines_written": 10076,
+  "chars_in": 200200,
+  "chars_retrieved": 200200,
+  "retrieval": 1.0,
+  "line_retrieval": 1.0,
+  "retrieval_worst": 1.0,
+  "retrieval_worst_page": 1,
+  "probe": {
+   "checked": 200,
+   "found": 200,
+   "missed": 0,
+   "outside_line_box": 0,
+   "mean_offset_pt": 0.61,
+   "max_offset_pt": 2.93,
+   "max_dy_pt": 2.93
+  }
+ },
+ "swift_measured_by_python_verify": {
+  "chars_in": 200200,
+  "chars_retrieved": 200200,
+  "retrieval": 1.0,
+  "line_retrieval": 1.0,
+  "retrieval_worst": 1.0,
+  "retrieval_worst_page": 1,
+  "probe": {
+   "checked": 200,
+   "found": 200,
+   "missed": 0,
+   "outside_line_box": 0,
+   "mean_offset_pt": 2.4,
+   "max_offset_pt": 34.22,
+   "max_dy_pt": 1.84
+  }
+ },
+ "swift_self_check": {
+  "pages_embedded": 372,
+  "pages_skipped_native": 1,
+  "pages_skipped_native_gate": 0,
+  "lines_written": 10076,
+  "retrieval": 0.9999,
+  "line_retrieval": 0.9976,
+  "retrieval_worst": 0.819,
+  "retrieval_worst_page": 13,
+  "probe_checked": 200,
+  "probe_found": 200,
+  "probe_missed": 0,
+  "probe_outside": 0,
+  "probe_mean_offset_pt": 1.14,
+  "probe_max_offset_pt": 1.84
+ },
+ "python_verify_warnings": [],
+ "swift_warnings": []
+}

@@ -22,6 +22,7 @@ usage:
   ocr-cli page-info <pdf> [--pages A-B|a,b,c] [--ink] --out info.json
   ocr-cli fuse <vision.json> <rapidocr.json> --out fused.json [--legacy] [--force]
   ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
+  ocr-cli pdf <源.pdf> <fused.json> --out x.searchable.pdf [--force] [--force-text] [--stats stats.json]
 
 """
 
@@ -179,6 +180,26 @@ do {
         }
         print("页 \(st.pages)  原始行 \(st.linesIn)  合行后 \(st.rows)  正文行 \(st.keptRows)  "
               + "丢弃 \(st.dropped)  标题 \(st.headings)  段落 \(st.paragraphs)  正文 \(st.chars) 字")
+
+    case "pdf":
+        guard args.count >= 2, let out = option(args, "--out") else { fail(usage) }
+        let srcURL = URL(fileURLWithPath: args[0]), outURL = URL(fileURLWithPath: out)
+        if srcURL.standardizedFileURL == outURL.standardizedFileURL { fail("输出路径不能等于源 PDF", code: 1) }
+        if FileManager.default.fileExists(atPath: out), !args.contains("--force") {
+            fail("输出已存在, 拒绝覆盖: \(out)（要覆盖请加 --force）", code: 3)
+        }
+        var o = PDFOutOptions()
+        o.forceText = args.contains("--force-text")
+        let st = try writeSearchablePDF(src: srcURL, fused: JSONDecoder().decode(FusedDoc.self, from: Data(contentsOf: URL(fileURLWithPath: args[1]))),
+                                        out: outURL, options: o)
+        if let sp = option(args, "--stats") {
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            try enc.encode(st).write(to: URL(fileURLWithPath: sp))
+        }
+        print("嵌字 \(st.pagesEmbedded)/\(st.pages) 页  行 \(st.linesWritten)  取回率 \(st.retrieval.map { "\($0)" } ?? "无")"
+              + "  行级 \(st.lineRetrieval.map { "\($0)" } ?? "无")  \(st.sizeIn) → \(st.sizeOut)")
+        for w in st.warnings.prefix(12) { warn("⚠ \(w)") }
 
     default:
         fail(usage)
