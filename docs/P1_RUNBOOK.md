@@ -38,6 +38,8 @@ brew install llama.cpp          # 提供 llama-server（Metal）
 | `xiaomi-bf16-mps` | Xiaomi-OCR-0 原版 | transformers + MPS（自写极简 OpenAI 兼容封装或 vLLM 不可用时跳过） | `xiaomi` | 用来核对社区 GGUF 是否掉精度 |
 | `minicpm47-1b-llamacpp` | MiniCPM-V 4.7 1B GGUF + mmproj | llama-server | `minicpm` | 在 HF 的 openbmb 组织下找官方 gguf |
 | `paddlevl16-mlx` | PaddleOCR-VL-1.6 | `mlx_vlm.server` | `paddlevl` | PaddleOCR 官方 Apple Silicon 教程用的就是 mlx-vlm |
+| `mineru25pro-mlx8` | MinerU2.5-Pro-2605-1.2B（MLX 8bit 社区版，或自己 `mlx_vlm convert`） | `mlx_vlm.server` | `mineru` | 整页走「文本识别」提示；版面两阶段放 Phase 5。核对模型卡里的任务提示词 |
+| `ovisocr2-*` | OvisOCR2（`ATH-MaaS/OvisOCR2`） | 先试 mlx-vlm 转换，不行试 llama.cpp GGUF（Qwen3.5 结构），都不行用 transformers + MPS | `ovis` | 提示词以模型卡为准 |
 
 llama-server 启动模板：
 

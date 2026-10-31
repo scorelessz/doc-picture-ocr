@@ -56,6 +56,11 @@ PROMPTS = {
     "minicpm": {"page": "逐字识别图片中的全部文字，按阅读顺序输出纯文本。不要翻译、不要改写、不要补全、不要加任何解释。",
                 "line": "逐字识别图片中的文字，只输出这些文字本身。"},
     "paddlevl": {"page": "OCR:", "line": "OCR:"},
+    #  MinerU2.5 的任务提示词(待按模型卡核对): 整页这里只测「文本识别」, 两阶段版面在 Phase 5
+    "mineru": {"page": "\nText Recognition:", "line": "\nText Recognition:"},
+    #  OvisOCR2 整页出 Markdown; 提示词待按模型卡核对
+    "ovis": {"page": "Convert this document page to Markdown in reading order.",
+             "line": "Transcribe the text in this image exactly. Output the text only."},
     "generic": {"page": "Transcribe all text in this image exactly as written, in reading order. Output plain text only.",
                 "line": "Transcribe the text in this image exactly. Output the text only."},
 }

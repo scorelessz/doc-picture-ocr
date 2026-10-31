@@ -4,7 +4,7 @@
 全自动，没有人工校对环节，质量报告是唯一的质量抓手。
 
 **正在整体重构**为 Mac 原生（Swift）+ 多模型（Vision / PP-OCRv6 / Xiaomi-OCR-0 / MiniCPM-V /
-PaddleOCR-VL）+ 本地/在线双模式，流程与决策见 **`docs/REFACTOR_PLAN.md`**。
+PaddleOCR-VL-1.6 / MinerU2.5-Pro / OvisOCR2）+ 本地/在线双模式，流程与决策见 **`docs/REFACTOR_PLAN.md`**。
 重构期间现有 Python 实现（`src/` `app/`）是基准，新实现与它逐字对拍，Phase 7 才下线。
 
 剧本线（手机拍摄的剧本 → 保留版面 md，带人工校对）已于 2026-10-30 删除，git 历史可查。
@@ -40,7 +40,7 @@ PaddleOCR-VL）+ 本地/在线双模式，流程与决策见 **`docs/REFACTOR_PL
 - 页码删除要求与相邻页序列一致。（孤立数字当页码会误删正文）
 - 删除的页眉/页脚/页码逐页列进质量报告。
 - Vision 置信度只有 0.3/0.5/1.0 三档且与对错无关，不可用作错误信号；RapidOCR 的是连续值。
-- VLM（Xiaomi-OCR-0 / MiniCPM-V / PaddleOCR-VL）不出坐标、会「润色」：
+- VLM（Xiaomi-OCR-0 / MiniCPM-V / PaddleOCR-VL / MinerU2.5-Pro / OvisOCR2）多数不出行级坐标、会「润色」：
   默认组合必须含一个 CTC 型识别器（Vision 或 PP-OCRv6），编造率要有独立指标。
 
 ## 教训

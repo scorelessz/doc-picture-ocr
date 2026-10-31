@@ -10,7 +10,10 @@
 | 2 | 支持 MiniCPM | MiniCPM-V 4.7（2026-10-12，1B 与 35B-A3B，Apache-2.0）。默认 1B；35B-A3B 按内存可选 |
 | 3 | Mac 原生构建 | Swift + SwiftUI + SwiftPM，取代 Python + Tk + PyInstaller。App 与 CLI 共用一个核心库 |
 | 4 | **ANE 加速** | 能上 ANE 就上，否则 Metal GPU，最后 CPU；启动时探测，可手动覆盖，实际用到的硬件写进报告 |
-| 5 | 支持 Paddle 模型 | PP-OCRv6（det/cls/rec）、PP-DocLayoutV3、PaddleOCR-VL-1.6。走 paddle2onnx → Core ML（ANE）/ ONNX Runtime 兜底 |
+| 5 | 支持 Paddle 模型 | PP-OCRv6（det/cls/rec）、PP-DocLayoutV3：paddle2onnx → Core ML（ANE）/ ONNX Runtime 兜底 |
+| 5a | **支持 PaddleOCR-VL-1.6** | 百度文档解析 VLM。官方 Apple Silicon 路径是 mlx-vlm（≥0.3.11）服务 |
+| 5b | **支持 MinerU2.5-Pro** | opendatalab，1.2B（2605 版），官方 vLLM + `mineru-vl-utils`；社区 MLX 4/8bit 版。两阶段：先版面检测（**带框**）、再逐块识别；社区 MLX 卡注明版面阶段要缩到 1036×1036 |
+| 5c | **支持 OvisOCR2** | 0.8B，基于 Qwen3.5-0.8B 后训练，整页 → Markdown（阅读顺序），官方 vLLM / Docker；HF `ATH-MaaS/OvisOCR2`（需核实是否官方） |
 | 6 | 本地模型或在线 API | 统一 `Provider` 抽象；在线服务预置几家 + 自定义，见 §3 |
 | 7 | **输出 Markdown 可选** | 产物可勾选：可搜索 PDF / Markdown（至少选一个） |
 | 8 | **选 Markdown 时识别分页、去页眉页脚页码** | 见 §4 |
@@ -33,7 +36,8 @@
 可搜索 PDF 要把字写回原位、去页眉页脚靠页缘位置、跨页合并靠行位置 —— 全都需要**行框**。
 
 - **几何引擎**（框 + 字 + 置信度）：Vision、PP-OCRv6。
-- **读字引擎**（只出字）：Xiaomi-OCR-0、MiniCPM-V、PaddleOCR-VL。
+- **读字引擎**（只出字）：Xiaomi-OCR-0、MiniCPM-V、PaddleOCR-VL-1.6、MinerU2.5-Pro、OvisOCR2。
+  例外：MinerU2.5-Pro 的版面阶段输出块级框，可直接作区域模式的切块来源（与 PP-DocLayoutV3 并列）。
   - **区域模式（默认）**：按行框或 PP-DocLayoutV3 版面块裁图逐块读，结果天然带坐标。
   - **整页模式**：整页出 Markdown，再与几何引擎的行做序列对齐挂回坐标；对不上的标 `unaligned`，不静默丢弃。
 
@@ -136,7 +140,7 @@ Package.swift
 - **门槛**：`bench/baseline.json` 入库。
 
 ### Phase 1 · 模型实测（Mac 上跑脚本，不写产品代码）
-- 矩阵：{Xiaomi-OCR-0, MiniCPM-V 4.7 1B, PaddleOCR-VL-1.6, PP-OCRv6, Vision} × {llama.cpp, MLX, Transformers-MPS, Core ML, ORT-CoreML} × {区域, 整页}。
+- 矩阵：{Xiaomi-OCR-0, MiniCPM-V 4.7 1B, PaddleOCR-VL-1.6, MinerU2.5-Pro 1.2B, OvisOCR2, PP-OCRv6, Vision} × {llama.cpp, MLX, Transformers-MPS, Core ML, ORT-CoreML} × {区域, 整页}。
 - 指标：CER、**编造率**、**吞字率**、秒/页、峰值内存、实际落在 ANE/GPU/CPU。
 - 脚本只输出**数字**（JSON），不输出识别文本，方便你直接把结果提交回仓库给我看而不外传书的内容。
 - **门槛**：决策表 → 默认引擎组合、默认运行时、D3 终版。
@@ -197,3 +201,5 @@ git fetch origin claude/zen-dijkstra-81hcfw && git checkout claude/zen-dijkstra-
 - Xiaomi-OCR-0：<https://huggingface.co/xiaomi-research/Xiaomi-OCR-0>，技术报告 <https://arxiv.org/abs/2609.36136>，社区 GGUF <https://github.com/xzl01/Xiaomi-OCR-0-GGUF/releases/tag/v1.0.0>
 - MiniCPM-V：<https://github.com/openbmb/MiniCPM-V>
 - PaddleOCR-VL on Apple Silicon：<https://www.paddleocr.ai/latest/version3.x/pipeline_usage/PaddleOCR-VL-Apple-Silicon.html>
+- MinerU2.5-Pro：<https://huggingface.co/opendatalab/MinerU2.5-Pro-2605-1.2B>
+- OvisOCR2：<https://huggingface.co/ATH-MaaS/OvisOCR2>
