@@ -77,10 +77,13 @@ public struct FusedPage: Codable, Equatable, Sendable {
     public var image: String?
     public var nativeText: Bool
     public var lines: [FusedLine]
+    public var noInk: Bool?
+    public var textSource: String?
 
     enum CodingKeys: String, CodingKey {
         case page, width, height, zoom, rotation, image, lines
         case pdfWidth = "pdf_width", pdfHeight = "pdf_height", nativeText = "native_text"
+        case noInk = "no_ink", textSource = "text_source"
     }
 }
 
@@ -385,7 +388,8 @@ public func fuse(_ vision: EngineDoc, _ rapid: EngineDoc, rules: FuseRules = Fus
         outPages.append(FusedPage(page: pno, width: base.width, height: base.height,
                                   pdfWidth: base.pdfWidth, pdfHeight: base.pdfHeight, zoom: base.zoom,
                                   rotation: base.rotation, image: base.image ?? rp?.image,
-                                  nativeText: base.nativeText, lines: sorted))
+                                  nativeText: base.nativeText, lines: sorted,
+                                  noInk: base.noInk, textSource: base.textSource))
         stats.pages += 1
         stats.lines += sorted.count
     }

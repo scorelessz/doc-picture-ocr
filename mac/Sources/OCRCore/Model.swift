@@ -27,19 +27,25 @@ public struct PageDoc: Codable, Equatable, Sendable {
     public var image: String?
     public var nativeText: Bool
     public var lines: [Line]
+    /// 渲染图没有墨迹。只在闸门命中时写，Python 产物没有这个键。
+    public var noInk: Bool?
+    /// lines 的来源。闸门命中且有原生文字层时是 "native_text"，不是识别结果。
+    public var textSource: String?
 
     enum CodingKeys: String, CodingKey {
         case page, width, height, zoom, rotation, image, lines
         case pdfWidth = "pdf_width", pdfHeight = "pdf_height", nativeText = "native_text"
+        case noInk = "no_ink", textSource = "text_source"
     }
 
     public init(page: Int, width: Int, height: Int, pdfWidth: Double, pdfHeight: Double,
                 zoom: Double, rotation: Int = 0, image: String? = nil, nativeText: Bool = false,
-                lines: [Line] = []) {
+                lines: [Line] = [], noInk: Bool? = nil, textSource: String? = nil) {
         self.page = page; self.width = width; self.height = height
         self.pdfWidth = pdfWidth; self.pdfHeight = pdfHeight
         self.zoom = zoom; self.rotation = rotation; self.image = image
         self.nativeText = nativeText; self.lines = lines
+        self.noInk = noInk; self.textSource = textSource
     }
 }
 

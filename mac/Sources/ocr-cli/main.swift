@@ -7,14 +7,19 @@ import OCREngines
 // Phase 2 命令行。子命令：
 //   ocr-cli vision <image> [--nocorrect]                 TSV 到 stdout，与 bin/vision-ocr 逐行对拍
 //   ocr-cli render <pdf> --page N [--dpi 300] --out x.png  PDFKit 渲染一页（灰度）
-//   ocr-cli recognize <pdf> [--pages A-B] [--dpi 300] --out doc.vision.json
-//                                                        渲染 + Vision，写引擎契约 JSON
+//   ocr-cli recognize <pdf> [--pages A-B|a,b,c] [--dpi N] --out doc.vision.json
+//                                                        渲染 + 白页闸门 + Vision，写引擎契约 JSON；
+//                                                        不给 --dpi 时逐页按内嵌图分辨率定
+//   ocr-cli page-info <pdf> [--pages A-B|a,b,c] [--ink] --out info.json
+//                                                        只出每页 dpi / 尺寸 / 文字层字数，--ink 再量暗像素
+//   ocr-cli fuse / ocr-cli md                            见 usage
 
 let usage = """
 usage:
   ocr-cli vision <image> [--nocorrect]
   ocr-cli render <pdf> --page N [--dpi 300] --out page.png
-  ocr-cli recognize <pdf> [--pages A-B] [--dpi 300] --out doc.vision.json
+  ocr-cli recognize <pdf> [--pages A-B|a,b,c] [--dpi N] --out doc.vision.json
+  ocr-cli page-info <pdf> [--pages A-B|a,b,c] [--ink] --out info.json
   ocr-cli fuse <vision.json> <rapidocr.json> --out fused.json [--legacy] [--force]
   ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
 
@@ -25,6 +30,10 @@ func fail(_ msg: String, code: Int32 = 2) -> Never {
     exit(code)
 }
 
+func warn(_ msg: String) {
+    FileHandle.standardError.write((msg + "\n").data(using: .utf8)!)
+}
+
 func option(_ args: [String], _ name: String) -> String? {
     guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
     return args[i + 1]
@@ -32,6 +41,9 @@ func option(_ args: [String], _ name: String) -> String? {
 
 func pageRange(_ spec: String?, count: Int) -> [Int] {
     guard let spec, !spec.isEmpty else { return Array(1...max(1, count)) }
+    if spec.contains(",") {
+        return spec.split(separator: ",").flatMap { pageRange(String($0).contains("-") ? String($0) : "\($0)-\($0)", count: count) }
+    }
     let parts = spec.split(separator: "-").compactMap { Int($0) }
     if parts.count == 2 { return Array(max(1, parts[0])...min(count, parts[1])) }
     if let n = parts.first { return Array(1...min(count, n)) }
@@ -66,20 +78,62 @@ do {
 
     case "recognize":
         guard let path = args.first, let out = option(args, "--out") else { fail(usage) }
-        let dpi = option(args, "--dpi").flatMap(Double.init) ?? 300
+        let fixed = option(args, "--dpi").flatMap(Double.init)      // 不给就逐页按内嵌图分辨率定
         let doc = try PageRenderer.open(URL(fileURLWithPath: path))
-        var result = EngineDoc(source: path, engine: "vision", dpi: dpi)
+        var result = EngineDoc(source: path, engine: "vision", dpi: fixed ?? RenderDefaults.baseDPI)
+        var dpis = Set<Double>()
         for n in pageRange(option(args, "--pages"), count: doc.pageCount) {
+            guard let page = doc.page(at: n - 1) else { fail("no page \(n)", code: 1) }
+            let dpi = fixed ?? PageInspect.chooseDPI(page)
+            dpis.insert(dpi)
             let r = try PageRenderer.render(doc, page: n, dpi: dpi)
-            let lines = sortReadingOrder(try VisionEngine.recognize(r.image))
-            result.pages.append(PageDoc(page: n, width: r.image.width, height: r.image.height,
-                                        pdfWidth: r.pdfWidth, pdfHeight: r.pdfHeight, zoom: r.zoom,
-                                        rotation: r.rotation, lines: lines))
-            FileHandle.standardError.write("page \(n): \(lines.count) lines\n".data(using: .utf8)!)
+            let native = PageInspect.hasNativeText(page)
+            var p = PageDoc(page: n, width: r.image.width, height: r.image.height,
+                            pdfWidth: r.pdfWidth, pdfHeight: r.pdfHeight, zoom: pyRound(r.zoom, 6),
+                            rotation: r.rotation, nativeText: native)
+            // 白页闸门：没墨迹就别让引擎读（VLM 在白页上会编造）。有文字层的不能当空白吞掉。
+            let dark = PageInspect.darkRatio(r.image)
+            if dark >= 0, dark < RenderDefaults.noInkDark {
+                p.noInk = true
+                if native {
+                    p.lines = sortReadingOrder(PageInspect.nativeLines(page, zoom: r.zoom, visualHeight: r.pdfHeight))
+                    p.textSource = "native_text"
+                    warn("⚠ 第 \(n) 页无墨迹但有原生文字层: 已改用文字层 \(p.lines.count) 行, 这不是识别结果, 请复核")
+                } else {
+                    warn("⚠ 第 \(n) 页无墨迹且无文字层: 按白页处理")
+                }
+            } else {
+                p.lines = sortReadingOrder(try VisionEngine.recognize(r.image))
+            }
+            result.pages.append(p)
+            warn("page \(n): \(p.lines.count) lines  dpi \(dpi)")
         }
+        if dpis.count == 1, let d = dpis.first { result.dpi = d }
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try enc.encode(result).write(to: URL(fileURLWithPath: out))
+
+    case "page-info":
+        guard let path = args.first, let out = option(args, "--out") else { fail(usage) }
+        let doc = try PageRenderer.open(URL(fileURLWithPath: path))
+        var rows: [[String: Double]] = []
+        for n in pageRange(option(args, "--pages"), count: doc.pageCount) {
+            guard let page = doc.page(at: n - 1) else { fail("no page \(n)", code: 1) }
+            let dpi = PageInspect.chooseDPI(page)
+            let r = try PageRenderer.render(doc, page: n, dpi: args.contains("--ink") ? dpi : 18)
+            let zoom = dpi / 72
+            var row: [String: Double] = [
+                "page": Double(n), "dpi": dpi, "zoom": pyRound(zoom, 6),
+                "width": (r.pdfWidth * zoom - 0.001).rounded(.up), "height": (r.pdfHeight * zoom - 0.001).rounded(.up),
+                "pdf_width": r.pdfWidth, "pdf_height": r.pdfHeight,
+                "native_chars": Double(codePointCount(pyStrip(page.string ?? ""))),
+            ]
+            if args.contains("--ink") { row["dark"] = PageInspect.darkRatio(r.image) }
+            rows.append(row)
+        }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try enc.encode(rows).write(to: URL(fileURLWithPath: out))
 
     case "fuse":
         guard args.count >= 2, let out = option(args, "--out") else { fail(usage) }

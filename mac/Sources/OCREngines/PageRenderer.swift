@@ -37,11 +37,12 @@ public enum PageRenderer {
     /// 渲染第 `number` 页（从 1 开始，PDF 文件里的绝对页序）为灰度图。
     public static func render(_ doc: PDFDocument, page number: Int, dpi: Double) throws -> RenderedPage {
         guard let page = doc.page(at: number - 1) else { throw PageRendererError.noPage(number) }
-        let box = page.bounds(for: .mediaBox)
+        let box = page.bounds(for: .cropBox)
         let rot = ((page.rotation % 360) + 360) % 360
         let (vw, vh) = rot == 90 || rot == 270 ? (box.height, box.width) : (box.width, box.height)
         let zoom = dpi / 72.0
-        let w = Int((Double(vw) * zoom).rounded()), h = Int((Double(vh) * zoom).rounded())
+        // 向外取整，与 pymupdf 的 fz_irect_from_rect 一致：差 1 像素，页图尺寸就对不上
+        let w = Int((Double(vw) * zoom - 0.001).rounded(.up)), h = Int((Double(vh) * zoom - 0.001).rounded(.up))
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpaceCreateDeviceGray(),
                                   bitmapInfo: CGImageAlphaInfo.none.rawValue) else {
@@ -49,9 +50,11 @@ public enum PageRenderer {
         }
         ctx.setFillColor(gray: 1, alpha: 1)
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        // 画布比页面略大时，内容贴左上角（CGContext 原点在左下）
+        ctx.translateBy(x: 0, y: CGFloat(Double(h) - Double(vh) * zoom))
         ctx.scaleBy(x: zoom, y: zoom)
         // PDFPage.draw 会按页面的 /Rotate 摆正内容
-        page.draw(with: .mediaBox, to: ctx)
+        page.draw(with: .cropBox, to: ctx)
         guard let img = ctx.makeImage() else { throw PageRendererError.cannotRender(number) }
         return RenderedPage(image: img, zoom: zoom, pdfWidth: Double(vw), pdfHeight: Double(vh), rotation: rot)
     }
