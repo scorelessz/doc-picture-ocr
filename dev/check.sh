@@ -58,9 +58,19 @@ case "$stage" in
     .venv/bin/python bench/p3_fuse_parity.py "失约之城" --tag zh --spot work/bench/spot-zh > /dev/null
     .venv/bin/python bench/p3_md_parity.py "City of Broken Promises" --tag en > /dev/null
     .venv/bin/python bench/p3_md_parity.py "失约之城" --tag zh > /dev/null
+    .venv/bin/python bench/p3_chain.py > /dev/null
     .venv/bin/python bench/p3_md_synth.py "$@"
     echo "P3 对拍全部通过"
     ;;
+  p3-e2e)
+    # 整本跑两本书, 十几分钟。依赖 ./dev/check.sh p3 留下的 work/bench/p3/<tag>-chain.swift.md
+    need_venv
+    need_vision
+    swift build -c release
+    .venv/bin/python bench/p3_pdf_synth.py > /dev/null
+    caffeinate -i .venv/bin/python bench/p3_e2e.py "$@"
+    echo "P3 端到端完成: bench/results/p3-e2e.json"
+    ;;
   *)
-    echo "用法: ./dev/check.sh p0|p2 <pdf> [...] | p3 [--docs N]"; exit 2 ;;
+    echo "用法: ./dev/check.sh p0|p2 <pdf> [...] | p3 [--docs N] | p3-e2e [--only en|zh]"; exit 2 ;;
 esac
