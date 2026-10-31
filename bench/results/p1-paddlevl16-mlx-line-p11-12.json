@@ -1,0 +1,52 @@
+{
+ "phase": "p1",
+ "name": "paddlevl16-mlx",
+ "mode": "line",
+ "prompt_id": "paddlevl",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:04:38",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  11,
+  12
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 3063,
+  "cer": 0.01698,
+  "ins_rate": 0.01143,
+  "del_rate": 0.00065,
+  "sub_rate": 0.0049,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 27.1,
+  "sec_per_page": 13.55,
+  "requests": 70,
+  "server_peak_rss_mb": 1874.7
+ },
+ "per_page": [
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1371,
+   "ins": 0,
+   "del": 0,
+   "sub": 8,
+   "requests": 31,
+   "seconds": 11.84,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1725,
+   "ins": 35,
+   "del": 2,
+   "sub": 7,
+   "requests": 39,
+   "seconds": 15.26,
+   "error": null
+  }
+ ]
+}
