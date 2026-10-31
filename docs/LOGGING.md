@@ -12,7 +12,7 @@ DOCOCR_LOG=debug                          等价于 --log-level，命令行优�
 
 日志只落本地，不上传。stdout 不受影响，脚本解析 `vision` 的 TSV 等不会被打断。
 
-新机器先跑 `ocr-cli doctor [--models 目录] [--outdir 目录] [--out checks.json]`。它只检查环境，不处理书：
+新机器先跑 `ocr-cli doctor [--models-dir 目录] [--outdir 目录] [--out checks.json]`。它只检查环境，不处理书：
 macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE / all / CPU 三种计算单元各跑一次样张。
 `✓` 通过，`✗` 必需项失败（退出码 1），`△` 可选项失败（ANE、all 不可用时，CPU 还能跑）。
 
