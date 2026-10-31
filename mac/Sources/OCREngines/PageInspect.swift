@@ -14,8 +14,9 @@ public enum RenderDefaults {
     /// 小图（logo/插图）不参与原生 dpi 判定
     public static let minImageCoverage = 0.40
     public static let nativeMinChars = 50
-    /// 暗像素（<128）占比低于它算「无墨迹」。基准书 6 个白页 0.0000~0.0001，正文最低页约 0.02。
-    public static let noInkDark = 0.001
+    /// 暗像素（<128）占比低于它算「无墨迹」。基准书无内容页最高 0.00009；
+    /// 有内容页最低 0.00077（英文第 2 页只有两个印章字），所以不能用 0.001。
+    public static let noInkDark = 0.0003
 }
 
 public struct EmbeddedImage: Sendable {

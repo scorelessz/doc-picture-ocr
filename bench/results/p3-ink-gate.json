@@ -1,7 +1,7 @@
 {
  "phase": "p3",
  "name": "ink-gate",
- "threshold_dark": 0.001,
+ "threshold_dark": 0.0003,
  "en_pages": [
   {
    "page": 10,
@@ -237,14 +237,14 @@
     "page": 324,
     "dark": 9e-05,
     "native_chars": 691
-   },
+   }
+  ],
+  "lowest_above": [
    {
     "page": 2,
     "dark": 0.00077,
     "native_chars": 0
-   }
-  ],
-  "lowest_above": [
+   },
    {
     "page": 4,
     "dark": 0.00411,
@@ -269,11 +269,6 @@
     "page": 9,
     "dark": 0.02079,
     "native_chars": 241
-   },
-   {
-    "page": 8,
-    "dark": 0.02141,
-    "native_chars": 340
    }
   ]
  },
@@ -373,6 +368,39 @@
    "p0_vision_chars": 0,
    "p0_rapidocr_chars": 0,
    "p0_fused_lines": 0
+  }
+ ],
+ "note": "阈值从 0.001 改为 0.0003: 第 2 页有内容且暗像素 0.00077, 0.001 会误伤",
+ "recheck": [
+  {
+   "page": 2,
+   "no_ink": false,
+   "text_source": null,
+   "lines": 2
+  },
+  {
+   "page": 10,
+   "no_ink": true,
+   "text_source": "native_text",
+   "lines": 21
+  },
+  {
+   "page": 202,
+   "no_ink": true,
+   "text_source": "native_text",
+   "lines": 17
+  },
+  {
+   "page": 248,
+   "no_ink": true,
+   "text_source": null,
+   "lines": 0
+  },
+  {
+   "page": 325,
+   "no_ink": true,
+   "text_source": null,
+   "lines": 0
   }
  ]
 }
