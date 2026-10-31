@@ -23,8 +23,11 @@ public struct FuseRules: Sendable {
     public var wideMaxChars = 3
 
     public var containVov = 0.50, containHov = 0.60
-    /// 新规则：最长公共子串覆盖单源行的比例下限、单源行最少字数
-    public var containCover = 0.85, containMinChars = 4
+    /// 新规则：单源行对配对行的最佳局部编辑距离 / 单源行字数 的上限。
+    /// 几何重叠高（垂直、水平都 ≥ containGeoHigh）时放宽；不超过 containShortChars 字的短行不放宽，只认子串。
+    public var containMaxDist = 0.15, containMaxDistHighGeo = 0.30
+    public var containGeoHigh = 0.90
+    public var containShortChars = 6
     /// 还原「整个是子串」的旧文本条件，只用于与 Python 对拍
     public var legacyContain = false
 
@@ -171,30 +174,31 @@ func visionWins(_ v: Line, _ r: Line, _ rules: FuseRules) -> Bool {
 
 // MARK: - 碎片重影
 
-/// 最长公共子串长度（按码点）。
-func longestCommonSubstring(_ a: [Unicode.Scalar], _ b: [Unicode.Scalar]) -> Int {
-    guard !a.isEmpty, !b.isEmpty else { return 0 }
-    var prev = [Int](repeating: 0, count: b.count + 1), best = 0
-    for ca in a {
-        var cur = [Int](repeating: 0, count: b.count + 1)
-        for (j, cb) in b.enumerated() where ca == cb {
-            cur[j + 1] = prev[j] + 1
-            best = max(best, cur[j + 1])
+/// 单源行对配对行的最佳局部对齐编辑距离（Sellers）：s 整条要对齐，host 里从哪开始、到哪结束都不计代价。
+func localEditDistance(_ s: [Unicode.Scalar], _ host: [Unicode.Scalar]) -> Int {
+    var prev = [Int](repeating: 0, count: host.count + 1)
+    for (i, c) in s.enumerated() {
+        var cur = [Int](repeating: 0, count: host.count + 1)
+        cur[0] = i + 1
+        for (j, h) in host.enumerated() {
+            cur[j + 1] = min(prev[j] + (c == h ? 0 : 1), prev[j + 1] + 1, cur[j] + 1)
         }
         prev = cur
     }
-    return best
+    return prev.min() ?? s.count
 }
 
 /// 单源文本算不算被配对文本包含。
-///   旧条件：归一化后整个是子串。
-///   新条件（放宽，旧条件仍成立）：最长公共子串覆盖单源行 ≥ containCover，且单源行 ≥ containMinChars 个字。
-///   放宽是因为两个检测框把同一行各读一遍、其中一条开头带乱字时，子串条件抓不到（P1 第 12 页）。
-func textContained(_ single: [Unicode.Scalar], in host: [Unicode.Scalar], _ r: FuseRules) -> Bool {
-    let lcs = longestCommonSubstring(single, host)
-    if lcs == single.count { return true }
-    if r.legacyContain { return false }
-    return single.count >= r.containMinChars && Double(lcs) >= r.containCover * Double(single.count)
+///   旧条件：归一化后整个是子串（对应距离 0，始终成立）。
+///   新条件：允许替换的局部对齐。两个检测框把同一行各读一遍时，OCR 的替换会把公共子串切碎
+///   （P1 第 236 页 p/P、e/c 两处差异就让覆盖率掉到 0.45），所以不能用最长公共子串。
+func textContained(_ single: [Unicode.Scalar], in host: [Unicode.Scalar],
+                   vov: Double, hov: Double, _ r: FuseRules) -> Bool {
+    let d = localEditDistance(single, host)
+    if d == 0 { return true }
+    if r.legacyContain || single.count <= r.containShortChars { return false }
+    let high = vov >= r.containGeoHigh && hov >= r.containGeoHigh
+    return Double(d) <= (high ? r.containMaxDistHighGeo : r.containMaxDist) * Double(single.count)
 }
 
 private func spanOverlap(_ a0: Double, _ a1: Double, _ b0: Double, _ b1: Double) -> Double {
@@ -211,8 +215,9 @@ func containedHost(_ s: Line, _ lines: [FusedLine], bothIdx: [Int], _ r: FuseRul
         guard host.w > 0, host.h > 0 else { continue }
         let vov = spanOverlap(s.y, s.y + s.h, host.y, host.y + host.h) / min(s.h, host.h)
         if vov <= r.containVov { continue }
-        if spanOverlap(s.x, s.x + s.w, host.x, host.x + host.w) / s.w <= r.containHov { continue }
-        if !textContained(ts, in: Array(norm(host.text).unicodeScalars), r) { continue }
+        let hov = spanOverlap(s.x, s.x + s.w, host.x, host.x + host.w) / s.w
+        if hov <= r.containHov { continue }
+        if !textContained(ts, in: Array(norm(host.text).unicodeScalars), vov: vov, hov: hov, r) { continue }
         if vov > bestVov { best = i; bestVov = vov }
     }
     return best

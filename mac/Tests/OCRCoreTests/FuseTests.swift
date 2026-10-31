@@ -130,6 +130,39 @@ final class FuseTests: XCTestCase {
         XCTAssertEqual(try fuse(v, r).stats.droppedContained, 1)
     }
 
+    func testLocalEditDistance() {
+        func d(_ a: String, _ b: String) -> Int { localEditDistance(Array(a.unicodeScalars), Array(b.unicodeScalars)) }
+        XCTAssertEqual(d("abc", "xxabcxx"), 0)
+        XCTAssertEqual(d("abc", "xxadcxx"), 1)
+        XCTAssertEqual(d("abc", ""), 3)
+    }
+
+    /// P1 第 236 页：几何几乎重合，OCR 替换把公共子串切碎。
+    func testSubstitutionsNoLongerHideGhost() throws {
+        let (v, r) = docs([l(100, 100, 900, "No other Priest must comc, Tom! It is not")],
+                          [l(100, 100, 900, "No other Priest must comc, Tom! It is not"),
+                           l(110, 101, 880, "No other priest must come, Tom! It is not")])
+        let f = try fuse(v, r)
+        XCTAssertEqual(f.pages[0].lines.count, 1)
+        XCTAssertEqual(f.stats.droppedContained, 1)
+        var rules = FuseRules()
+        rules.legacyContain = true
+        XCTAssertEqual(try fuse(v, r, rules: rules).pages[0].lines.count, 2)
+    }
+
+    func testRelaxedThresholdNeedsHighGeometry() throws {
+        // 距离比 0.2：几何不够高（水平只盖住 70%）时不能按相似度丢
+        let host = "abcdefghijklmnopqrstuvwxyz"
+        let (v, r) = docs([l(100, 100, 400, host)], [l(100, 100, 400, host), l(220, 102, 400, "abcdefgXXXXlmnopqrst")])
+        XCTAssertEqual(try fuse(v, r).stats.droppedContained, 0)
+    }
+
+    func testShortLineDoesNotRelax() throws {
+        // 6 字，距离比 1/6，几何完全重合：短行不放宽
+        let (v, r) = docs([l(100, 100, 900, "他说话了很久很久")], [l(100, 100, 900, "他说话了很久很久"), l(100, 100, 900, "他说呀了很久")])
+        XCTAssertEqual(try fuse(v, r).stats.droppedContained, 0)
+    }
+
     func testSingleSourceLineIsKept() throws {
         let (v, r) = docs([l(100, 100, 900, "只有 Vision 读到")], [])
         let f = try fuse(v, r)

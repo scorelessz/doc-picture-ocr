@@ -35,23 +35,31 @@
   "stats_new": {
    "both": 11481,
    "divergent": 4229,
-   "dropped_contained": 64,
+   "dropped_contained": 90,
    "dropped_empty": 0,
    "glossary_hits": 0,
-   "lines": 11600,
+   "lines": 11574,
    "low_conf": 3,
-   "only_rapidocr": 75,
-   "only_vision": 44,
+   "only_rapidocr": 74,
+   "only_vision": 19,
    "pages": 328
   },
-  "newly_dropped": 32,
+  "newly_dropped": 58,
   "pages": [
    {
     "page": 12,
     "lines_removed": 1
    },
    {
+    "page": 32,
+    "lines_removed": 1
+   },
+   {
     "page": 35,
+    "lines_removed": 2
+   },
+   {
+    "page": 50,
     "lines_removed": 1
    },
    {
@@ -63,7 +71,19 @@
     "lines_removed": 1
    },
    {
+    "page": 69,
+    "lines_removed": 1
+   },
+   {
+    "page": 76,
+    "lines_removed": 2
+   },
+   {
     "page": 102,
+    "lines_removed": 1
+   },
+   {
+    "page": 104,
     "lines_removed": 1
    },
    {
@@ -83,11 +103,31 @@
     "lines_removed": 1
    },
    {
+    "page": 135,
+    "lines_removed": 1
+   },
+   {
+    "page": 153,
+    "lines_removed": 1
+   },
+   {
     "page": 158,
     "lines_removed": 1
    },
    {
     "page": 169,
+    "lines_removed": 2
+   },
+   {
+    "page": 170,
+    "lines_removed": 1
+   },
+   {
+    "page": 171,
+    "lines_removed": 1
+   },
+   {
+    "page": 180,
     "lines_removed": 1
    },
    {
@@ -111,15 +151,39 @@
     "lines_removed": 1
    },
    {
+    "page": 223,
+    "lines_removed": 1
+   },
+   {
+    "page": 224,
+    "lines_removed": 1
+   },
+   {
+    "page": 228,
+    "lines_removed": 1
+   },
+   {
     "page": 229,
     "lines_removed": 1
    },
    {
+    "page": 233,
+    "lines_removed": 1
+   },
+   {
     "page": 235,
+    "lines_removed": 2
+   },
+   {
+    "page": 236,
     "lines_removed": 1
    },
    {
     "page": 238,
+    "lines_removed": 1
+   },
+   {
+    "page": 239,
     "lines_removed": 1
    },
    {
@@ -152,10 +216,14 @@
    },
    {
     "page": 272,
-    "lines_removed": 1
+    "lines_removed": 2
    },
    {
     "page": 274,
+    "lines_removed": 1
+   },
+   {
+    "page": 279,
     "lines_removed": 1
    },
    {
@@ -164,10 +232,22 @@
    },
    {
     "page": 285,
+    "lines_removed": 2
+   },
+   {
+    "page": 286,
+    "lines_removed": 1
+   },
+   {
+    "page": 287,
     "lines_removed": 1
    },
    {
     "page": 308,
+    "lines_removed": 1
+   },
+   {
+    "page": 320,
     "lines_removed": 1
    }
   ]
@@ -207,21 +287,21 @@
   },
   "new": {
    "chars": 10173,
-   "edits": 229,
-   "cer": 0.02251,
-   "ins": 0.01769,
+   "edits": 170,
+   "cer": 0.01671,
+   "ins": 0.0117,
    "del": 0.00167,
-   "sub": 0.00315,
+   "sub": 0.00334,
    "edits_by_page": {
     "3": 128,
     "8": 5,
     "9": 0,
     "11": 6,
     "12": 5,
-    "50": 24,
+    "50": 3,
     "120": 5,
     "185": 4,
-    "236": 44,
+    "236": 6,
     "300": 8
    }
   }
@@ -262,20 +342,20 @@
   },
   "new": {
    "chars": 10016,
-   "edits": 101,
-   "cer": 0.01008,
-   "ins": 0.00829,
+   "edits": 42,
+   "cer": 0.00419,
+   "ins": 0.0022,
    "del": 0.0006,
-   "sub": 0.0012,
+   "sub": 0.0014,
    "edits_by_page": {
     "8": 5,
     "9": 0,
     "11": 6,
     "12": 5,
-    "50": 24,
+    "50": 3,
     "120": 5,
     "185": 4,
-    "236": 44,
+    "236": 6,
     "300": 8
    }
   }
