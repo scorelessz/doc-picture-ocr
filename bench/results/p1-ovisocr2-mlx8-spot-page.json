@@ -1,0 +1,220 @@
+{
+ "phase": "p1",
+ "name": "ovisocr2-mlx8-spot",
+ "mode": "page",
+ "prompt_id": "ovis",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:48:44",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  3,
+  8,
+  9,
+  11,
+  12,
+  50,
+  120,
+  185,
+  236,
+  300,
+  10,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 13421,
+  "cer": 0.61165,
+  "ins_rate": 0.3537,
+  "del_rate": 0.12995,
+  "sub_rate": 0.12801,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 194.4,
+  "sec_per_page": 12.15,
+  "requests": 16,
+  "server_peak_rss_mb": 1892.0
+ },
+ "per_page": [
+  {
+   "page": 3,
+   "ref_chars": 186,
+   "hyp_chars": 269,
+   "ins": 84,
+   "del": 1,
+   "sub": 35,
+   "requests": 1,
+   "seconds": 4.41,
+   "error": null
+  },
+  {
+   "page": 8,
+   "ref_chars": 265,
+   "hyp_chars": 249,
+   "ins": 7,
+   "del": 23,
+   "sub": 27,
+   "requests": 1,
+   "seconds": 3.42,
+   "error": null
+  },
+  {
+   "page": 9,
+   "ref_chars": 197,
+   "hyp_chars": 205,
+   "ins": 21,
+   "del": 13,
+   "sub": 10,
+   "requests": 1,
+   "seconds": 3.33,
+   "error": null
+  },
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1367,
+   "ins": 0,
+   "del": 4,
+   "sub": 4,
+   "requests": 1,
+   "seconds": 6.47,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1686,
+   "ins": 0,
+   "del": 6,
+   "sub": 2,
+   "requests": 1,
+   "seconds": 7.34,
+   "error": null
+  },
+  {
+   "page": 50,
+   "ref_chars": 1527,
+   "hyp_chars": 1525,
+   "ins": 4,
+   "del": 6,
+   "sub": 9,
+   "requests": 1,
+   "seconds": 7.29,
+   "error": null
+  },
+  {
+   "page": 120,
+   "ref_chars": 1464,
+   "hyp_chars": 1461,
+   "ins": 0,
+   "del": 3,
+   "sub": 8,
+   "requests": 1,
+   "seconds": 6.89,
+   "error": null
+  },
+  {
+   "page": 185,
+   "ref_chars": 1071,
+   "hyp_chars": 1071,
+   "ins": 1,
+   "del": 1,
+   "sub": 26,
+   "requests": 1,
+   "seconds": 5.61,
+   "error": null
+  },
+  {
+   "page": 236,
+   "ref_chars": 1168,
+   "hyp_chars": 1164,
+   "ins": 0,
+   "del": 4,
+   "sub": 49,
+   "requests": 1,
+   "seconds": 5.78,
+   "error": null
+  },
+  {
+   "page": 300,
+   "ref_chars": 1279,
+   "hyp_chars": 1279,
+   "ins": 3,
+   "del": 3,
+   "sub": 47,
+   "requests": 1,
+   "seconds": 6.29,
+   "error": null
+  },
+  {
+   "page": 10,
+   "ref_chars": 182,
+   "hyp_chars": 2048,
+   "ins": 1866,
+   "del": 0,
+   "sub": 181,
+   "requests": 1,
+   "seconds": 43.06,
+   "error": null
+  },
+  {
+   "page": 20,
+   "ref_chars": 513,
+   "hyp_chars": 1,
+   "ins": 0,
+   "del": 512,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.2,
+   "error": null
+  },
+  {
+   "page": 62,
+   "ref_chars": 660,
+   "hyp_chars": 1,
+   "ins": 0,
+   "del": 659,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.2,
+   "error": null
+  },
+  {
+   "page": 98,
+   "ref_chars": 560,
+   "hyp_chars": 2048,
+   "ins": 1488,
+   "del": 0,
+   "sub": 547,
+   "requests": 1,
+   "seconds": 43.79,
+   "error": null
+  },
+  {
+   "page": 160,
+   "ref_chars": 775,
+   "hyp_chars": 2048,
+   "ins": 1273,
+   "del": 0,
+   "sub": 773,
+   "requests": 1,
+   "seconds": 44.13,
+   "error": null
+  },
+  {
+   "page": 324,
+   "ref_chars": 511,
+   "hyp_chars": 2,
+   "ins": 0,
+   "del": 509,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.22,
+   "error": null
+  }
+ ]
+}
