@@ -25,12 +25,16 @@ usage:
   ocr-cli md <fused.json> --out out.md [--no-page-marks] [--force] [--stats stats.json]
   ocr-cli pdf <源.pdf> <fused.json> --out x.searchable.pdf [--force] [--force-text] [--stats stats.json]
   ocr-cli paddle <image>... --models dir [--units ane|all|cpu|gpu] [--cls] --out lines.json
+  ocr-cli doctor [--models dir] [--outdir output] [--out checks.json]
   ocr-cli paddle-plan --models dir --out plan.json
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
                [--paddle coreml|python] [--models dir] [--units ane|all|cpu|gpu]
                [--python .venv/bin/python] [--result result.json]
 
+
+所有子命令: --log-level error|warn|info|debug|trace  --log-file 路径  --log-format json|text  --log-text
+            环境变量 DOCOCR_LOG 等价于 --log-level; 默认不写识别正文, --log-text 才写
 """
 
 func fail(_ msg: String, code: Int32 = 2) -> Never {
@@ -58,13 +62,38 @@ func pageRange(_ spec: String?, count: Int) -> [Int] {
     fail("bad --pages: \(spec)")
 }
 
-var args = Array(CommandLine.arguments.dropFirst())
+var args: [String]
+do {
+    args = try Log.shared.configure(Array(CommandLine.arguments.dropFirst()), env: ProcessInfo.processInfo.environment)
+} catch {
+    fail("\(error)")
+}
 guard let cmd = args.first else { fail(usage) }
 args.removeFirst()
+let startedAt = Date()
 
 #if canImport(Vision)
+let defaultModels = option(args, "--models") ?? (NSHomeDirectory() + "/Desktop/Ignore/models/coreml")
+logEnvironment(args: [cmd] + args, models: URL(fileURLWithPath: defaultModels, isDirectory: true))
+Log.shared.info("start", ["command": .s(cmd), "log_text": .b(Log.shared.withText)])
+defer {
+    let rss = peakRSSMB()
+    Log.shared.info("end", ["command": .s(cmd), "seconds": .d((Date().timeIntervalSince(startedAt) * 1000).rounded() / 1000),
+                            "peak_rss_mb": .d(rss.own), "peak_rss_children_mb": .d(rss.children)])
+}
 do {
     switch cmd {
+    case "doctor":
+        let checks = runDoctor(models: URL(fileURLWithPath: defaultModels, isDirectory: true),
+                               outdir: URL(fileURLWithPath: option(args, "--outdir") ?? "output", isDirectory: true))
+        for c in checks { print("\(c.ok ? "✓" : (c.required ? "✗" : "△")) \(c.name): \(c.detail)") }
+        if let o = option(args, "--out") {
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            try enc.encode(checks).write(to: URL(fileURLWithPath: o))
+        }
+        if checks.contains(where: { !$0.ok && $0.required }) { exit(1) }
+
     case "vision":
         guard let path = args.first else { fail(usage) }
         var opts = VisionOptions()
@@ -223,7 +252,7 @@ do {
         o.forceOCR = args.contains("--force-ocr")
         o.keepPages = args.contains("--keep-pages")
         if (option(args, "--paddle") ?? "coreml") == "coreml" {
-            let dir = option(args, "--models") ?? (NSHomeDirectory() + "/Desktop/Ignore/models/coreml")
+            let dir = defaultModels
             guard FileManager.default.fileExists(atPath: dir + "/keys.txt") else {
                 fail("找不到 Core ML 模型: \(dir)（先跑 tools/convert_paddle.py，或用 --models 指定）", code: 2)
             }
@@ -231,6 +260,7 @@ do {
             let units: [String: MLComputeUnits] = ["ane": .cpuAndNeuralEngine, "all": .all, "cpu": .cpuOnly, "gpu": .cpuAndGPU]
             guard let u = units[option(args, "--units") ?? "ane"] else { fail(usage) }
             o.units = u
+            o.unitsLabel = option(args, "--units") ?? "ane"
         }
         do {
             let res = try runBook(o, log: warn)
@@ -247,6 +277,7 @@ do {
                 exit(3)
             }
         } catch let e as BookError {
+            Log.shared.error("refused", ["command": .s(cmd), "error": .s("\(e)")])
             fail("\(e)", code: 3)
         }
 
@@ -309,6 +340,7 @@ do {
         fail(usage)
     }
 } catch {
+    Log.shared.error("failed", ["command": .s(cmd), "type": .s("\(type(of: error))"), "error": .s("\(error)")])
     fail("\(error)", code: 1)
 }
 #else

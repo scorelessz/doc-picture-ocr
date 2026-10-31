@@ -21,6 +21,7 @@ public struct BookOptions {
     /// PP-OCR 用哪条路：Core ML 模型目录；为 nil 时走 src/rapid_pages.py（只留作对照）
     public var coreml: URL?
     public var units: MLComputeUnits = .cpuAndNeuralEngine
+    public var unitsLabel = "ane"
 
     public init(pdf: URL, outdir: URL, workdir: URL, python: String) {
         self.pdf = pdf; self.outdir = outdir; self.workdir = workdir; self.python = python
@@ -108,6 +109,9 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         let dt = Date().timeIntervalSince(t0)
         timing.append((name, dt))
         res.seconds[name] = (dt * 100).rounded() / 100
+        let rss = peakRSSMB()
+        Log.shared.info("stage", ["name": .s(name), "seconds": .d((dt * 1000).rounded() / 1000),
+                                  "peak_rss_mb": .d(rss.own), "peak_rss_children_mb": .d(rss.children)])
         return v
     }
 
@@ -123,11 +127,14 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         var error: String?
         var image: CGImage?
         var paddle: [Line] = []
+        var dpi = 0.0, dark = 0.0, visionSec = 0.0, paddleSec = 0.0
+        var gate = "ocr"
     }
     var slots: [Slot] = []
     var paddleFailed: [Int] = []
     var paddleSeconds = 0.0
     let paddle: PaddleEngine? = try o.coreml.map { try PaddleEngine(directory: $0, units: o.units) }
+    if let paddle { logComputePlan(paddle, units: o.units, label: o.unitsLabel) }
     var dpis = Set<Double>()
     try stage("render+vision") {
         for start in stride(from: 1, through: n, by: o.jobs) {
@@ -145,13 +152,17 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                 let noInk = dark >= 0 && dark < RenderDefaults.noInkDark
                 if noInk { p.noInk = true }
                 let slot = Slot()
+                slot.dpi = dpi
+                slot.dark = dark
                 if native, noInk || !o.forceOCR {
+                    slot.gate = noInk ? "no_ink_native_text" : "native_text"
                     // 文字本来就在页上：用文字层，不做 OCR，也不重复嵌字
                     p.nativeText = true
                     p.textSource = "native_text"
                     p.lines = sortReadingOrder(PageInspect.nativeLines(page, zoom: r.zoom, visualHeight: r.pdfHeight))
                     if noInk { log("⚠ 第 \(pno) 页无墨迹但有文字层: 已改用文字层 \(p.lines.count) 行") }
                 } else if noInk {
+                    slot.gate = "no_ink_blank"
                     log("⚠ 第 \(pno) 页无墨迹且无文字层: 按白页处理")
                 } else {
                     slot.image = r.image
@@ -164,12 +175,15 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
             DispatchQueue.concurrentPerform(iterations: work.count) { i in
                 let (pno, s) = work[i]
                 autoreleasepool {
+                    let tv = Date()
                     do {
                         s.doc!.lines = sortReadingOrder(try VisionEngine.recognize(s.image!))
                     } catch {
                         s.failed = true
                         s.error = "\(error)"
+                        Log.shared.error("engine_failed", ["page": .i(pno), "engine": .s("vision"), "stage": .s("recognize"), "error": .s("\(error)")])
                     }
+                    s.visionSec = Date().timeIntervalSince(tv)
                     if o.coreml == nil {
                         let png = pagesDir.appendingPathComponent(String(format: "p%04d.png", pno))
                         do {
@@ -185,12 +199,15 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
             if let paddle {
                 let t0 = Date()
                 for (pno, s) in work {
+                    let tp = Date()
                     do {
                         s.paddle = try paddle.recognize(s.image!)
                     } catch {
                         paddleFailed.append(pno)
                         log("⚠ 第 \(pno) 页 PP-OCR 失败: \(error)")
+                        Log.shared.error("engine_failed", ["page": .i(pno), "engine": .s("ppocr"), "stage": .s("recognize"), "error": .s("\(error)")])
                     }
+                    s.paddleSec = Date().timeIntervalSince(tp)
                     s.image = nil
                 }
                 paddleSeconds += Date().timeIntervalSince(t0)
@@ -253,6 +270,29 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     let flog = FuseLog()
     let fused = try stage("fuse") { try fuse(vDoc, rDoc, log: flog) }
     try encodeJSON(fused).write(to: fURL)
+    if Log.shared.enabled {
+        let drops = Dictionary(grouping: flog.drops, by: \.page)
+        for (i, s) in slots.enumerated() {
+            let pno = i + 1
+            let fp = fused.pages.first { $0.page == pno }
+            var f: [String: LogValue] = [
+                "page": .i(pno), "dpi": .d(s.dpi), "width": .i(s.doc?.width ?? 0), "height": .i(s.doc?.height ?? 0),
+                "dark": .d((s.dark * 100000).rounded() / 100000), "gate": .s(s.gate),
+                "vision_lines": .i(vDoc.pages[i].lines.count), "vision_seconds": .d((s.visionSec * 1000).rounded() / 1000),
+                "ppocr_lines": .i(rDoc.pages[i].lines.count), "ppocr_seconds": .d((s.paddleSec * 1000).rounded() / 1000),
+                "fused_lines": .i(fp?.lines.count ?? 0),
+                "divergent": .i(fp?.lines.filter { $0.flag == "divergent" }.count ?? 0),
+                "only_vision": .i(fp?.lines.filter { $0.src == "vision" }.count ?? 0),
+                "only_ppocr": .i(fp?.lines.filter { $0.src == "rapidocr" }.count ?? 0),
+                "dedup": .i(drops[pno]?.count ?? 0),
+                "dedup_new_rule": .i(drops[pno]?.filter(\.newRuleOnly).count ?? 0),
+            ]
+            if Log.shared.withText {
+                f["lines"] = .a((fp?.lines ?? []).map { .s($0.text) })
+            }
+            Log.shared.debug("page", f)
+        }
+    }
 
     // ---- Markdown ----
     var mdStats: MDStats?
@@ -263,6 +303,15 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
             opt.pageRule = o.pageMarks == "rule"
             let (md, st) = toMarkdown(try JSONDecoder().decode(MDDoc.self, from: Data(contentsOf: fURL)), options: opt)
             mdStats = st
+            Log.shared.info("md", ["paragraphs": .i(st.paragraphs), "headings": .i(st.headings), "chars": .i(st.chars),
+                                   "dropped": .o(st.droppedDetail.mapValues { .i($0) }),
+                                   "vertical_pages": .a(st.verticalPages.map { .i($0) }),
+                                   "two_column_pages": .a(st.twoColumnPages.map { .i($0) })])
+            for d in st.droppedLines {
+                var f: [String: LogValue] = ["page": .i(d.page), "reason": .s(d.reason)]
+                if Log.shared.withText { f["text"] = .s(d.text) }
+                Log.shared.debug("md_dropped", f)
+            }
             let part = mdURL.deletingLastPathComponent().appendingPathComponent(mdURL.lastPathComponent + ".part")
             try withMark(md).write(to: part, atomically: false, encoding: .utf8)
             _ = try? fm.removeItem(at: mdURL)
@@ -285,6 +334,12 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         p.probeMax = st.probeMaxOffset; p.sizeIn = st.sizeIn; p.sizeOut = st.sizeOut
         p.belowThreshold = st.pagesBelowThreshold; p.warnings = st.warnings
         rp = p
+        Log.shared.info("pdf", ["embedded": .i(st.pagesEmbedded), "skipped_native": .i(st.pagesSkippedNative),
+                                "skipped_gate": .i(st.pagesSkippedNativeGate), "retrieval": st.retrieval.map { .d($0) } ?? .null,
+                                "line_retrieval": st.lineRetrieval.map { .d($0) } ?? .null,
+                                "probe_found": .i(st.probeFound), "probe_checked": .i(st.probeChecked),
+                                "size_in": .i(st.sizeIn), "size_out": .i(st.sizeOut)])
+        for w in st.warnings { Log.shared.warn("pdf_warning", ["message": .s(w)]) }
         res.outputs.append(pdfURL.path)
     }
 
@@ -311,6 +366,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     try buildReport(ri).write(to: reportURL, atomically: true, encoding: .utf8)
     res.outputs.append(reportURL.path)
 
+    for d in degraded { Log.shared.warn("degraded", ["message": .s(d)]) }
     res.pages = n
     res.degraded = degraded
     res.totalSeconds = (timing.map(\.1).reduce(0, +) * 10).rounded() / 10

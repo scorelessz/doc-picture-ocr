@@ -193,3 +193,32 @@ final class FuseTests: XCTestCase {
         XCTAssertThrowsError(try fuse(v, r))
     }
 }
+
+final class LogTests: XCTestCase {
+    func testConfigureStripsOptions() throws {
+        let l = Log()
+        let rest = try l.configure(["book", "a.pdf", "--log-level", "debug", "--log-format", "text", "--force", "--log-text"], env: [:])
+        XCTAssertEqual(rest, ["book", "a.pdf", "--force"])
+        XCTAssertEqual(l.level, .debug)
+        XCTAssertTrue(l.withText)
+    }
+
+    func testEnvIsEquivalentAndFlagWins() throws {
+        let a = Log(), b = Log()
+        _ = try a.configure(["x"], env: ["DOCOCR_LOG": "trace"])
+        XCTAssertEqual(a.level, .trace)
+        _ = try b.configure(["--log-level", "warn"], env: ["DOCOCR_LOG": "trace"])
+        XCTAssertEqual(b.level, .warn)
+    }
+
+    func testOffByDefault() throws {
+        let l = Log()
+        _ = try l.configure(["x"], env: [:])
+        XCTAssertFalse(l.enabled)
+        XCTAssertFalse(l.withText)
+    }
+
+    func testBadLevelThrows() {
+        XCTAssertThrowsError(try Log().configure(["--log-level", "loud"], env: [:]))
+    }
+}
