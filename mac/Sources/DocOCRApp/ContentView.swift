@@ -382,9 +382,9 @@ struct JobStatusView: View {
         case .queued: Text("排队中").font(.caption).foregroundStyle(.secondary)
         case .preparing: Text("准备上传内容…").font(.caption)
         case .awaitingConfirm: Text("等待确认上传").font(.caption).foregroundStyle(.orange)
-        case let .running(stage, done, total):
+        case let .running(stage, done, total, unit):
             VStack(alignment: .leading, spacing: 2) {
-                Text(total > 0 ? "\(stage) \(done)/\(total) 页" : stage).font(.caption)
+                Text(total > 0 ? "\(stage) \(done)/\(total) \(unit)" : stage).font(.caption)
                 if total > 0 { ProgressView(value: Double(done), total: Double(total)).frame(width: 240) }
             }
         case .done: Text("完成").font(.caption).foregroundStyle(.green)

@@ -117,7 +117,8 @@ private final class StopFlag: @unchecked Sendable {
 
 /// 逐条裁决，并发数看 reader。鉴权之类的硬失败立刻停，其余条目保留本地读法；不换家，不退回别的方式。结果按问题顺序写回。
 public func runAdjudication(_ doc: FusedDoc, questions: [AdjudicationQuestion], pages: [OnlinePage], mode: AdjudicationMode,
-                            reader: OnlineReader, providerID: String, model: String, isCancelled: @escaping @Sendable () -> Bool = { false }) async -> AdjudicationOutcome {
+                            reader: OnlineReader, providerID: String, model: String, isCancelled: @escaping @Sendable () -> Bool = { false },
+                            onDone: @escaping @Sendable (Int) -> Void = { _ in }) async -> AdjudicationOutcome {
     var o = AdjudicationOutcome(doc: doc)
     let byID = Dictionary(uniqueKeysWithValues: pages.map { ($0.id, $0) })
     let todo = questions.filter { byID[$0.id] != nil }
@@ -126,7 +127,7 @@ public func runAdjudication(_ doc: FusedDoc, questions: [AdjudicationQuestion], 
         if case OnlineError.http(let c)? = e as? OnlineError, c == 429 || c >= 500 { return true }
         return e is URLError || e as? OnlineError == .emptyReply
     }
-    let results: [Result<String, Error>?] = await runConcurrently(todo, limiter: reader.limiter, shouldStop: { hard.value || isCancelled() }) { q in
+    let results: [Result<String, Error>?] = await runConcurrently(todo, limiter: reader.limiter, shouldStop: { hard.value || isCancelled() }, onDone: onDone) { q in
         do {
             return .success(try await reader.read(byID[q.id]!))
         } catch {

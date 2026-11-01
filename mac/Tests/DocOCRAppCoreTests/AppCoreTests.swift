@@ -593,6 +593,20 @@ final class AppCoreTests: XCTestCase {
         XCTAssertEqual(r.q.jobs[0].status, .done)
     }
 
+    func testAdjudicationProgressCountsLinesNotPages() async throws {
+        let r = try adjRig()
+        var seen: [JobStatus] = []
+        let sink = r.q.$jobs.sink { if let s = $0.first?.status { seen.append(s) } }
+        defer { sink.cancel() }
+        r.q.start()
+        await until { r.q.confirm != nil }
+        r.q.confirmUpload(checkbox: true, forBatch: false)
+        await r.q.waitUntilIdle()
+        XCTAssertTrue(seen.contains(.running(stage: "在线裁决", done: 0, total: 1, unit: "处")), "\(seen)")
+        XCTAssertTrue(seen.contains(.running(stage: "在线裁决", done: 1, total: 1, unit: "处")), "\(seen)")
+        XCTAssertEqual(r.q.jobs[0].status, .done)
+    }
+
     func testAdjudicationBodiesAreRemoved() async throws {
         let r = try adjRig()
         r.q.start()

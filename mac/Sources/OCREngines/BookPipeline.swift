@@ -404,7 +404,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     if let d = o.uploadBodies { try? fm.removeItem(at: d) }
     var adjudication: AdjudicationSummary?
     if let f = o.adjudicate {
-        o.progress?(.adjudicate, n, n)
+        o.progress?(.adjudicate, 0, 0)     // 单位是分歧处，数量由挂钩自己报
         if let (d, a) = try stage("adjudicate", { try f(fused) }) {
             fused = d
             adjudication = a
@@ -624,8 +624,10 @@ public struct AdjudicationPlan: Sendable {
 
     public func discard() { try? FileManager.default.removeItem(at: bodies) }
 
-    public func run(_ doc: FusedDoc, reader: OnlineReader, isCancelled: @escaping @Sendable () -> Bool = { false }) async -> AdjudicationOutcome {
-        await runAdjudication(doc, questions: questions, pages: pages, mode: mode, reader: reader, providerID: preset.id, model: model, isCancelled: isCancelled)
+    public func run(_ doc: FusedDoc, reader: OnlineReader, isCancelled: @escaping @Sendable () -> Bool = { false },
+                    onDone: @escaping @Sendable (Int) -> Void = { _ in }) async -> AdjudicationOutcome {
+        await runAdjudication(doc, questions: questions, pages: pages, mode: mode, reader: reader, providerID: preset.id, model: model,
+                              isCancelled: isCancelled, onDone: onDone)
     }
 
     public func summary(_ o: AdjudicationOutcome) -> AdjudicationSummary {

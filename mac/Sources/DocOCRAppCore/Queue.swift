@@ -9,7 +9,7 @@ import OCRVL
 
 public enum JobStatus: Equatable, Sendable {
     case queued, preparing, awaitingConfirm
-    case running(stage: String, done: Int, total: Int)
+    case running(stage: String, done: Int, total: Int, unit: String = "页")
     case done, failed(String), cancelled, declined
 }
 
@@ -431,7 +431,12 @@ public final class QueueModel: ObservableObject {
             let transport = try blocking { await app.transport }
             let reader = OnlineReader(transport: transport, endpoint: plan.endpoint, providerID: preset.id, model: model, key: key,
                                       ticket: ticket, ledger: try FileLedger(uploads), jobs: k)
-            let out = try blocking { await plan.run(doc, reader: reader, isCancelled: { flag.value }) }
+            let total = plan.questions.count
+            let progress: @Sendable (Int) -> Void = { done in
+                Task { @MainActor in self?.advance(id, stage: BookStage.adjudicate.rawValue, done: done, total: total, unit: "处") }
+            }
+            progress(0)
+            let out = try blocking { await plan.run(doc, reader: reader, isCancelled: { flag.value }, onDone: progress) }
             return (out.doc, plan.summary(out))
         }
     }
@@ -450,6 +455,13 @@ public final class QueueModel: ObservableObject {
             return nil
         }
         return try? await app.gate.confirm(checkbox: true, scope: scope)
+    }
+
+    /// 回调是逐个切回主线程的，可能乱序：进度只增不减，任务结束后也不再改状态
+    private func advance(_ id: UUID, stage: String, done: Int, total: Int, unit: String) {
+        guard let j = jobs.first(where: { $0.id == id }), case let .running(s, d, _, _) = j.status else { return }
+        if s == stage, d > done { return }
+        set(id, .running(stage: stage, done: done, total: total, unit: unit))
     }
 
     /// 设置 → 服务商里每家单独设的并发数
