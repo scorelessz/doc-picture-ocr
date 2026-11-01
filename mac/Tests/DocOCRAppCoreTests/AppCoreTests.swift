@@ -364,6 +364,14 @@ final class AppCoreTests: XCTestCase {
         XCTAssertTrue(m.installed(.coreml))
     }
 
+    func testNoModelsBlocksStartWithGuide() {
+        let q = QueueModel(app: AppModel(store: Mem(), wire: CountingWire(), secrets: MemorySecretStore()), backend: FakeBackend(dir: dir),
+                           modelsDir: dir.appendingPathComponent("none"), history: History(url: dir.appendingPathComponent("n.json")), prefs: Mem(), outdir: dir)
+        q.add([pdf("a")])
+        XCTAssertFalse(q.canStart)
+        XCTAssertEqual(q.blockReason, QueueModel.noModelNote)
+    }
+
     func testOnlyPDFsAreAddedOnce() throws {
         let r = try rig(online: false)
         r.q.add([pdf("a"), pdf("a"), dir.appendingPathComponent("x.txt")])

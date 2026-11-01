@@ -39,6 +39,14 @@ struct AdvancedTab: View {
     }
 }
 
+/// 选 DocOCR-models-v1.zip，或 VL 模型文件夹
+@MainActor func pickModelFile(_ models: ModelManager) {
+    let p = NSOpenPanel()
+    p.allowedContentTypes = [.zip]
+    p.canChooseDirectories = true
+    if p.runModal() == .OK, let u = p.url { models.importFile(u) }
+}
+
 struct ModelsTab: View {
     @EnvironmentObject var models: ModelManager
     @State private var deleting: ModelKind?
@@ -54,6 +62,7 @@ struct ModelsTab: View {
                     HStack {
                         if !models.isBundled(k) {
                             Button(models.installed(k) ? "重新下载" : "下载") { models.download(k) }
+                            Button("从文件导入…") { pickModelFile(models) }
                             Text(ModelManager.downloadLabel).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()

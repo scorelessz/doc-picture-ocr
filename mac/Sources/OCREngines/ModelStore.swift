@@ -98,6 +98,10 @@ public enum ModelStore {
 
     /// 下载 VL 模型到 dir。全部校验过才换进去；不符的文件立刻删掉，已校验的留在暂存目录，重跑不用再下。
     public static func fetchVL(base: String? = nil, files: [VLFile] = VLModel.files, into dir: URL, log: (String) -> Void) throws {
+        try recorded("model_fetch", source: base ?? VLModel.baseURL) { try fetchVLFiles(base: base, files: files, into: dir, log: log) }
+    }
+
+    @discardableResult private static func fetchVLFiles(base: String?, files: [VLFile], into dir: URL, log: (String) -> Void) throws -> URL {
         guard let root = URL(string: base ?? VLModel.baseURL) else { throw ModelError.download("URL 无效") }
         let fm = FileManager.default
         let part = dir.deletingLastPathComponent().appendingPathComponent(".\(dir.lastPathComponent)-partial", isDirectory: true)
@@ -121,10 +125,45 @@ public enum ModelStore {
         _ = try? fm.removeItem(at: dir)
         try fm.moveItem(at: part, to: dir)
         Log.shared.info("vl_fetched", ["dir": .s(dir.path), "repo": .s(VLModel.repo), "revision": .s(String(VLModel.revision.prefix(12)))])
+        return dir
     }
 
     /// 下载（或 file:// 本地取）、校验、解压，换到目标目录。校验不过一个字节都不装。
     public static func fetch(url: String?, sha: String?, into dir: URL, log: (String) -> Void) throws {
+        try recorded("model_fetch", source: url ?? ModelRelease.url) { try install(url: url, sha: sha, into: dir, log: log) }
+    }
+
+    /// 从本地文件导入，不联网。校验和下载相同，不过就什么都不装。
+    public static func importZip(_ file: URL, into dir: URL, log: (String) -> Void = { _ in }) throws {
+        try recorded("model_import", source: file.lastPathComponent) { try install(url: file.absoluteString, sha: nil, into: dir, log: log) }
+    }
+
+    /// 从文件夹导入 VL 模型：三个文件逐个校验
+    public static func importVL(_ folder: URL, into dir: URL, log: (String) -> Void = { _ in }) throws {
+        try recorded("model_import", source: "vl:" + folder.lastPathComponent) { try fetchVLFiles(base: folder.absoluteString, files: VLModel.files, into: dir, log: log) }
+    }
+
+    private static func recorded(_ event: String, source: String, _ f: () throws -> URL) throws {
+        let t0 = Date()
+        var fields: [String: LogValue] = ["source": .s(source)]
+        func finish(_ ok: Bool) {
+            fields["ok"] = .b(ok)
+            fields["seconds"] = .d((Date().timeIntervalSince(t0) * 1000).rounded() / 1000)
+            Log.shared.info(event, fields)
+        }
+        do {
+            let d = try f()
+            fields["bytes"] = .i(Int((FileManager.default.enumerator(at: d, includingPropertiesForKeys: [.fileSizeKey])?.allObjects as? [URL] ?? [])
+                .map { (try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0 }.reduce(0, +)))
+            finish(true)
+        } catch {
+            fields["error"] = .s("\(error)")
+            finish(false)
+            throw error
+        }
+    }
+
+    @discardableResult private static func install(url: String?, sha: String?, into dir: URL, log: (String) -> Void) throws -> URL {
         let want = sha ?? ModelRelease.sha256
         guard let u = URL(string: url ?? ModelRelease.url) else { throw ModelError.download("URL 无效") }
         let fm = FileManager.default
@@ -150,10 +189,13 @@ public enum ModelStore {
         let staged = dir.deletingLastPathComponent().appendingPathComponent(".\(dir.lastPathComponent)-new-\(ProcessInfo.processInfo.processIdentifier)")
         try fm.moveItem(at: root, to: staged)
         let oldVL = VLModel.directory(models: dir)
-        if fm.fileExists(atPath: oldVL.path) { try fm.moveItem(at: oldVL, to: VLModel.directory(models: staged)) }
+        let newVL = VLModel.directory(models: staged)
+        if fm.fileExists(atPath: newVL.path), !VLModel.problems(newVL).isEmpty { try fm.removeItem(at: newVL) }     // 包里的 VL 校验不过就不要
+        if fm.fileExists(atPath: oldVL.path), !fm.fileExists(atPath: newVL.path) { try fm.moveItem(at: oldVL, to: newVL) }
         _ = try? fm.removeItem(at: dir)
         try fm.moveItem(at: staged, to: dir)
         Log.shared.info("models_fetched", ["dir": .s(dir.path), "sha256": .s(String(got.prefix(12)))])
+        return dir
     }
 }
 #endif

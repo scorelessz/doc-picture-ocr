@@ -89,7 +89,7 @@ elif [ "$PY" = 0 ]; then
    xattr -dr com.apple.quarantine /Applications/DocOCR.app
    \`\`\`
 
-需要 Apple Silicon 和 macOS 14 以上。高精度模式的模型在设置里按需下载，约 1.1 GB。
+需要 Apple Silicon 和 macOS 14 以上。App 不带模型，第一次打开时下载识别模型（约 139 MB）或从文件导入；高精度模式的模型约 1.1 GB。
 
 sha256: \`$SHA\`
 EOF

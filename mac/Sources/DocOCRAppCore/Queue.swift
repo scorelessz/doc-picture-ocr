@@ -168,6 +168,8 @@ private final class Flag: @unchecked Sendable {
 public final class QueueModel: ObservableObject {
     public static let highPrecisionNote = "普通模式：两个本地引擎交叉核对，整本约 3 分钟，错误率约 0.5%。\n高精度模式：再加本地大模型逐页投票，错误率再降约 0.05–0.1 个百分点（中文 0.49% → 0.40%，英文 0.50% → 0.45%），但整本约 1 小时（慢约 20 倍），内存多约 1–3 GB。不赶时间、要求逐字精确时再开。"
 
+    public static let noModelNote = "还没有识别模型（约 139 MB）：请下载或从文件导入"
+
     @Published public private(set) var jobs: [Job] = []
     @Published public var makeMarkdown = true
     @Published public var makePDF = true
@@ -249,7 +251,7 @@ public final class QueueModel: ObservableObject {
             if localEndpoint == nil { return "本机服务只接受本机地址，例如 http://127.0.0.1:11434/v1" }
             if localModel.isEmpty { return "本机服务要填模型名" }
         }
-        if !coreMLInstalled { return "还没有识别模型，请到设置 → 模型下载" }
+        if !coreMLInstalled { return Self.noModelNote }
         if needsVLModel { return "高精度模式需要 VL 模型，请到设置 → 模型下载" }
         if highPrecision, onlineEnabled { return "高精度模式和在线读字只能选一个" }
         if onlineProviderID != nil, !onlineEnabled { return app.networkAllowed ? "在线读字要选中服务商并填模型名" : AppModel.offReason }

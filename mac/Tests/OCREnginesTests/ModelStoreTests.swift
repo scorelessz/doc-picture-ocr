@@ -45,6 +45,36 @@ final class ModelStoreTests: XCTestCase {
         XCTAssertEqual(VLModel.problems(dir, files: [f]), [])
     }
 
+    func testResolvedFallsBackToApplicationSupport() {
+        XCTAssertNil(ModelStore.bundledDirectory)
+        XCTAssertEqual(ModelStore.resolvedDirectory, ModelStore.defaultDirectory)
+    }
+
+    func testBadZipImportLeavesNothing() throws {
+        let zip = root.appendingPathComponent("DocOCR-models-v1.zip"), dir = root.appendingPathComponent("models")
+        try Data("不是模型包".utf8).write(to: zip)
+        XCTAssertThrowsError(try ModelStore.importZip(zip, into: dir))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path))
+        let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        XCTAssertEqual(Set(names), ["src", "DocOCR-models-v1.zip"], "不留半成品")
+    }
+
+    func testBadZipKeepsExistingModels() throws {
+        let zip = root.appendingPathComponent("a.zip"), dir = root.appendingPathComponent("models")
+        try Data("x".utf8).write(to: zip)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data().write(to: dir.appendingPathComponent("keys.txt"))
+        XCTAssertThrowsError(try ModelStore.importZip(zip, into: dir))
+        XCTAssertTrue(ModelStore.installed(dir))
+    }
+
+    func testBadVLFolderIsRefused() throws {
+        _ = try file("config.json", "假的")
+        let dir = root.appendingPathComponent("vl-new")
+        XCTAssertThrowsError(try ModelStore.importVL(root.appendingPathComponent("src"), into: dir))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path))
+    }
+
     func testProblemsReportsMissingFile() {
         XCTAssertEqual(VLModel.problems(root, files: [VLFile(name: "x", sha256: "0", size: 1)]), ["x"])
     }

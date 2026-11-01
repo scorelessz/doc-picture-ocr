@@ -172,6 +172,9 @@ public func runDoctor(models: URL, outdir: URL, vlDirectory: URL? = nil) -> [Doc
         add("write", false, "\(outdir.path): \(error)")
     }
 
+    let source = ModelStore.bundledDirectory != nil ? "包内" : (ModelStore.installed(models) ? "Application Support" : "缺失")
+    add("models_source", source != "缺失", source, required: false)
+
     // VL 是可选项，缺了不算失败
     let vl = vlDirectory ?? VLModel.directory(models: models)
     if !FileManager.default.fileExists(atPath: vl.path) {

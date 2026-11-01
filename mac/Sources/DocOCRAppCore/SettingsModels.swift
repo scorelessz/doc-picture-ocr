@@ -83,6 +83,20 @@ public final class ModelManager: ObservableObject {
         }
     }
 
+    /// zip 是识别模型包，文件夹是 VL 模型。不联网，校验不过什么都不装。
+    public func importFile(_ u: URL) {
+        let (dir, vl) = (dir, vl)
+        let folder = (try? u.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        work(folder ? .vl : .coreml, "导入中…") {
+            if folder {
+                try ModelStore.importVL(u, into: vl)
+            } else {
+                try ModelStore.importZip(u, into: dir)
+            }
+            return "导入完成，校验通过"
+        }
+    }
+
     public func verify(_ k: ModelKind) {
         let (dir, vl, bundled) = (dir, vl, bundled)
         work(k, "校验中…") {

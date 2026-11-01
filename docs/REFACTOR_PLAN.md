@@ -150,7 +150,7 @@ Package.swift
 ### 5.0 已定决策（2026-10-31）
 
 - 默认组合：PP-OCRv6（Core ML，几何 + CTC 核对）+ PaddleOCR-VL-1.6（整页读字），Vision 降为可选。
-- 模型分发：PP-OCRv6 打进 App；大模型首次使用按需下载；测试期经 GitHub Release + `ocr-cli models fetch`（校验 sha256）。
+- 模型分发（2026-11-01 更新）：默认不打包，App 内下载或从文件导入，仓库公开。PP-OCRv6 来自本仓库 Release models-v1，VL 来自 Hugging Face 钉死版本，都校验 sha256。
 - 页面尺寸：扫描件尺寸不可控，**任意尺寸都必须正常识别**（一致率 ≥98%），预设尺寸只是加速手段，可回落 GPU/CPU。
 - 倒扫页：整页方向判定，不做逐行方向分类（逐行分类实测把正常长行判成 180°，读成乱码）。
 - 旧 Python 链路与 `src/rapid_pages.py`：保留，用户通知后再删。

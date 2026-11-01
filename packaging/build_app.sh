@@ -2,21 +2,25 @@
 # 组装 DocOCR.app：swift build → 拼包 → 打入 Core ML 模型 → ad-hoc 签名 → ditto 压缩。
 #   packaging/build_app.sh               产物是 dist/DocOCR-<版本>.zip
 #   packaging/build_app.sh --skip-build  用现成的 .build/release
+#   packaging/build_app.sh --with-models 把 Core ML 模型打进包里，自用。默认不打包，使用者在 App 里下载或从文件导入
 #   packaging/build_app.sh --keep-app    保留 dist/DocOCR.app（默认删掉：系统会把它当成第二个 App 索引）
 # 没有开发者账号，只做本机签名，不做公证。PaddleOCR-VL 不打包，按需下载。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-SKIP=0; KEEP=0
+SKIP=0; KEEP=0; WITH=0
 for a in "$@"; do
   case "$a" in
     --skip-build) SKIP=1 ;;
     --keep-app) KEEP=1 ;;
+    --with-models) WITH=1 ;;
     *) echo "未知参数: $a"; exit 2 ;;
   esac
 done
 MODELS="${DOCOCR_MODELS:-$HOME/Library/Application Support/DocOCR/models}"
-[ -f "$MODELS/keys.txt" ] || { echo "✗ 没有模型: $MODELS（先跑 ocr-cli models fetch）"; exit 1; }
+if [ "$WITH" = 1 ]; then
+  [ -f "$MODELS/keys.txt" ] || { echo "✗ 没有模型: $MODELS（先跑 ocr-cli models fetch）"; exit 1; }
+fi
 [ "$SKIP" = 1 ] || swift build -c release --product DocOCRApp
 
 # 版本号：最近的 tag 去掉 v；构建号是提交数；完整 commit 记进 Info.plist
@@ -28,14 +32,18 @@ git diff --quiet HEAD -- mac Package.swift packaging || COMMIT="$COMMIT-dirty"
 
 APP=dist/DocOCR.app; C="$APP/Contents"
 rm -rf "$APP"
-mkdir -p "$C/MacOS" "$C/Resources/models"
+mkdir -p "$C/MacOS" "$C/Resources"
 cp .build/release/DocOCRApp "$C/MacOS/DocOCR"
 cp packaging/AppIcon.icns "$C/Resources/AppIcon.icns"
 # mlx 在主 bundle 的 Resources 下找这个 bundle（Metal 着色器）
 cp -R .build/release/mlx-swift_Cmlx.bundle "$C/Resources/"
 # 只放预编译的 .mlmodelc：包内只读，不能现场编译
-cp "$MODELS/keys.txt" "$MODELS/manifest.json" "$C/Resources/models/"
-cp -R "$MODELS"/*.mlmodelc "$C/Resources/models/"
+if [ "$WITH" = 1 ]; then
+  mkdir -p "$C/Resources/models"
+  cp "$MODELS/keys.txt" "$MODELS/manifest.json" "$C/Resources/models/"
+  cp -R "$MODELS"/*.mlmodelc "$C/Resources/models/"
+fi
+cp docs/THIRD_PARTY_LICENSES.md "$C/Resources/"
 
 cat > "$C/Info.plist" <<P
 <?xml version="1.0" encoding="UTF-8"?>

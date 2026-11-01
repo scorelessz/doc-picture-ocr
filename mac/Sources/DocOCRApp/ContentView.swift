@@ -181,6 +181,7 @@ struct ModelField: View {
 
 struct QueueView: View {
     @EnvironmentObject var app: AppModel
+    @EnvironmentObject var models: ModelManager
     @EnvironmentObject var providers: ProviderSettings
     @EnvironmentObject var queue: QueueModel
     @State private var targeted = false
@@ -205,6 +206,7 @@ struct QueueView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    if !queue.coreMLInstalled { modelGuide }
                     dropZone
                     if !queue.jobs.isEmpty { jobsList }
                     options
@@ -214,6 +216,18 @@ struct QueueView: View {
             footer.padding(12)
         }
         .navigationTitle("处理队列")
+    }
+
+    private var modelGuide: some View {
+        GroupBox {
+            HStack {
+                Label(QueueModel.noModelNote, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                Spacer()
+                Button(models.busy.contains(.coreml) ? "处理中…" : "下载") { models.download(.coreml) }.disabled(models.busy.contains(.coreml))
+                Button("从文件导入…") { pickModelFile(models) }.disabled(models.busy.contains(.coreml))
+            }
+            if let m = models.message[.coreml] { Text(m).font(.caption).frame(maxWidth: .infinity, alignment: .leading) }
+        }
     }
 
     private var dropZone: some View {
@@ -362,7 +376,6 @@ struct QueueView: View {
         HStack {
             if let r = queue.blockReason {
                 Text(r).foregroundStyle(.orange)
-                if !queue.coreMLInstalled { SettingsLink { Text("去模型管理") } }
             }
             Spacer()
             if queue.isRunning {
