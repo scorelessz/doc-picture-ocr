@@ -57,6 +57,8 @@ public struct BookResult: Encodable {
     public var pages = 0, degraded: [String] = []
     public var outputs: [String] = []
 
+    public init() {}
+
     enum CodingKeys: String, CodingKey {
         case seconds, pages, degraded, outputs
         case totalSeconds = "total_seconds", secPerPage = "sec_per_page"
@@ -506,6 +508,11 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
 public struct OnlinePlan: Sendable {
     public let preset: ProviderPreset, endpoint: Endpoint, model: String
     public let pages: [OnlinePage], manifest: UploadManifest, bodies: URL
+
+    public init(preset: ProviderPreset, endpoint: Endpoint, model: String, pages: [OnlinePage], manifest: UploadManifest, bodies: URL) {
+        self.preset = preset; self.endpoint = endpoint; self.model = model
+        self.pages = pages; self.manifest = manifest; self.bodies = bodies
+    }
 
     public static func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, workdir: URL, log: (String) -> Void) throws -> OnlinePlan {
         let endpoint = try Endpoint(preset.baseURL)

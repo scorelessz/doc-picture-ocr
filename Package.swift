@@ -9,6 +9,7 @@ let package = Package(
     products: [
         .library(name: "OCRCore", targets: ["OCRCore"]),
         .executable(name: "ocr-cli", targets: ["ocr-cli"]),
+        .executable(name: "DocOCRApp", targets: ["DocOCRApp"]),
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.33.0")),
@@ -24,6 +25,10 @@ let package = Package(
         .target(name: "OCRProviders", dependencies: ["OCRCore"], path: "mac/Sources/OCRProviders"),
         .executableTarget(name: "ocr-cli", dependencies: ["OCRCore", "OCREngines", "OCRVL", "OCRProviders"],
                           path: "mac/Sources/ocr-cli"),
+        .target(name: "DocOCRAppCore", dependencies: ["OCRCore", "OCREngines", "OCRProviders", "OCRVL"], path: "mac/Sources/DocOCRAppCore"),
+        .executableTarget(name: "DocOCRApp", dependencies: ["DocOCRAppCore", "OCRCore", "OCREngines", "OCRProviders"],
+                          path: "mac/Sources/DocOCRApp"),
+        .testTarget(name: "DocOCRAppCoreTests", dependencies: ["DocOCRAppCore", "OCRProviders", "OCREngines", "OCRCore"], path: "mac/Tests/DocOCRAppCoreTests"),
         .testTarget(name: "OCRCoreTests", dependencies: ["OCRCore"], path: "mac/Tests/OCRCoreTests"),
         .testTarget(name: "OCREnginesTests", dependencies: ["OCREngines", "OCRCore"], path: "mac/Tests/OCREnginesTests"),
         .testTarget(name: "OCRProvidersTests", dependencies: ["OCRProviders", "OCRCore"], path: "mac/Tests/OCRProvidersTests"),

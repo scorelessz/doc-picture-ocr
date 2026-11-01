@@ -57,6 +57,26 @@ func freeDiskGB(_ path: String) -> Double {
     return ((Double(v?.volumeAvailableCapacityForImportantUsage ?? 0) / 1_073_741_824) * 10).rounded() / 10
 }
 
+public struct SystemSummary: Sendable {
+    public let chip: String, ramGB: Double, cpus: Int, macOS: String
+}
+
+public func systemSummary() -> SystemSummary {
+    let os = ProcessInfo.processInfo.operatingSystemVersion
+    return SystemSummary(chip: sysctl("machdep.cpu.brand_string") ?? "?", ramGB: (Double(sysctl64("hw.memsize")) / 1_073_741_824 * 10).rounded() / 10,
+                         cpus: ProcessInfo.processInfo.activeProcessorCount, macOS: "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)")
+}
+
+/// Core ML 的实际落点：每个模型分到 ANE / GPU / CPU 的算子数。
+public func accelerationPlan(models: URL) async -> [(model: String, ane: Int, gpu: Int, cpu: Int)] {
+    guard #available(macOS 14.4, *), let e = try? PaddleEngine(directory: models, units: .cpuAndNeuralEngine), let items = try? e.allCompiled() else { return [] }
+    var out: [(String, Int, Int, Int)] = []
+    for (name, url) in items {
+        if let p = try? await computePlan(url, name: name, units: .cpuAndNeuralEngine, label: "ane") { out.append((p.model, p.ane, p.gpu, p.cpu)) }
+    }
+    return out
+}
+
 public func modelManifest(_ dir: URL?) -> [String: LogValue] {
     guard let dir, let d = try? Data(contentsOf: dir.appendingPathComponent("manifest.json")),
           let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],

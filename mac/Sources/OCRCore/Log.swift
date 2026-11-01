@@ -54,6 +54,7 @@ public final class Log: @unchecked Sendable {
     /// 从参数里摘掉日志选项，其余原样返回。DOCOCR_LOG 等价于 --log-level。
     public func configure(_ args: [String], env: [String: String]) throws -> [String] {
         var rest: [String] = [], file: String?, lvl = env["DOCOCR_LOG"].flatMap { LogLevel(name: $0) }
+        withText = false
         var i = 0
         while i < args.count {
             let a = args[i]
