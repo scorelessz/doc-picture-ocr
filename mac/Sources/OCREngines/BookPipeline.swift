@@ -618,7 +618,7 @@ public struct AdjudicationPlan: Sendable {
                                pages: Set<Int>? = nil, bodies: URL) throws -> AdjudicationPlan {
         let cropper = try pdf.map { try LineCropper(pdf: $0, doc: doc) }
         return try build(doc: doc, source: source, preset: preset, model: model, mode: mode, pages: pages, bodies: bodies) { pno, l in
-            try cropper?.crop(page: pno, line: l)
+            try autoreleasepool { try cropper?.crop(page: pno, line: l) }     // 后台线程没有事件循环，不手动释放，整页图会一直堆着
         }
     }
 
