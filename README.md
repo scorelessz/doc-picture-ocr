@@ -256,7 +256,9 @@ CLAUDE.md       项目级约定与不变量（改代码前必读）
 
 ## 许可
 
-私有仓库，暂不附开源许可证（默认保留所有权利）。
+本项目自身代码采用 **[PolyForm Noncommercial License 1.0.0](LICENSE)**：允许非商业用途的使用、修改与分发（个人、学习研究、非营利组织等），**禁止商业使用**。作者本人仅用于内部与个人用途，不盈利。
+
+第三方组件与模型各按其自身许可证，清单见 [docs/THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md)；PolyForm 只覆盖本项目自己写的代码，不改变第三方组件的许可。
 
 **如果以后要把打包好的 .app 公开分发，先看一眼这个**：PyMuPDF 是
 **AGPL-3.0 或 Artifex 商业许可**双授权 —— 公开分发含它的二进制，就要按 AGPL 开放整个应用的源码，
