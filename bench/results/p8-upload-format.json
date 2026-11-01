@@ -1,0 +1,65 @@
+{
+ "phase": "p8",
+ "name": "upload-format",
+ "note": "本地 PaddleOCR-VL 作代理, 灰度页图; bytes 是编码后图片, 请求体还要加 base64 的 33%",
+ "en": {
+  "png-1792": {
+   "pages": 9,
+   "mean_kb": 506.2,
+   "edits": 25,
+   "chars": 10016,
+   "cer": 0.0025
+  },
+  "jpeg90-1792": {
+   "pages": 9,
+   "mean_kb": 349.4,
+   "edits": 25,
+   "chars": 10016,
+   "cer": 0.0025
+  },
+  "jpeg90-1280": {
+   "pages": 9,
+   "mean_kb": 209.6,
+   "edits": 36,
+   "chars": 10016,
+   "cer": 0.00359
+  },
+  "jpeg75-1792": {
+   "pages": 9,
+   "mean_kb": 219.2,
+   "edits": 25,
+   "chars": 10016,
+   "cer": 0.0025
+  }
+ },
+ "zh": {
+  "png-1792": {
+   "pages": 15,
+   "mean_kb": 477.3,
+   "edits": 27,
+   "chars": 8568,
+   "cer": 0.00315
+  },
+  "jpeg90-1792": {
+   "pages": 15,
+   "mean_kb": 309.6,
+   "edits": 27,
+   "chars": 8568,
+   "cer": 0.00315
+  },
+  "jpeg90-1280": {
+   "pages": 15,
+   "mean_kb": 196.5,
+   "edits": 31,
+   "chars": 8568,
+   "cer": 0.00362
+  },
+  "jpeg75-1792": {
+   "pages": 15,
+   "mean_kb": 194.1,
+   "edits": 26,
+   "chars": 8568,
+   "cer": 0.00303
+  }
+ }
+}
