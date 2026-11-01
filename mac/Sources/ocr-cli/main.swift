@@ -34,6 +34,7 @@ usage:
   ocr-cli models fetch --vl [--models-dir dir] [--url 基址]
   ocr-cli adjudicate <fused.json> --provider id --model m --out o.json --allow-network [--mode image|text] [--pdf p]
                      [--pages 1,2] [--confirm-upload 清单sha256] [--key-stdin] [--force]
+  ocr-cli verify-uploads <report.md> <uploads.jsonl>
   ocr-cli provider list
   ocr-cli provider key set|delete <id>        Key 从 stdin 读，不接受参数
   ocr-cli provider models <id> --allow-network [--key-stdin]
@@ -161,6 +162,13 @@ do {
 
     case "provider":
         try runProvider(args)
+
+    case "verify-uploads":
+        guard args.count >= 2 else { fail(usage) }
+        let bad = reconcileUploads(report: try String(contentsOfFile: args[0], encoding: .utf8), rows: try FileLedger.rows(URL(fileURLWithPath: args[1])))
+        for b in bad { print("✗ \(b)") }
+        if !bad.isEmpty { exit(1) }
+        print("✓ 报告与上传记录一致")
 
     case "adjudicate":
         try runAdjudicate(args)

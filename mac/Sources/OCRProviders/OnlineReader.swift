@@ -148,3 +148,30 @@ public final class OnlineReader: @unchecked Sendable {
     }
 }
 #endif
+
+#if canImport(CryptoKit)
+/// 报告和上传记录对账。返回不一致的地方，空表示对得上。报告是用户看的，记录是实际发生的，两边必须一致。
+public func reconcileUploads(report: String, rows: [UploadRecord]) -> [String] {
+    var inTable = false
+    var seen: [String] = []
+    var calledPages: Int?
+    for l in report.components(separatedBy: "\n") {
+        if l.hasPrefix("## ") { inTable = l.hasSuffix("上传记录") }
+        let c = l.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        if c.count >= 3, c[1] == "调用页数" { calledPages = Int(c[2]) }
+        guard inTable, c.count == 8, Int(c[4]) != nil else { continue }
+        seen.append([c[2], c[3], c[4], c[5], c[6]].joined(separator: "|"))
+    }
+    let key: (UploadRecord) -> String = { "\($0.host)|\($0.model)|\($0.page)|\($0.bytes)|\($0.status)" }
+    var left = rows.map(key)
+    var out: [String] = []
+    for s in seen {
+        if let i = left.firstIndex(of: s) { left.remove(at: i) } else { out.append("报告里有、上传记录里没有: \(s)") }
+    }
+    out += left.map { "上传记录里有、报告里没有: \($0)" }
+    out += rows.filter { $0.status == "pending" }.map { "第 \($0.page) 页的上传没有结果（可能发出后中断）" }
+    let ok = Set(rows.filter { $0.status == "ok" }.map(\.page))
+    if let calledPages, !rows.isEmpty, calledPages != ok.count { out.append("报告调用页数 \(calledPages)，上传成功 \(ok.count) 页") }
+    return out
+}
+#endif

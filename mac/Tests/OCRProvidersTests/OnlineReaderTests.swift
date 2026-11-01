@@ -132,6 +132,36 @@ final class OnlineReaderTests: XCTestCase {
 #if canImport(CryptoKit)
 import OCRCore
 
+final class ReconcileTests: XCTestCase {
+    private func rec(_ seq: Int, _ page: Int, _ status: String = "ok") -> UploadRecord {
+        UploadRecord(seq: seq, time: Date(), host: "h", provider: "p", model: "m", ticket: "t", scope: "once", page: page, item: "p\(page)", bytes: 9, status: status)
+    }
+
+    private func report(_ pages: [Int], called: Int? = nil) -> String {
+        var s = "# 报告\n\n## 5　上传记录\n\n| 时间 | 域名 | 模型 | 页 | 字节 | 结果 |\n|---|---|---|---|---|---|\n"
+        for p in pages { s += "| t | h | m | \(p) | 9 | ok |\n" }
+        s += "\n## 6　VLM 第三票\n\n| 项 | 值 |\n|---|---|\n| 调用页数 | \(called ?? pages.count) |\n"
+        return s
+    }
+
+    func testMatches() { XCTAssertEqual(reconcileUploads(report: report([1, 2]), rows: [rec(1, 1), rec(2, 2)]), []) }
+
+    func testNoUploadsNoProblem() { XCTAssertEqual(reconcileUploads(report: "# 报告\n", rows: []), []) }
+
+    func testReportMissingPage() { XCTAssertEqual(reconcileUploads(report: report([1], called: 2), rows: [rec(1, 1), rec(2, 2)]).count, 1) }
+
+    func testLedgerMissingPage() { XCTAssertEqual(reconcileUploads(report: report([1, 2], called: 1), rows: [rec(1, 1)]).count, 1) }
+
+    func testCalledPagesMismatch() {
+        XCTAssertTrue(reconcileUploads(report: report([1], called: 3), rows: [rec(1, 1)]).contains { $0.contains("调用页数") })
+    }
+
+    func testPendingReported() {
+        let r = "## 上传记录\n| t | h | m | 1 | 9 | pending |\n"
+        XCTAssertTrue(reconcileUploads(report: r, rows: [rec(1, 1, "pending")]).contains { $0.contains("没有结果") })
+    }
+}
+
 final class LogLeakTests: XCTestCase {
     /// 35、36：trace 全流程，开不开 --log-text，日志里都不能有 Key。没开时也不能有正文。
     func testNoKeyInLogs() async throws {

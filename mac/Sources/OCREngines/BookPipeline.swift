@@ -463,7 +463,16 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         let tf = ISO8601DateFormatter()
         ri.uploads = rows.map { UploadRow(time: tf.string(from: $0.time), host: $0.host, model: $0.model, page: $0.page, bytes: $0.bytes, status: $0.status) }
     }
-    try buildReport(ri).write(to: reportURL, atomically: true, encoding: .utf8)
+    var report = buildReport(ri)
+    if let u = o.uploadsPath, let rows = try? FileLedger.rows(u) {
+        let bad = reconcileUploads(report: report, rows: rows)
+        for b in bad {
+            degraded.append("上传对账: \(b)")
+            Log.shared.error("upload_mismatch", ["detail": .s(b)])
+        }
+        if !bad.isEmpty { report += "\n## 上传对账不一致\n\n" + bad.map { "- \($0)" }.joined(separator: "\n") + "\n" }
+    }
+    try report.write(to: reportURL, atomically: true, encoding: .utf8)
     res.outputs.append(reportURL.path)
 
     for d in degraded { Log.shared.warn("degraded", ["message": .s(d)]) }
