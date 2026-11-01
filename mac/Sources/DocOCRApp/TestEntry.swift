@@ -5,6 +5,7 @@ import SwiftUI
 
 // 测试入口，脚本用：
 //   --smoke <outdir> a.pdf b.pdf [--cancel-after 秒]   用和界面相同的 QueueModel 跑完，写 smoke.json 后退出
+//   --keychain-test write|read|overwrite|delete <结果文件>
 //   --snapshot <dir>               把各界面渲染成 PNG 后退出
 
 final class MemoryStore: KVStore {
@@ -16,7 +17,9 @@ final class MemoryStore: KVStore {
 @MainActor
 enum TestEntry {
     static func run(_ a: [String]) async {
-        if let i = a.firstIndex(of: "--smoke"), i + 1 < a.count {
+        if let i = a.firstIndex(of: "--keychain-test"), i + 2 < a.count {
+            keychain(a[i + 1], out: URL(fileURLWithPath: a[i + 2]))
+        } else if let i = a.firstIndex(of: "--smoke"), i + 1 < a.count {
             await smoke(out: URL(fileURLWithPath: a[i + 1]), pdfs: a[(i + 2)...].filter { $0.hasSuffix(".pdf") }.map { URL(fileURLWithPath: $0) })
         } else if let i = a.firstIndex(of: "--snapshot"), i + 1 < a.count {
             await snapshot(URL(fileURLWithPath: a[i + 1]))
@@ -24,11 +27,34 @@ enum TestEntry {
         exit(0)
     }
 
+    /// 单独的 service，不碰用户的条目。结果写文件，打包后 stdout 看不到。
+    private static func keychain(_ op: String, out: URL) {
+        let k = KeychainStore(service: "com.dococr.keychain-test"), id = "smoke"
+        var r: String
+        do {
+            switch op {
+            case "write":
+                try k.save("value-1", for: id)
+                r = "写入成功"
+            case "read":
+                r = try k.load(id) != nil ? "读到" : "没有条目"
+            case "overwrite":
+                try k.save("value-2", for: id)
+                r = "覆盖成功, " + (try k.load(id) != nil ? "读到" : "没有条目")
+            default:
+                try k.delete(id)
+                r = "已删除"
+            }
+        } catch { r = "错误: \(error)" }
+        try? r.write(to: out, atomically: true, encoding: .utf8)
+    }
+
     private static func smoke(out: URL, pdfs: [URL]) async {
         let app = AppModel(store: MemoryStore(), secrets: MemorySecretStore())
         let q = QueueModel(app: app, history: History(url: out.appendingPathComponent("history.json")), outdir: out)
         q.overwrite = true
         q.forceOCR = true
+        q.highPrecision = CommandLine.arguments.contains("--high-precision")
         q.add(pdfs)
         let cancelAfter = CommandLine.arguments.firstIndex(of: "--cancel-after").map { Double(CommandLine.arguments[$0 + 1]) ?? 0 }
         var maxGap = 0.0

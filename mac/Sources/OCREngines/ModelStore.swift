@@ -62,6 +62,15 @@ public enum ModelStore {
         return base.appendingPathComponent("DocOCR/models", isDirectory: true)
     }
 
+    /// App 包里自带的识别模型。命令行没有这个目录。
+    public static var bundledDirectory: URL? {
+        guard let d = Bundle.main.resourceURL?.appendingPathComponent("models", isDirectory: true), installed(d) else { return nil }
+        return d
+    }
+
+    /// 优先用包内模型，没有再找 Application Support
+    public static var resolvedDirectory: URL { bundledDirectory ?? defaultDirectory }
+
     public static func installed(_ dir: URL) -> Bool {
         FileManager.default.fileExists(atPath: dir.appendingPathComponent("keys.txt").path)
     }

@@ -23,15 +23,19 @@ struct ModelsTab: View {
             ForEach(ModelKind.allCases) { k in
                 Section(k.title) {
                     LabeledContent("来源", value: k.source)
-                    LabeledContent("状态", value: models.installed(k) ? "已安装" : "未安装")
+                    LabeledContent("状态", value: models.isBundled(k) ? "已内置在 App 里" : (models.installed(k) ? "已安装" : "未安装"))
                     LabeledContent("大小", value: ByteCountFormatter.string(fromByteCount: models.sizes[k] ?? 0, countStyle: .file))
                     if let m = models.message[k] { Text(m).foregroundStyle(.secondary) }
                     HStack {
-                        Button(models.installed(k) ? "重新下载" : "下载") { models.download(k) }
-                        Text(ModelManager.downloadLabel).font(.caption).foregroundStyle(.secondary)
+                        if !models.isBundled(k) {
+                            Button(models.installed(k) ? "重新下载" : "下载") { models.download(k) }
+                            Text(ModelManager.downloadLabel).font(.caption).foregroundStyle(.secondary)
+                        }
                         Spacer()
                         Button("校验") { models.verify(k) }.disabled(!models.installed(k))
-                        Button("删除", role: .destructive) { deleting = k }.disabled(!models.installed(k))
+                        if !models.isBundled(k) {
+                            Button("删除", role: .destructive) { deleting = k }.disabled(!models.installed(k))
+                        }
                     }.disabled(models.busy.contains(k))
                 }
             }
@@ -85,6 +89,7 @@ struct ProvidersTab: View {
                 }
             }.disabled(!app.canUse(p))
             if let r = app.unavailableReason(p) { Text(r).font(.caption).foregroundStyle(.secondary) }
+            if let r = providers.keyProblem(p.id) { Text(r).font(.caption).foregroundStyle(.orange) }
             if app.selected.contains(p.id) {
                 HStack {
                     SecureField(providers.hasKey(p.id) ? "Key 已保存在 Keychain" : "API Key", text: Binding(get: { keys[p.id] ?? "" }, set: { keys[p.id] = $0 }))

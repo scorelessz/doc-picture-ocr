@@ -47,8 +47,17 @@ public final class MemorySecretStore: SecretStore, @unchecked Sendable {
 #if canImport(Security)
 import Security
 
-public enum SecretError: Error, Equatable {
+public enum SecretError: Error, Equatable, CustomStringConvertible {
     case keychain(Int32)
+    /// ad-hoc 签名没有稳定身份，换一个版本的 App 就读不了旧条目
+    case needsReentry
+
+    public var description: String {
+        switch self {
+        case .keychain(let s): return "Keychain 错误 \(s)"
+        case .needsReentry: return "这个 Key 是旧版本 App 存的，请重新填写一次"
+        }
+    }
 }
 
 /// 只存本机，不进 iCloud 钥匙串和备份。
@@ -67,9 +76,11 @@ public struct KeychainStore: SecretStore {
         var q = query(id)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
+        q[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail      // 不弹系统密码框，由界面提示
         var out: CFTypeRef?
         let st = SecItemCopyMatching(q as CFDictionary, &out)
         if st == errSecItemNotFound { return nil }
+        if [errSecInteractionNotAllowed, errSecAuthFailed].contains(st) { throw SecretError.needsReentry }
         guard st == errSecSuccess, let d = out as? Data else { throw SecretError.keychain(st) }
         return SecretKey(String(decoding: d, as: UTF8.self))
     }

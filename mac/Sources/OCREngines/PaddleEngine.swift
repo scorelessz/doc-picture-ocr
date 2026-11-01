@@ -474,9 +474,12 @@ public final class PaddleEngine {
         config = MLModelConfiguration()
         config.computeUnits = units
         let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
-        for n in names where n.hasSuffix(".mlpackage") {
-            let parts = n.replacingOccurrences(of: ".mlpackage", with: "").split(separator: "-")
-            let u = directory.appendingPathComponent(n)
+        // App 包里只有预编译的 .mlmodelc；同名的两种都在时算一个
+        let stems = Set(names.filter { $0.hasSuffix(".mlpackage") || $0.hasSuffix(".mlmodelc") }.map { ($0 as NSString).deletingPathExtension })
+        for stem in stems {
+            let parts = stem.split(separator: "-")
+            let pkg = stem + ".mlpackage"
+            let u = directory.appendingPathComponent(names.contains(pkg) ? pkg : stem + ".mlmodelc")
             if parts[0] == "det", parts[1] == "flex" {
                 flexURL = u
             } else if parts[0] == "det" {
@@ -495,7 +498,7 @@ public final class PaddleEngine {
     /// 编译结果缓存在 .mlmodelc，避免每次运行重编译。
     public func compiled(_ url: URL) throws -> URL {
         let c = url.deletingPathExtension().appendingPathExtension("mlmodelc")
-        if FileManager.default.fileExists(atPath: c.path) { return c }
+        if FileManager.default.fileExists(atPath: c.path) { return c }      // App 包内只读，只走这里
         let tmp = try MLModel.compileModel(at: url)
         try? FileManager.default.removeItem(at: c)
         try FileManager.default.moveItem(at: tmp, to: c)
@@ -506,7 +509,7 @@ public final class PaddleEngine {
     public func allCompiled() throws -> [(String, URL)] {
         var names = detModels.map(\.url) + recModels.map(\.url) + (flexURL.map { [$0] } ?? [])
         if let c = try FileManager.default.contentsOfDirectory(atPath: dir.path)
-            .first(where: { $0.hasPrefix("cls-") && $0.hasSuffix(".mlpackage") }) {
+            .first(where: { $0.hasPrefix("cls-") && ($0.hasSuffix(".mlpackage") || $0.hasSuffix(".mlmodelc")) }) {
             names.append(dir.appendingPathComponent(c))
         }
         return try names.map { ($0.deletingPathExtension().lastPathComponent, try compiled($0)) }
@@ -551,7 +554,7 @@ public final class PaddleEngine {
     private func clsLoaded() throws -> MLModel? {
         if clsModel == nil {
             let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
-            guard let n = names.first(where: { $0.hasPrefix("cls-") && $0.hasSuffix(".mlpackage") }) else { return nil }
+            guard let n = names.first(where: { $0.hasPrefix("cls-") && ($0.hasSuffix(".mlpackage") || $0.hasSuffix(".mlmodelc")) }) else { return nil }
             clsModel = try load(dir.appendingPathComponent(n))
         }
         return clsModel

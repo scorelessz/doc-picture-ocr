@@ -26,7 +26,7 @@ struct DocOCRApp: App {
         NSApplication.shared.setActivationPolicy(.regular)     // swift run 启动时没有 bundle，要手动成为前台 App
         DispatchQueue.main.async { NSApplication.shared.activate(ignoringOtherApps: true) }
         let a = CommandLine.arguments
-        if a.contains("--smoke") || a.contains("--snapshot") {
+        if a.contains("--smoke") || a.contains("--snapshot") || a.contains("--keychain-test") {
             DispatchQueue.main.async { Task { @MainActor in await TestEntry.run(a) } }
         }
     }

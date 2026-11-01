@@ -34,6 +34,13 @@ struct ContentView: View {
                 if let r = queue.history.first(where: { $0.id == id }) { ResultView(record: r) } else { QueueView() }
             }
         }
+        .onAppear {
+            // 测启动时间：窗口出现时写时间戳后退出
+            if let i = CommandLine.arguments.firstIndex(of: "--startup-file") {
+                try? String(Date().timeIntervalSince1970).write(toFile: CommandLine.arguments[i + 1], atomically: true, encoding: .utf8)
+                NSApplication.shared.terminate(nil)
+            }
+        }
         .sheet(isPresented: .constant(!app.onboardingDone)) {
             OnboardingView().interactiveDismissDisabled()
         }

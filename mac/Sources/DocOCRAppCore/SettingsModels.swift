@@ -30,24 +30,28 @@ public final class ModelManager: ObservableObject {
     @Published public private(set) var busy: Set<ModelKind> = []
     @Published public private(set) var message: [ModelKind: String] = [:]
     @Published public private(set) var sizes: [ModelKind: Int64] = [:]
-    public let dir: URL
+    public let dir: URL, bundled: URL?
 
-    public init(dir: URL = ModelStore.defaultDirectory) {
+    public init(dir: URL = ModelStore.defaultDirectory, bundled: URL? = ModelStore.bundledDirectory) {
         self.dir = dir
+        self.bundled = bundled
         refresh()
     }
+
+    /// 识别模型在 App 包里时不能下载、不能删
+    public func isBundled(_ k: ModelKind) -> Bool { k == .coreml && bundled != nil }
 
     private var vl: URL { VLModel.directory(models: dir) }
 
     public func installed(_ k: ModelKind) -> Bool {
-        k == .coreml ? ModelStore.installed(dir) : FileManager.default.fileExists(atPath: vl.appendingPathComponent("model.safetensors").path)
+        k == .coreml ? (bundled != nil || ModelStore.installed(dir)) : FileManager.default.fileExists(atPath: vl.appendingPathComponent("model.safetensors").path)
     }
 
     public func refresh() {
-        let (dir, vl) = (dir, vl)
+        let (dir, vl, bundled) = (dir, vl, bundled)
         Task.detached {
-            let v = directorySize(vl), all = directorySize(dir)
-            await MainActor.run { [weak self] in self?.sizes = [.vl: v, .coreml: max(0, all - v)] }
+            let v = directorySize(vl), all = directorySize(bundled ?? dir)
+            await MainActor.run { [weak self] in self?.sizes = [.vl: v, .coreml: bundled != nil ? all : max(0, all - v)] }
         }
     }
 
@@ -80,13 +84,14 @@ public final class ModelManager: ObservableObject {
     }
 
     public func verify(_ k: ModelKind) {
-        let (dir, vl) = (dir, vl)
+        let (dir, vl, bundled) = (dir, vl, bundled)
         work(k, "校验中…") {
             if k == .vl {
                 let bad = VLModel.problems(vl)
                 return bad.isEmpty ? "校验通过" : "不符: \(bad)"
             }
-            return modelManifest(dir).isEmpty ? "清单缺失" : "清单完好（\(modelManifest(dir).count) 个模型）"
+            let m = modelManifest(bundled ?? dir)
+            return m.isEmpty ? "清单缺失" : "清单完好（\(m.count) 个模型）"
         }
     }
 
@@ -117,6 +122,14 @@ public final class ProviderSettings: ObservableObject {
     public init(app: AppModel) { self.app = app }
 
     public func hasKey(_ id: String) -> Bool { (try? app.secrets.load(id)) != nil }
+
+    /// Key 读不出来时给界面的说明，比如旧版本 App 存的
+    public func keyProblem(_ id: String) -> String? {
+        do {
+            _ = try app.secrets.load(id)
+            return nil
+        } catch { return "\(error)" }
+    }
 
     public func saveKey(_ key: String, for id: String) {
         let k = key.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -170,7 +183,7 @@ public final class DiagnosticsModel: ObservableObject {
     @Published public private(set) var checking = false
     public let logFile: URL, modelsDir: URL
 
-    public init(logFile: URL = AppPaths.log, modelsDir: URL = ModelStore.defaultDirectory) {
+    public init(logFile: URL = AppPaths.log, modelsDir: URL = ModelStore.resolvedDirectory) {
         self.logFile = logFile; self.modelsDir = modelsDir
         apply()
     }
@@ -191,7 +204,7 @@ public final class DiagnosticsModel: ObservableObject {
         checking = true
         let (m, tmp) = (modelsDir, FileManager.default.temporaryDirectory)
         Task.detached {
-            let c = runDoctor(models: m, outdir: tmp), p = await accelerationPlan(models: m)
+            let c = runDoctor(models: m, outdir: tmp, vlDirectory: VLModel.directory(models: ModelStore.defaultDirectory)), p = await accelerationPlan(models: m)
             await MainActor.run { [weak self] in
                 self?.checks = c
                 self?.plan = p

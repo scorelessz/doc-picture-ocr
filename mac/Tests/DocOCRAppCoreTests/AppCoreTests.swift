@@ -101,7 +101,7 @@ final class AppCoreTests: XCTestCase {
         s.save("sk-test", for: "dashscope")
         if network { a.allowNetwork() } else { a.chooseLocalOnly() }
         let b = FakeBackend(dir: dir)
-        let q = QueueModel(app: a, backend: b, modelsDir: try models(), history: History(url: dir.appendingPathComponent("h.json")), outdir: dir)
+        let q = QueueModel(app: a, backend: b, modelsDir: try models(), vlDirectory: dir.appendingPathComponent("vl"), history: History(url: dir.appendingPathComponent("h.json")), outdir: dir)
         if online {
             a.setSelected(qwen, true)
             q.onlineProviderID = "dashscope"
@@ -332,6 +332,20 @@ final class AppCoreTests: XCTestCase {
         r.q.highPrecision = true
         XCTAssertTrue(r.q.needsVLModel)
         XCTAssertFalse(r.q.canStart)
+    }
+
+    func testVLDirectoryIsNeverInsideBundledModels() {
+        let q = QueueModel(app: AppModel(store: Mem(), wire: CountingWire(), secrets: MemorySecretStore()), backend: FakeBackend(dir: dir),
+                           modelsDir: dir, history: History(url: dir.appendingPathComponent("h.json")), outdir: dir)
+        XCTAssertFalse(q.vlDirectory.path.hasPrefix(dir.path))
+        XCTAssertTrue(q.vlDirectory.path.contains("Application Support"))
+    }
+
+    func testBundledModelsCannotBeManaged() throws {
+        let m = ModelManager(dir: dir, bundled: try models())
+        XCTAssertTrue(m.isBundled(.coreml))
+        XCTAssertFalse(m.isBundled(.vl))
+        XCTAssertTrue(m.installed(.coreml))
     }
 
     func testOnlyPDFsAreAddedOnce() throws {

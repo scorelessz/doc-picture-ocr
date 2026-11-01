@@ -142,7 +142,7 @@ private func sampleImage() -> CGImage? {
     return ctx.makeImage()
 }
 
-public func runDoctor(models: URL, outdir: URL) -> [DoctorCheck] {
+public func runDoctor(models: URL, outdir: URL, vlDirectory: URL? = nil) -> [DoctorCheck] {
     var r: [DoctorCheck] = []
     func add(_ n: String, _ ok: Bool, _ d: String, required: Bool = true) {
         r.append(DoctorCheck(name: n, ok: ok, detail: d, required: required))
@@ -173,7 +173,7 @@ public func runDoctor(models: URL, outdir: URL) -> [DoctorCheck] {
     }
 
     // VL 是可选项，缺了不算失败
-    let vl = VLModel.directory(models: models)
+    let vl = vlDirectory ?? VLModel.directory(models: models)
     if !FileManager.default.fileExists(atPath: vl.path) {
         add("vl", false, "\(vl.path) 没有 VL 模型（book --vlm 才需要，ocr-cli models fetch --vl 下载）", required: false)
     } else {

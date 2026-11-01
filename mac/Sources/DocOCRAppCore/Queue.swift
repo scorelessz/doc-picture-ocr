@@ -144,18 +144,21 @@ public final class QueueModel: ObservableObject {
     @Published public private(set) var history: [HistoryRecord]
 
     private let app: AppModel, backend: BookBackend, modelsDir: URL, store: History
+    /// VL 模型按需下载，App 包只读，永远在 Application Support
+    public let vlDirectory: URL
     private var worker: Task<Void, Never>?
     private var cancelFlag = Flag()
     private var batchID = UUID()
     private var answer: CheckedContinuation<(Bool, Scope?), Never>?
 
-    public init(app: AppModel, backend: BookBackend = LocalBackend(), modelsDir: URL = ModelStore.defaultDirectory,
+    public init(app: AppModel, backend: BookBackend = LocalBackend(), modelsDir: URL = ModelStore.resolvedDirectory,
+                vlDirectory: URL = VLModel.directory(models: ModelStore.defaultDirectory),
                 history: History = History(url: AppPaths.history), outdir: URL) {
+        self.vlDirectory = vlDirectory
         self.app = app; self.backend = backend; self.modelsDir = modelsDir; self.store = history; self.outdir = outdir
         self.history = history.records
     }
 
-    public var vlDirectory: URL { VLModel.directory(models: modelsDir) }
     public var vlInstalled: Bool { FileManager.default.fileExists(atPath: vlDirectory.appendingPathComponent("model.safetensors").path) }
     public var needsVLModel: Bool { highPrecision && !vlInstalled }
     public var coreMLInstalled: Bool { ModelStore.installed(modelsDir) }
