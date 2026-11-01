@@ -3,6 +3,7 @@ import OCRCore
 #if canImport(Vision)
 import CoreML
 import OCREngines
+import OCRProviders
 import OCRVL
 #endif
 
@@ -353,7 +354,7 @@ do {
             o.unitsLabel = option(args, "--units") ?? "ane"
         }
         if let v = option(args, "--vlm-url") {
-            guard let u = URL(string: v), ["127.0.0.1", "localhost", "::1"].contains(u.host ?? "") else {
+            guard let u = URL(string: v), (try? Endpoint(v))?.isLoopback == true else {
                 fail("--vlm-url 只接受本机地址: 默认不外传用户文件", code: 2)
             }
             o.vlmURL = u

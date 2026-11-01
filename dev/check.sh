@@ -62,6 +62,13 @@ case "$stage" in
     .venv/bin/python bench/p3_md_synth.py "$@"
     echo "P3 对拍全部通过"
     ;;
+  p6)
+    # 发网络的代码只能在 Transport.swift
+    if grep -rln "URLSession" mac/Sources | grep -v "OCRProviders/Transport.swift"; then
+      echo "上面的文件直接用了 URLSession"; exit 1
+    fi
+    swift test --filter OCRProvidersTests
+    ;;
   p3-e2e)
     # 整本跑两本书, 十几分钟。依赖 ./dev/check.sh p3 留下的 work/bench/p3/<tag>-chain.swift.md
     need_venv

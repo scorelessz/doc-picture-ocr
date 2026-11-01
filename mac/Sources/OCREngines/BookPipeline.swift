@@ -4,6 +4,7 @@ import CoreML
 import Foundation
 import ImageIO
 import OCRCore
+import OCRProviders
 import PDFKit
 
 // 总流程：渲染 → Vision + RapidOCR → 融合 → md / 可搜索 PDF / 报告。
@@ -474,23 +475,23 @@ func vlmRead(_ image: CGImage, url: URL, model: String) throws -> String {
     let b64 = (data as Data).base64EncodedString()
     let body: [String: Any] = ["model": model, "temperature": 0, "max_tokens": 4096, "messages": [["role": "user", "content": [
         ["type": "image_url", "image_url": ["url": "data:image/png;base64,\(b64)"]], ["type": "text", "text": "OCR:"]]]]]
-    var req = URLRequest(url: url.appendingPathComponent("chat/completions"))
-    req.httpMethod = "POST"
-    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    req.httpBody = try JSONSerialization.data(withJSONObject: body)
-    req.timeoutInterval = 300
+    let payload = try JSONSerialization.data(withJSONObject: body)
+    let req = OutboundRequest(endpoint: try Endpoint(url.absoluteString), providerID: "local", path: "chat/completions", payload: .loopback(body: payload))
+    let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(), selection: ProviderSelection(), gate: UploadGate())
     let sem = DispatchSemaphore(value: 0)
     nonisolated(unsafe) var out: Result<String, Error> = .failure(BookError.failed("VLM 无响应"))
-    URLSession.shared.dataTask(with: req) { d, _, e in
+    Task.detached {
         defer { sem.signal() }
-        if let e { out = .failure(e); return }
-        guard let d, let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
-              let c = j["choices"] as? [[String: Any]], let m = c.first?["message"] as? [String: Any] else {
-            out = .failure(BookError.failed("VLM 响应无法解析"))
-            return
-        }
-        out = .success(m["content"] as? String ?? "")
-    }.resume()
+        do {
+            let r = try await t.send(req)
+            guard let j = try? JSONSerialization.jsonObject(with: r.body) as? [String: Any],
+                  let c = j["choices"] as? [[String: Any]], let m = c.first?["message"] as? [String: Any] else {
+                out = .failure(BookError.failed("VLM 响应无法解析"))
+                return
+            }
+            out = .success(m["content"] as? String ?? "")
+        } catch { out = .failure(error) }
+    }
     sem.wait()
     return try out.get()
 }

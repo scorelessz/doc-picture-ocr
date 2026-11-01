@@ -2,6 +2,7 @@
 import CryptoKit
 import Foundation
 import OCRCore
+import OCRProviders
 
 // 模型的存放与下载。App 里打包进 bundle；测试期 Core ML 从 GitHub Release 取，VL 从 Hugging Face 取。
 
@@ -80,21 +81,10 @@ public enum ModelStore {
             return
         }
         log("下载 \(u.absoluteString)")
-        let sem = DispatchSemaphore(value: 0)
-        nonisolated(unsafe) var failure: String?
-        let task = URLSession.shared.downloadTask(with: u) { loc, resp, err in
-            defer { sem.signal() }
-            if let err { failure = "\(err)"; return }
-            guard let loc, (resp as? HTTPURLResponse)?.statusCode == 200 else {
-                let c = (resp as? HTTPURLResponse)?.statusCode ?? 0
-                failure = c == 404 ? "HTTP 404: 模型包可能还没发布, 用 --url 指定本地包, 或 tools/convert_paddle.py 自己转" : "HTTP \(c)"
-                return
-            }
-            do { try FileManager.default.moveItem(at: loc, to: out) } catch { failure = "\(error)" }
+        let code = try ModelDownload.fetch(u, to: out)
+        guard code == 200 else {
+            throw ModelError.download(code == 404 ? "HTTP 404: 模型包可能还没发布, 用 --url file:// 指定本地包, 或 tools/convert_paddle.py 自己转" : "HTTP \(code)")
         }
-        task.resume()
-        sem.wait()
-        if let failure { throw ModelError.download(failure) }
     }
 
     /// 下载 VL 模型到 dir。全部校验过才换进去；不符的文件立刻删掉，已校验的留在暂存目录，重跑不用再下。

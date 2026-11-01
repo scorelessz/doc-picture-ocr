@@ -20,7 +20,7 @@ let package = Package(
             .product(name: "MLXNN", package: "mlx-swift"),
             .product(name: "MLXFast", package: "mlx-swift"),
         ], path: "mac/Sources/OCRVL"),
-        .target(name: "OCREngines", dependencies: ["OCRCore"], path: "mac/Sources/OCREngines"),
+        .target(name: "OCREngines", dependencies: ["OCRCore", "OCRProviders"], path: "mac/Sources/OCREngines"),
         .target(name: "OCRProviders", dependencies: ["OCRCore"], path: "mac/Sources/OCRProviders"),
         .executableTarget(name: "ocr-cli", dependencies: ["OCRCore", "OCREngines", "OCRVL", "OCRProviders"],
                           path: "mac/Sources/ocr-cli"),

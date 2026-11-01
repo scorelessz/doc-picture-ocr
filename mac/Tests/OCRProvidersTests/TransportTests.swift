@@ -31,6 +31,29 @@ private func manifest(host: String = "api.example.com", model: String = "m", ite
                    estimatedRequests: 2, byteLimit: limit)
 }
 
+final class ModelDownloadTests: XCTestCase {
+    func testAllowlist() {
+        for u in ["https://github.com/scorelessz/doc-picture-ocr/releases/download/models-v1/x.zip",
+                  "https://huggingface.co/OpenGryd/PaddleOCR-VL-1.6-MLX-8bit/resolve/abc/model.safetensors",
+                  "https://huggingface.co/api/resolve-cache/models/OpenGryd/PaddleOCR-VL-1.6-MLX-8bit/abc/config.json",
+                  "https://release-assets.githubusercontent.com/a", "https://us.aws.cdn.hf.co/a"] {
+            XCTAssertTrue(ModelDownload.allowed(URL(string: u)!), u)
+        }
+        for u in ["http://github.com/scorelessz/doc-picture-ocr/releases/download/x", "https://github.com/evil/x/releases/download/y",
+                  "https://huggingface.co/evil/model/resolve/a", "https://huggingface.co/api/resolve-cache/models/evil/m/a", "https://evil.com/", "https://githubusercontent.com.evil.com/a",
+                  "https://evilhf.co/a", "https://u@huggingface.co/OpenGryd/PaddleOCR-VL-1.6-MLX-8bit/resolve/a"] {
+            XCTAssertFalse(ModelDownload.allowed(URL(string: u)!), u)
+        }
+    }
+
+    func testRefusedURLThrowsWithoutRequest() {
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        XCTAssertThrowsError(try ModelDownload.fetch(URL(string: "https://evil.com/x")!, to: out)) {
+            XCTAssertEqual($0 as? TransportError, .refused(.modelURLNotAllowed))
+        }
+    }
+}
+
 final class EndpointTests: XCTestCase {
     func testPlainHTTPRemoteRejected() {                // 19
         XCTAssertThrowsError(try Endpoint("http://api.example.com/v1"))

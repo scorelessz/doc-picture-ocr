@@ -57,6 +57,7 @@ public enum Refusal: String, Sendable {
     case networkOff = "network_off", providerNotSelected = "provider_not_selected"
     case loopbackPayloadToRemote = "loopback_payload_to_remote", userDataToLoopback = "user_data_to_loopback"
     case redirectBlocked = "redirect_blocked", tooManyRedirects = "too_many_redirects"
+    case modelURLNotAllowed = "model_url_not_allowed"
 }
 
 public enum TransportError: Error, Equatable {
@@ -140,6 +141,56 @@ public struct GuardedTransport: HTTPTransport {
             url = next
         }
         throw refuse(.tooManyRedirects, r)
+    }
+}
+
+/// 模型下载（方案 B）：不受总开关约束，所以只许连钉死的地址，只 GET，不带任何请求体、Key 和 cookie。
+/// 响应要落文件，一个 GB 放不进 HTTPReply，所以不走 Payload，单独一条路。
+public enum ModelDownload {
+    static let exact: [String: [String]] = [
+        "github.com": ["/scorelessz/doc-picture-ocr/releases/download/"],
+        "huggingface.co": ["/OpenGryd/PaddleOCR-VL-1.6-MLX-8bit/resolve/", "/api/resolve-cache/models/OpenGryd/PaddleOCR-VL-1.6-MLX-8bit/"],
+    ]
+    /// 这两家的下载都会跳到自家 CDN
+    static let cdnSuffixes = [".githubusercontent.com", ".hf.co", ".huggingface.co"]
+
+    public static func allowed(_ u: URL) -> Bool {
+        guard u.scheme?.lowercased() == "https", let h = u.host?.lowercased(), u.user == nil else { return false }
+        if let prefixes = exact[h] { return prefixes.contains { u.path.hasPrefix($0) } }
+        return cdnSuffixes.contains { h.hasSuffix($0) }
+    }
+
+    private final class Guard: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+        func urlSession(_ s: URLSession, task: URLSessionTask, willPerformHTTPRedirection r: HTTPURLResponse,
+                        newRequest q: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+            if let u = q.url, ModelDownload.allowed(u) { return completionHandler(q) }
+            Log.shared.warn("redirect_blocked", ["from": .s(task.originalRequest?.url?.host ?? "?"), "to": .s(q.url?.host ?? "?")])
+            completionHandler(nil)
+        }
+    }
+
+    /// 下载到 out，返回 HTTP 状态码。地址不在白名单直接拒绝，不发请求。
+    public static func fetch(_ u: URL, to out: URL) throws -> Int {
+        guard allowed(u) else {
+            Log.shared.warn("provider_refused", ["reason": .s("model_url_not_allowed"), "host": .s(u.host ?? "?")])
+            throw TransportError.refused(.modelURLNotAllowed)
+        }
+        let session = URLSession(configuration: URLSessionWire.configuration, delegate: Guard(), delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let sem = DispatchSemaphore(value: 0)
+        nonisolated(unsafe) var result: Result<Int, Error> = .failure(TransportError.badResponse)
+        session.downloadTask(with: URLRequest(url: u)) { loc, resp, err in
+            defer { sem.signal() }
+            if let err { result = .failure(err); return }
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            guard let loc, code == 200 else { result = .success(code); return }
+            do {
+                try FileManager.default.moveItem(at: loc, to: out)
+                result = .success(code)
+            } catch { result = .failure(error) }
+        }.resume()
+        sem.wait()
+        return try result.get()
     }
 }
 
