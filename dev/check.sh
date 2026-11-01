@@ -69,6 +69,9 @@ case "$stage" in
     fi
     swift test --filter OCRProvidersTests
     ;;
+  p7)
+    swift test --filter DocOCRAppCoreTests
+    ;;
   p3-e2e)
     # 整本跑两本书, 十几分钟。依赖 ./dev/check.sh p3 留下的 work/bench/p3/<tag>-chain.swift.md
     need_venv
@@ -79,5 +82,5 @@ case "$stage" in
     echo "P3 端到端完成: bench/results/p3-e2e.json"
     ;;
   *)
-    echo "用法: ./dev/check.sh p0|p2 <pdf> [...] | p3 [--docs N] | p3-e2e [--only en|zh] | p6"; exit 2 ;;
+    echo "用法: ./dev/check.sh p0|p2 <pdf> [...] | p3 [--docs N] | p3-e2e [--only en|zh] | p6 | p7"; exit 2 ;;
 esac

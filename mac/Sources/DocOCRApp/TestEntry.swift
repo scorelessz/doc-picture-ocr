@@ -88,6 +88,10 @@ enum TestEntry {
         let m = UploadManifest(providerID: "dashscope", providerName: "阿里云百炼", host: "dashscope.aliyuncs.com", model: "m",
                                items: [UploadItem(id: "p1", sourceFile: "示例.pdf", page: 1, bytes: 750_000)], estimatedRequests: 1)
         render(wrap(ConfirmView(request: ConfirmRequest(manifest: m, fileName: "示例.pdf"))), CGSize(width: 520, height: 380), dir.appendingPathComponent("confirm.png"))
-        if let r = env.queue.history.first { render(wrap(ResultView(record: r)), CGSize(width: 760, height: 560), dir.appendingPathComponent("result.png")) }
+        if let i = CommandLine.arguments.firstIndex(of: "--report"), let t = try? String(contentsOfFile: CommandLine.arguments[i + 1], encoding: .utf8) {
+            var r = HistoryRecord(pdf: "/tmp/示例.pdf", outdir: dir.path, startedAt: Date(), state: "done")
+            r.outputs = [CommandLine.arguments[i + 1]]
+            render(wrap(ResultView(record: r, sections: ReportDocument.sections(ReportDocument.parse(t)))), CGSize(width: 760, height: 900), dir.appendingPathComponent("result.png"))
+        }
     }
 }

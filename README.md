@@ -265,3 +265,15 @@ CLAUDE.md       项目级约定与不变量（改代码前必读）
 或者买商业许可。自用和私有仓库不触发这条。其余依赖较宽松：
 RapidOCR / opencv-python Apache-2.0，onnxruntime / pyclipper / Pillow MIT 系，
 numpy / shapely BSD，PyInstaller GPLv2 但有明确的「允许打包并分发非自由程序」例外。
+
+## Mac App（测试版）
+
+需要 macOS 14+、Xcode 和 Metal Toolchain（`xcodebuild -downloadComponent MetalToolchain`）。还没有签名和打包，先在本机运行：
+
+```bash
+swift build -c release
+.build/release/DocOCRApp
+```
+
+首次打开选「仅本地使用」或「允许联网」，然后在设置 → 模型下载识别模型。默认不联网，用户文件不离开这台 Mac。
+冒烟测试：`./dev/p7_smoke.sh 英文书.pdf 中文书.pdf`。详情见 `docs/P7_RESULTS.md`。

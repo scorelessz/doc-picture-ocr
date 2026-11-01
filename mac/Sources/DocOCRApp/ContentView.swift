@@ -263,7 +263,8 @@ struct JobStatusView: View {
 
 struct ResultView: View {
     let record: HistoryRecord
-    @State private var sections: [ReportSection] = []
+    @State var sections: [ReportSection] = []
+    @State var expanded: Set<Int> = [0, 1, 2]
 
     var body: some View {
         ScrollView {
@@ -289,7 +290,7 @@ struct ResultView: View {
                     Text(record.outputs.isEmpty ? "没有产物。" : "这份没有报告。已写出的产物: \(record.outputs.count) 个").foregroundStyle(.secondary)
                 }
                 ForEach(sections) { s in
-                    DisclosureGroup(s.title) {
+                    DisclosureGroup(s.title, isExpanded: Binding(get: { expanded.contains(s.id) }, set: { if $0 { expanded.insert(s.id) } else { expanded.remove(s.id) } })) {
                         VStack(alignment: .leading, spacing: 6) { ForEach(Array(s.blocks.enumerated()), id: \.offset) { ReportBlockView(block: $0.element) } }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 4)
