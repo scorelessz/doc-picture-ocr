@@ -51,3 +51,6 @@ macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE 
 
 没有 `--log-text` 时不写任何识别文本。`argv` 和 `warning` 里会有文件路径，所以书名会出现在日志里，发给别人前看一下。
 `--log-text` 的日志含全书正文，不要提交。
+
+| `vl_fetched` / `vl_fetch_rejected` | VL 模型安装成功 / 校验不符拒绝（文件名、期望与实际 sha256 前缀） |
+| `vlm` | book 的 VLM 汇总：调用页数、无墨迹与无分歧跳过页数、翻转行数、独有片段数 |

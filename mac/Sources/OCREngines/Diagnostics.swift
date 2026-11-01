@@ -152,6 +152,15 @@ public func runDoctor(models: URL, outdir: URL) -> [DoctorCheck] {
         add("write", false, "\(outdir.path): \(error)")
     }
 
+    // VL 是可选项，缺了不算失败
+    let vl = VLModel.directory(models: models)
+    if !FileManager.default.fileExists(atPath: vl.path) {
+        add("vl", false, "\(vl.path) 没有 VL 模型（book --vlm 才需要，ocr-cli models fetch --vl 下载）", required: false)
+    } else {
+        let bad = VLModel.problems(vl)
+        add("vl", bad.isEmpty, bad.isEmpty ? "\(VLModel.repo)@\(VLModel.revision.prefix(12)) 校验通过" : "这些文件 sha256 不符或缺失: \(bad)（重跑 ocr-cli models fetch --vl）", required: false)
+    }
+
     guard FileManager.default.fileExists(atPath: models.appendingPathComponent("keys.txt").path) else {
         add("models", false, "\(models.path) 没有模型（先跑 ocr-cli models fetch）")
         return r

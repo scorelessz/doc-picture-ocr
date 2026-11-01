@@ -30,11 +30,12 @@ usage:
   ocr-cli vl <image>... --vl-model dir --out texts.json
   ocr-cli doctor [--models-dir dir] [--outdir output] [--out checks.json]
   ocr-cli models fetch [--models-dir dir] [--url u] [--sha256 h]
+  ocr-cli models fetch --vl [--models-dir dir] [--url 基址]
   ocr-cli paddle-plan --models dir --out plan.json
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
                [--paddle coreml|python] [--models-dir dir] [--units ane|all|cpu|gpu]
-               [--vlm [--vl-model dir] | --vlm-url http://127.0.0.1:端口/v1 [--vlm-model 名]]
+               [--vlm [--vl-model dir] [--vlm-all] | --vlm-url http://127.0.0.1:端口/v1 [--vlm-model 名]]
                [--python .venv/bin/python] [--result result.json]
 
 
@@ -153,6 +154,12 @@ do {
     case "models":
         guard args.first == "fetch" else { fail(usage) }
         let dir = URL(fileURLWithPath: defaultModels, isDirectory: true)
+        if args.contains("--vl") {
+            let vl = VLModel.directory(models: dir)
+            try ModelStore.fetchVL(base: option(args, "--url"), into: vl, log: warn)
+            print("-> \(vl.path)")
+            break
+        }
         try ModelStore.fetch(url: option(args, "--url"), sha: option(args, "--sha256"), into: dir, log: warn)
         print("-> \(dir.path)")
 
@@ -321,6 +328,7 @@ do {
         o.searchable = !args.contains("--no-pdf")
         o.pageMarks = option(args, "--page-marks") ?? "comment"
         o.vlmBreaks = args.contains("--vlm-breaks")
+        o.vlmAll = args.contains("--vlm-all")
         guard ["none", "comment", "rule"].contains(o.pageMarks) else { fail(usage) }
         o.force = args.contains("--force")
         o.clobber = args.contains("--clobber")
@@ -345,13 +353,13 @@ do {
             o.vlmModel = option(args, "--vlm-model") ?? "local"
         }
         if args.contains("--vlm") {
-            let dir = option(args, "--vl-model") ?? ModelStore.defaultDirectory.deletingLastPathComponent().appendingPathComponent("vl/paddleocr-vl-1.6-8bit").path
+            let dir = option(args, "--vl-model") ?? VLModel.directory(models: URL(fileURLWithPath: defaultModels, isDirectory: true)).path
             do {
                 let vl = try PaddleVL(directory: URL(fileURLWithPath: dir, isDirectory: true))
                 Log.shared.info("vlm_loaded", ["model": .s(dir), "seconds": .d((vl.loadSeconds * 1000).rounded() / 1000), "runtime": .s("mlx-swift")])
                 o.vlmLocal = { px, w, h in vl.read(px, w: w, h: h).text }
             } catch {
-                fail("\(error)（用 --vl-model 指定，或 --vlm-url 走本地服务）", code: 2)
+                fail("\(error)（先跑 ocr-cli models fetch --vl，或用 --vl-model 指定，或 --vlm-url 走本地服务）", code: 2)
             }
         }
         do {

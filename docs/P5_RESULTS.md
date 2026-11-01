@@ -48,3 +48,14 @@ P1 没有明确定义，这里按「段落切分听 VLM」实现：VLM 换行处
 
 CER 没有变差，但也没测到收益：不保护缩进时中文会把几段并成一段，保护后基本没作用。所以规则保留，**默认关闭**，
 `--vlm-breaks` 才开。这里的 CER 算在 md 文字上，含被删的页码，只看相对差。
+
+## VL 模型分发
+
+权重不进我们的 Release。`ocr-cli models fetch --vl` 从 Hugging Face 的 `OpenGryd/PaddleOCR-VL-1.6-MLX-8bit`（Apache-2.0）下载，
+钉死 commit `dba7c66b4614` 和三个文件（`config.json`、`tokenizer.json`、`model.safetensors`）的 sha256，放到 `<models>/vl/`，`book --vlm` 默认从这里读。
+全部校验过才换进去，不符的文件立刻删除，旧安装不动。重装 Core ML 模型包时保留 `vl/`。`doctor` 的 `vl` 是可选项，缺失或不符不算失败。
+实测：匿名下载 68 秒，约 1.1 GB。
+
+## 进度（2026-11-01）
+
+P5 第二批：1) 分发 已完成；2) 速度、3) 整本端到端、4) 小图补样、5) P6 设计稿 见后续小节。

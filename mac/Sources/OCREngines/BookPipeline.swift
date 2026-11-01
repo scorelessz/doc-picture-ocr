@@ -29,6 +29,8 @@ public struct BookOptions {
     /// 进程内 VLM：灰度像素 → 文字。设了就优先于 vlmURL。
     public var vlmLocal: (([UInt8], Int, Int) -> String)?
     public var vlmBreaks = false
+    /// 默认只读有分歧行的页（别的页 VLM 翻转不了）；true 时每页都读，报告才有全书的独有片段
+    public var vlmAll = false
 
     public init(pdf: URL, outdir: URL, workdir: URL, python: String) {
         self.pdf = pdf; self.outdir = outdir; self.workdir = workdir; self.python = python
@@ -312,6 +314,12 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                     vlmReports.append(r)
                     continue
                 }
+                if !o.vlmAll, !fused.pages[i].lines.contains(where: { $0.flag == "divergent" }) {
+                    var (_, r) = applyVLM(fused.pages[i], vlm: nil)
+                    r.skippedNoDivergence = true
+                    vlmReports.append(r)
+                    continue
+                }
                 let t0 = Date()
                 do {
                     let r0 = try PageRenderer.render(doc2, page: pno, dpi: slots[i].dpi)
@@ -336,6 +344,11 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                     Log.shared.error("engine_failed", ["page": .i(pno), "engine": .s("vlm"), "stage": .s("request"), "error": .s("\(error)")])
                 }
             }
+            Log.shared.info("vlm", ["pages": .i(vlmReports.count), "called": .i(vlmReports.filter { $0.gate.rawChars > 0 }.count),
+                                    "skipped_no_ink": .i(vlmReports.filter(\.skippedNoInk).count),
+                                    "skipped_no_divergence": .i(vlmReports.filter(\.skippedNoDivergence).count),
+                                    "flips": .i(vlmReports.map(\.flips.count).reduce(0, +)),
+                                    "orphans": .i(vlmReports.map(\.orphans.count).reduce(0, +))])
         }
     }
     try encodeJSON(fused).write(to: fURL)

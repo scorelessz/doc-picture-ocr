@@ -30,6 +30,7 @@ public struct VLMPageReport: Sendable {
     public var flips: [(line: Int, from: String, to: String, vlm: String)] = []
     public var orphans: [String] = []
     public var skippedNoInk = false
+    public var skippedNoDivergence = false
 }
 
 /// Markdown 标记不是书的内容。

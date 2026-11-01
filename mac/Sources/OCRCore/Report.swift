@@ -224,6 +224,7 @@ public func buildReport(_ r: ReportInput) -> String {
         A("|---|---|")
         A("| 调用页数 | \(r.vlm.filter { !$0.skippedNoInk && $0.gate.rawChars > 0 }.count) |")
         A("| 无墨迹未调用 | \(r.vlm.filter(\.skippedNoInk).map(\.page)) |")
+        A("| 无分歧行跳过的页数 | \(r.vlm.filter(\.skippedNoDivergence).count) |")
         A("| 输出被截断(超长或循环) | \(cut.isEmpty ? "无" : "\(cut)") |")
         A("| 翻转的分歧行 | \(flips.count) |")
         A("| VLM 改了段落切分的行 | \(r.md?.vlmBreakOverrides ?? 0) |")
