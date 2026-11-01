@@ -72,7 +72,28 @@ final class CapabilityTests: XCTestCase {
         XCTAssertEqual(p.maxLongEdge, 1024)
         XCTAssertTrue(p.supportsImage)
         XCTAssertEqual(p.responseFormat, .jsonObject)
-        XCTAssertEqual(w.bodies.count, 3 + 1)            // 512、1024、失败的 1792，加 JSON；4096 没发
+        XCTAssertEqual(w.bodies.count, 4 + 1)            // 512、1024、1792 失败两次，加 JSON；4096 没发
+    }
+
+    func testOneMisreadDigitStillSawImage() {
+        XCTAssertTrue(CapabilityProber.sawImage("018218", code: "018213"))
+        XCTAssertTrue(CapabilityProber.sawImage("300618", code: "380818"))
+        XCTAssertFalse(CapabilityProber.sawImage("444444", code: "486877"))
+        XCTAssertFalse(CapabilityProber.sawImage("", code: "486877"))
+        XCTAssertTrue(CapabilityProber.sawImage("10286", code: "100286"))
+        XCTAssertFalse(CapabilityProber.sawImage("486", code: "486877"))
+        XCTAssertTrue(CapabilityProber.sawImage("486877486877", code: "486877"))
+    }
+
+    func testEmptyReplyIsRetried() async throws {
+        let w = FakeVisionWire(maxEdge: 512)
+        nonisolated(unsafe) var n = 0
+        w.onImage = { png in
+            n += 1
+            return n == 1 ? "" : Self.readCode(png)
+        }
+        let p = try await prober(w).probe(model: "m")
+        XCTAssertEqual(p.maxLongEdge, 512)
     }
 
     /// 用 Vision 真读合成图，顺带确认图是可读的

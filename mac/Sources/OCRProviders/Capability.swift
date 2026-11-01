@@ -45,6 +45,23 @@ public struct CapabilityProfile: Sendable, Codable, Equatable {
 
 public struct CapabilityProber: Sendable {
     public static let ladder = [512, 1024, 1792, 2048, 4096]
+    static let rungRetries = 1
+    /// 这里判的是「收到图了吗」，不是读得准不准：好模型也偶尔读错或漏一位。
+    /// 6 位随机数字里只差 2 个编辑以内，靠猜基本碰不上。
+    static let maxEdits = 2
+
+    static func sawImage(_ digits: String, code: String) -> Bool {
+        if digits.contains(code) { return true }     // 有的模型把数字重复几遍
+        let a = Array(digits), b = Array(code)
+        var prev = Array(0...b.count)
+        for (i, x) in a.enumerated() {
+            var cur = [i + 1] + [Int](repeating: 0, count: b.count)
+            for (j, y) in b.enumerated() { cur[j + 1] = min(prev[j] + (x == y ? 0 : 1), prev[j + 1] + 1, cur[j] + 1) }
+            prev = cur
+        }
+        return prev[b.count] <= maxEdits
+    }
+
     let transport: HTTPTransport, endpoint: Endpoint, providerID: String, key: SecretKey?
 
     public init(transport: HTTPTransport, endpoint: Endpoint, providerID: String, key: SecretKey?) {
@@ -69,12 +86,18 @@ public struct CapabilityProber: Sendable {
     /// 策略拒绝照常抛出；服务商返回错误只算这一级不通过，到此为止。
     public func probe(model: String) async throws -> CapabilityProfile {
         var best: Int?
-        for edge in Self.ladder {
-            guard let img = SyntheticImage.make(longEdge: edge) else { break }
-            let reply = try await chat(ProbeRequest(model: model, prompt: "读出图中的 6 位数字，只回答这 6 位数字。", image: img))
-            let digits = (reply ?? "").filter(\.isNumber)
-            guard digits.contains(img.code) else { break }
-            best = edge
+        rungs: for edge in Self.ladder {
+            for _ in 0...Self.rungRetries {
+                guard let img = SyntheticImage.make(longEdge: edge) else { break rungs }
+                let reply = try await chat(ProbeRequest(model: model, prompt: "读出图中的 6 位数字，只回答这 6 位数字。", image: img))
+                let digits = (reply ?? "").filter { $0.isASCII && $0.isNumber }    // 有的模型回答里夹中文数字
+                Log.shared.debug("probe_rung", ["edge": .i(edge), "want": .s(img.code), "digits": .s(digits), "reply_chars": .i(reply?.count ?? -1)])
+                if Self.sawImage(digits, code: img.code) {
+                    best = edge
+                    continue rungs
+                }
+            }
+            break
         }
         let j = try await chat(ProbeRequest(model: model, prompt: "用 JSON 回答：{\"ok\": true}", image: nil, wantJSON: true))
         let isJSON = j.flatMap { $0.data(using: .utf8) }.flatMap { try? JSONSerialization.jsonObject(with: $0) } != nil

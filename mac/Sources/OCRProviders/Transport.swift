@@ -26,13 +26,13 @@ public struct ProbeRequest: Sendable {
         self.model = model; self.prompt = prompt; self.image = image; self.wantJSON = wantJSON
     }
 
-    /// 请求体由这里生成，调用方没有地方塞入别的内容
+    /// 请求体由这里生成。max_tokens 要留够，带思考的模型会先用掉一部分，否则正文是空的。，调用方没有地方塞入别的内容
     var body: Data {
         var content: [[String: Any]] = [["type": "text", "text": prompt]]
         if let image {
             content.insert(["type": "image_url", "image_url": ["url": "data:image/png;base64,\(image.png.base64EncodedString())"]], at: 0)
         }
-        var o: [String: Any] = ["model": model, "temperature": 0, "max_tokens": 64, "messages": [["role": "user", "content": content]]]
+        var o: [String: Any] = ["model": model, "temperature": 0, "max_tokens": 512, "messages": [["role": "user", "content": content]]]
         if wantJSON { o["response_format"] = ["type": "json_object"] }
         return (try? JSONSerialization.data(withJSONObject: o)) ?? Data()
     }
@@ -127,7 +127,10 @@ public struct GuardedTransport: HTTPTransport {
             if let k = r.key { q.setValue("Bearer \(k.value)", forHTTPHeaderField: "Authorization") }
             Log.shared.debug("provider_request", ["host": .s(r.endpoint.host), "provider": .s(r.providerID),
                                                   "bytes": .i(q.httpBody?.count ?? 0), "attempt": .i(attempt)])
+            let t0 = Date()
             let reply = try await wire.perform(q)
+            Log.shared.debug("provider_response", ["host": .s(r.endpoint.host), "status": .i(reply.status), "bytes": .i(reply.body.count),
+                                                   "seconds": .d((Date().timeIntervalSince(t0) * 1000).rounded() / 1000)])
             guard [301, 302, 303, 307, 308].contains(reply.status), let loc = reply.location else { return reply }
             guard let next = URL(string: loc, relativeTo: url)?.absoluteURL, next.host?.lowercased() == r.endpoint.host,
                   next.scheme?.lowercased() == url.scheme?.lowercased() else {

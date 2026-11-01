@@ -35,6 +35,16 @@ macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE 
 | `vlm` | info | `pages` `called` `skipped_no_ink` `skipped_no_divergence` `flips` `orphans` |
 | `vl_fetched` | info | `dir` `repo` `revision` |
 | `vl_fetch_rejected` | error | `file` `want` `got` |
+| `network_switch` | info | `allowed` |
+| `gate_request` | info | `host` `items` `bytes` `requests` `digest` |
+| `gate_decision` | info | `decision` `scope` `ticket` |
+| `gate_revoked` | warn | `reason` `ticket` |
+| `provider_request` | debug | `host` `provider` `bytes` `attempt` |
+| `provider_response` | debug | `host` `status` `bytes` `seconds` |
+| `provider_refused` | warn | `reason` `host` `provider` 或 `item` |
+| `redirect_blocked` | warn | `from` `to` |
+| `probe_rung` | debug | `edge` `want` `digits` `reply_chars`（只有合成图的随机码） |
+| `probe_result` | info | `host` `model` `supports_image` `max_long_edge` `response_format` |
 | `orientation` | debug | `rotation` `conf0` `best` |
 | `tiled` | debug | `tiles` `width` `height` |
 | `models_fetched` | info | `dir` `sha256` |
