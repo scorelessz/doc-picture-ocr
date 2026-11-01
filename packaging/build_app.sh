@@ -13,7 +13,7 @@ MODELS="${DOCOCR_MODELS:-$HOME/Library/Application Support/DocOCR/models}"
 
 # 版本号：最近的 tag 去掉 v；构建号是提交数；完整 commit 记进 Info.plist
 TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
-VERSION=${TAG#v}
+VERSION=${DOCOCR_VERSION:-${TAG#v}}
 BUILD=$(git rev-list --count HEAD)
 COMMIT=$(git rev-parse --short=12 HEAD)
 git diff --quiet HEAD -- mac Package.swift packaging || COMMIT="$COMMIT-dirty"

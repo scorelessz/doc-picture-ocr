@@ -266,7 +266,24 @@ CLAUDE.md       项目级约定与不变量（改代码前必读）
 RapidOCR / opencv-python Apache-2.0，onnxruntime / pyclipper / Pillow MIT 系，
 numpy / shapely BSD，PyInstaller GPLv2 但有明确的「允许打包并分发非自由程序」例外。
 
-## Mac App（测试版）
+## Mac App
+
+### 从 zip 安装
+
+`packaging/build_app.sh` 生成 `dist/DocOCR-版本-构建号.zip`。解压后把 `DocOCR.app` 拖进「应用程序」或 `~/Applications`，需要 Apple Silicon 和 macOS 14 以上。
+
+这个 App 只有本机签名（ad-hoc），没有公证。**拷到别的 Mac 后**系统会拦下，用下面任一方法打开：
+
+- 右键点图标 → 打开，在弹窗里再点一次「打开」。新版 macOS 如果没有这个选项，到「系统设置 → 隐私与安全性」点「仍要打开」。
+- 或在终端运行：`xattr -dr com.apple.quarantine /Applications/DocOCR.app`
+
+几点说明：
+
+- 识别模型已经在 App 里。高精度模式的模型在设置里按需下载，约 1.1 GB。
+- 每个新版本第一次访问「桌面」「文稿」时，系统都会询问一次，这是正常的。用文件选择窗或拖入的文件不会问，但默认输出目录在「文稿」下。
+- 换版本后，之前保存的 API Key 需要在设置里授权一次或重新填写。
+
+### 从源码运行
 
 需要 macOS 14+、Xcode 和 Metal Toolchain（`xcodebuild -downloadComponent MetalToolchain`）。还没有签名和打包，先在本机运行：
 
