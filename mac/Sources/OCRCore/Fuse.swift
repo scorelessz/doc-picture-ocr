@@ -36,6 +36,14 @@ public struct FuseRules: Sendable {
     public init() {}
 }
 
+public struct Adjudication: Codable, Equatable, Sendable {
+    public var provider: String, model: String, evidence: String, from: String
+
+    public init(provider: String, model: String, evidence: String, from: String) {
+        self.provider = provider; self.model = model; self.evidence = evidence; self.from = from
+    }
+}
+
 public struct FusedLine: Codable, Equatable, Sendable {
     public var x: Double
     public var y: Double
@@ -48,9 +56,11 @@ public struct FusedLine: Codable, Equatable, Sendable {
     public var flag: String
     /// VLM 对这一行是不是段首的判断（断句信 VLM）。nil = 没有判断。只在有 VLM 时写。
     public var vlmBreak: Bool?
+    /// 在线裁决的来源。nil = 没有在线裁决。
+    public var adjudication: Adjudication?
 
     enum CodingKeys: String, CodingKey {
-        case x, y, w, h, text, conf, src, alt, flag
+        case x, y, w, h, text, conf, src, alt, flag, adjudication
         case vlmBreak = "vlm_break"
     }
 
@@ -69,6 +79,7 @@ public struct FusedLine: Codable, Equatable, Sendable {
         try c.encode(src, forKey: .src); try c.encode(alt, forKey: .alt)
         try c.encode(flag, forKey: .flag)
         try c.encodeIfPresent(vlmBreak, forKey: .vlmBreak)
+        try c.encodeIfPresent(adjudication, forKey: .adjudication)
     }
 }
 
@@ -266,6 +277,31 @@ func mergeAlt(_ host: inout FusedLine, _ text: String) {
 }
 
 /// Python str.split(sep)：按码点找分隔符。
+/// 这一行的全部候选读法，当前读法在最前。
+public func lineCandidates(_ l: FusedLine) -> [String] {
+    [l.text] + (l.alt.map { splitScalars($0, altSep) } ?? [])
+}
+
+/// 裁决只能选候选之一：序号越界什么都不改。
+public func chooseCandidate(_ l: FusedLine, index: Int, adjudication a: Adjudication) -> FusedLine {
+    let c = lineCandidates(l)
+    guard c.indices.contains(index) else { return l }
+    var out = l
+    out.adjudication = a
+    guard index != 0 else { return out }
+    out.text = c[index]
+    out.alt = c.enumerated().filter { $0.offset != index }.map(\.element).joined(separator: altSep)
+    return out
+}
+
+/// 裁切框：行框上下左右各留不超过行高 25% 的白，夹在图内。
+public func lineCropRect(_ l: FusedLine, imageWidth w: Int, imageHeight h: Int) -> (x: Int, y: Int, w: Int, h: Int) {
+    let m = l.h * 0.25
+    let x0 = max(0, Int(l.x - m)), y0 = max(0, Int(l.y - m))
+    let x1 = min(w, Int((l.x + l.w + m).rounded(.up))), y1 = min(h, Int((l.y + l.h + m).rounded(.up)))
+    return (x0, y0, max(1, x1 - x0), max(1, y1 - y0))
+}
+
 func splitScalars(_ s: String, _ sep: String) -> [String] {
     let u = Array(s.unicodeScalars), p = Array(sep.unicodeScalars)
     var out: [String] = [], cur = String.UnicodeScalarView(), i = 0

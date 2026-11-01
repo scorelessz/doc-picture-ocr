@@ -128,3 +128,41 @@ final class OnlineReaderTests: XCTestCase {
     }
 }
 #endif
+
+#if canImport(CryptoKit)
+import OCRCore
+
+final class LogLeakTests: XCTestCase {
+    /// 35、36：trace 全流程，开不开 --log-text，日志里都不能有 Key。没开时也不能有正文。
+    func testNoKeyInLogs() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("leak-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let canary = "sk-canary-0123456789", secretText = "金丝雀正文"
+        for withText in [false, true] {
+            let log = dir.appendingPathComponent("\(withText).log")
+            _ = try Log.shared.configure(["--log-level", "trace", "--log-file", log.path] + (withText ? ["--log-text"] : []), env: [:])
+            let body = dir.appendingPathComponent("b.json")
+            try Data(count: 10).write(to: body)
+            let page = OnlinePage(id: "p1", sourceFile: "a.pdf", page: 1, body: body, bytes: 10)
+            let w = MockWire([HTTPReply(status: 200, body: try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": secretText]]]]))])
+            let s = ProviderSelection(), g = UploadGate()
+            s.select("p")
+            let t = GuardedTransport(wire: w, network: NetworkSwitch(allowed: true), selection: s, gate: g)
+            await g.request(onlineManifest([page], providerID: "p", providerName: "P", host: "api.example.com", model: "m"))
+            let tk = try await g.confirm(checkbox: true, scope: .once)
+            let r = OnlineReader(transport: t, endpoint: try Endpoint("https://api.example.com/v1"), providerID: "p", model: "m",
+                                 key: SecretKey(canary), ticket: tk, ledger: try FileLedger(dir.appendingPathComponent("u.jsonl")), backoff: { _ in })
+            _ = try await r.read(page)
+            XCTAssertEqual(w.requests[0].value(forHTTPHeaderField: "Authorization"), "Bearer \(canary)")
+            _ = try Log.shared.configure(["--log-level", "error"], env: [:])
+            let text = try String(contentsOf: log, encoding: .utf8)
+            XCTAssertTrue(text.contains("provider_request"), "日志要真的写了")
+            XCTAssertFalse(text.contains(canary))
+            XCTAssertFalse(text.contains(secretText))
+            let ledger = try String(contentsOf: dir.appendingPathComponent("u.jsonl"), encoding: .utf8)
+            XCTAssertFalse(ledger.contains(canary))
+        }
+    }
+}
+#endif

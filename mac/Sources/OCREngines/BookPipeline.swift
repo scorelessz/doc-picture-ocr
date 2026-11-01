@@ -476,6 +476,26 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     return res
 }
 
+/// 把分歧行从页面图里裁出来。只有这一行，不含整页。
+public final class LineCropper {
+    private let doc: PDFDocument, zoom: [Int: Double]
+
+    public init(pdf: URL, doc fused: FusedDoc) throws {
+        doc = try PageRenderer.open(pdf)
+        zoom = Dictionary(fused.pages.map { ($0.page, $0.zoom) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    public func crop(page: Int, line: FusedLine) throws -> Data {
+        let r = try PageRenderer.render(doc, page: page, dpi: (zoom[page] ?? 300.0 / 72) * 72)
+        let c = lineCropRect(line, imageWidth: r.image.width, imageHeight: r.image.height)
+        guard let img = r.image.cropping(to: CGRect(x: c.x, y: c.y, width: c.w, height: c.h)), let data = CFDataCreateMutable(nil, 0),
+              let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else { throw PaddleError.badImage }
+        CGImageDestinationAddImage(dest, img, nil)
+        guard CGImageDestinationFinalize(dest) else { throw PaddleError.badImage }
+        return data as Data
+    }
+}
+
 /// 上传前的准备：渲染、缩放、编码成请求体落盘。跳过无墨迹页和用文字层的页。在做任何 OCR 之前调用。
 public func prepareOnlinePages(pdf: URL, model: String, maxEdge: Int, forceOCR: Bool, into dir: URL, log: (String) -> Void) throws -> [OnlinePage] {
     let doc = try PageRenderer.open(pdf)

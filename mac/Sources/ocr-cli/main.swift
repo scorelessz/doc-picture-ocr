@@ -32,6 +32,8 @@ usage:
   ocr-cli doctor [--models-dir dir] [--outdir output] [--out checks.json]
   ocr-cli models fetch [--models-dir dir] [--url u] [--sha256 h]
   ocr-cli models fetch --vl [--models-dir dir] [--url 基址]
+  ocr-cli adjudicate <fused.json> --provider id --model m --out o.json --allow-network [--mode image|text] [--pdf p]
+                     [--pages 1,2] [--confirm-upload 清单sha256] [--key-stdin] [--force]
   ocr-cli provider list
   ocr-cli provider key set|delete <id>        Key 从 stdin 读，不接受参数
   ocr-cli provider models <id> --allow-network [--key-stdin]
@@ -159,6 +161,9 @@ do {
 
     case "provider":
         try runProvider(args)
+
+    case "adjudicate":
+        try runAdjudicate(args)
 
     case "models":
         guard args.first == "fetch" else { fail(usage) }

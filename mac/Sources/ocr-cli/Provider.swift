@@ -1,4 +1,5 @@
 import Foundation
+import OCRCore
 import OCREngines
 import OCRProviders
 
@@ -87,6 +88,76 @@ func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) t
         guard let page = byPage[pno] else { throw OnlineError.emptyReply }
         return try await_ { try await reader.read(page) }
     }
+}
+
+/// adjudicate 子命令：对做完的 fused.json 裁决分歧行。任务就是裁决本身，确认在第一个请求之前。
+func runAdjudicate(_ args: [String]) throws {
+    guard let path = args.first, let id = option(args, "--provider"), let model = option(args, "--model"), let out = option(args, "--out"),
+          let p = ProviderPresets.find(id) else { fail(usage) }
+    guard args.contains("--allow-network") else { fail("联网默认关闭: 在线裁决要显式加 --allow-network", code: 2) }
+    guard let mode = AdjudicationMode(rawValue: option(args, "--mode") ?? "image") else { fail(usage) }
+    guard p.dialect == .openAICompatible else { fail("\(p.name) 的适配还没有做", code: 2) }
+    if FileManager.default.fileExists(atPath: out), !args.contains("--force") { fail("\(out) 已存在, 拒绝覆盖（要覆盖请加 --force）") }
+    let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().load(p.id)
+    guard let key else { fail("没有 \(p.id) 的 Key: 先跑 ocr-cli provider key set \(p.id)", code: 2) }
+    let doc = try JSONDecoder().decode(FusedDoc.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+    let pages = option(args, "--pages").map { Set($0.split(separator: ",").compactMap { Int($0) }) }
+    if mode == .image, option(args, "--pdf") == nil { fail("--mode image 要配 --pdf", code: 2) }
+    let cropper = try option(args, "--pdf").map { try LineCropper(pdf: URL(fileURLWithPath: $0), doc: doc) }
+    let qs = try adjudicationQuestions(doc, pages: pages, mode: mode) { pno, l in try cropper?.crop(page: pno, line: l) }
+    guard !qs.isEmpty else { fail("没有要裁决的分歧行", code: 2) }
+    let endpoint = try Endpoint(p.baseURL)
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("dococr-adj-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let source = URL(fileURLWithPath: path).lastPathComponent
+    let items = try qs.map { q -> OnlinePage in
+        let b = try AdjudicationBody.make(model: model, q), f = dir.appendingPathComponent(q.id + ".json")
+        try b.write(to: f)
+        return OnlinePage(id: q.id, sourceFile: source, page: q.page, body: f, bytes: b.count)
+    }
+    let m = onlineManifest(items, providerID: p.id, providerName: p.name, host: endpoint.host, model: model)
+    let chars = qs.map { $0.candidates.map(\.count).reduce(0, +) }.reduce(0, +)
+    print("""
+    将上传分歧行到非本机地址:
+      服务商: \(p.name)  域名: \(endpoint.host)  模型: \(model)  方式: \(mode == .image ? "看图" : "仅文本")
+      \(qs.count) 处分歧，约 \(chars) 字\(mode == .image ? " / \(qs.count) 张裁切图" : "")，共 \(String(format: "%.2f", Double(m.totalBytes) / 1_048_576)) MB，费用未知
+      清单 sha256: \(m.sha256)
+    """)
+    let gate = UploadGate()
+    func stop(_ msg: String) -> Never {
+        try? FileManager.default.removeItem(at: dir)
+        fail(msg, code: 3)
+    }
+    let ticket: UploadTicket
+    if let confirm = option(args, "--confirm-upload") {
+        do {
+            ticket = try await_ {
+                await gate.request(m)
+                return try await gate.confirm(manifestSHA256: confirm)
+            }
+        } catch { stop("清单 sha256 不符，任务不开始") }
+    } else if isatty(STDIN_FILENO) == 1 {
+        print("确认上传请手动输入完整域名（\(endpoint.host)），其他输入取消: ", terminator: "")
+        guard readLine(strippingNewline: true) == endpoint.host else { stop("未确认，任务不开始") }
+        ticket = try await_ {
+            await gate.request(m)
+            return try await gate.confirm(checkbox: true, scope: .once)
+        }
+    } else {
+        stop("未确认，任务不开始。非交互运行请加 --confirm-upload <上面的清单 sha256>")
+    }
+    let selection = ProviderSelection()
+    selection.select(p.id)
+    let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(allowed: true), selection: selection, gate: gate)
+    let reader = OnlineReader(transport: t, endpoint: endpoint, providerID: p.id, model: model, key: key, ticket: ticket,
+                              ledger: try FileLedger(URL(fileURLWithPath: out + ".uploads.jsonl")))
+    let r = try await_ { await runAdjudication(doc, questions: qs, pages: items, mode: mode, reader: reader, providerID: p.id, model: model) }
+    let enc = JSONEncoder()
+    enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+    try enc.encode(r.doc).write(to: URL(fileURLWithPath: out))
+    print("裁决 \(qs.count) 处: 选定 \(r.chosen), 其中改了读法 \(r.changed), 未决 \(r.undecided)")
+    if let s = r.stoppedEarly { warn("⚠ 提前停止，其余保留本地读法: \(s)") }
 }
 
 func runProvider(_ args: [String]) throws {
