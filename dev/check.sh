@@ -64,7 +64,7 @@ case "$stage" in
     ;;
   p6)
     # 发网络的代码只能在 Transport.swift
-    if grep -rln "URLSession" mac/Sources | grep -v "OCRProviders/Transport.swift"; then
+    if grep -rlw "URLSession" mac/Sources | grep -v "OCRProviders/Transport.swift"; then
       echo "上面的文件直接用了 URLSession"; exit 1
     fi
     swift test --filter OCRProvidersTests
@@ -79,5 +79,5 @@ case "$stage" in
     echo "P3 端到端完成: bench/results/p3-e2e.json"
     ;;
   *)
-    echo "用法: ./dev/check.sh p0|p2 <pdf> [...] | p3 [--docs N] | p3-e2e [--only en|zh]"; exit 2 ;;
+    echo "用法: ./dev/check.sh p0|p2 <pdf> [...] | p3 [--docs N] | p3-e2e [--only en|zh] | p6"; exit 2 ;;
 esac
