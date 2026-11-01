@@ -34,12 +34,20 @@ public struct BookOptions {
     public var uploadsPath: URL?
     public var uploadBodies: URL?
     public var vlmBreaks = false
+    /// 进度：阶段名、已完成、总数。在工作线程上回调。
+    public var progress: (@Sendable (BookStage, Int, Int) -> Void)?
+    /// 轮询取消。在每批页面、每页 VLM 之间检查。
+    public var isCancelled: (@Sendable () -> Bool)?
     /// 默认只读有分歧行的页（别的页 VLM 翻转不了）；true 时每页都读，报告才有全书的独有片段
     public var vlmAll = false
 
     public init(pdf: URL, outdir: URL, workdir: URL, python: String) {
         self.pdf = pdf; self.outdir = outdir; self.workdir = workdir; self.python = python
     }
+}
+
+public enum BookStage: String, Sendable {
+    case ocr = "识别", vlm = "读字", fuse = "融合", markdown = "写 Markdown", pdf = "写 PDF", report = "写报告"
 }
 
 public struct BookResult: Encodable {
@@ -57,11 +65,12 @@ public struct BookResult: Encodable {
 }
 
 public enum BookError: Error, CustomStringConvertible {
-    case refused(String), failed(String)
+    case refused(String), failed(String), cancelled
 
     public var description: String {
         switch self {
         case .refused(let s), .failed(let s): return s
+        case .cancelled: return "已取消"
         }
     }
 }
@@ -154,6 +163,8 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     var dpis = Set<Double>()
     try stage("render+vision") {
         for start in stride(from: 1, through: n, by: o.jobs) {
+            if o.isCancelled?() == true { throw BookError.cancelled }
+            o.progress?(.ocr, start - 1, n)
             var batch: [(Int, Slot)] = []
             for pno in start...min(n, start + o.jobs - 1) {
                 guard let page = doc.page(at: pno - 1) else { throw BookError.failed("读不到第 \(pno) 页") }
@@ -304,6 +315,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
 
     // ---- 融合 ----
     let flog = FuseLog()
+    o.progress?(.fuse, n, n)
     var fused = try stage("fuse") { try fuse(vDoc, rDoc, log: flog) }
 
     // ---- VLM 第三票 ----
@@ -312,6 +324,8 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         try stage("vlm") {
             let doc2 = try PageRenderer.open(o.pdf)
             for i in fused.pages.indices {
+                if o.isCancelled?() == true { throw BookError.cancelled }
+                o.progress?(.vlm, i, fused.pages.count)
                 let pno = fused.pages[i].page
                 if fused.pages[i].noInk == true || fused.pages[i].textSource == "native_text" {
                     let (p, r) = applyVLM(fused.pages[i], vlm: nil)
@@ -390,6 +404,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     // ---- Markdown ----
     var mdStats: MDStats?
     if o.md {
+        o.progress?(.markdown, n, n)
         try stage("md") {
             var opt = MDOptions()
             opt.pageMarks = o.pageMarks != "none"
@@ -418,6 +433,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     // ---- 可搜索 PDF ----
     var rp: ReportPDF?
     if o.searchable {
+        o.progress?(.pdf, n, n)
         let st = try stage("pdf") { try writeSearchablePDF(src: o.pdf, fused: fused, out: pdfURL) }
         var p = ReportPDF()
         p.retrieval = st.retrieval; p.lineRetrieval = st.lineRetrieval; p.worst = st.retrievalWorst
@@ -439,6 +455,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     }
 
     // ---- 报告 ----
+    o.progress?(.report, n, n)
     if !visionFailed.isEmpty { degraded.append("Vision 在第 \(visionFailed) 页失败") }
     if !rapidFailed.isEmpty { degraded.append("PP-OCR 在第 \(rapidFailed) 页失败") }
     if let paddle, paddle.canvasFallbacks > 0 {
@@ -483,6 +500,46 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     res.peakRSSSelfMB = (peakRSS(RUSAGE_SELF) * 10).rounded() / 10
     res.peakRSSChildrenMB = (peakRSS(RUSAGE_CHILDREN) * 10).rounded() / 10
     return res
+}
+
+/// 在线读字的一次任务：确认前算好请求体和清单，确认后接到 BookOptions。CLI 和 App 共用。
+public struct OnlinePlan: Sendable {
+    public let preset: ProviderPreset, endpoint: Endpoint, model: String
+    public let pages: [OnlinePage], manifest: UploadManifest, bodies: URL
+
+    public static func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, workdir: URL, log: (String) -> Void) throws -> OnlinePlan {
+        let endpoint = try Endpoint(preset.baseURL)
+        let stem = pdf.deletingPathExtension().lastPathComponent
+        let dir = workdir.appendingPathComponent("\(stem).upload", isDirectory: true)
+        let pages = try prepareOnlinePages(pdf: pdf, model: model, maxEdge: 1792, forceOCR: forceOCR, into: dir, log: log)
+        let m = onlineManifest(pages, providerID: preset.id, providerName: preset.name, host: endpoint.host, model: model)
+        return OnlinePlan(preset: preset, endpoint: endpoint, model: model, pages: pages, manifest: m, bodies: dir)
+    }
+
+    /// 请求体里是页面图片，不确认就删
+    public func discard() { try? FileManager.default.removeItem(at: bodies) }
+
+    public func attach(to o: inout BookOptions, transport: HTTPTransport, key: SecretKey?, ticket: UploadTicket) throws {
+        let stem = o.pdf.deletingPathExtension().lastPathComponent
+        let uploads = o.outdir.appendingPathComponent("\(stem).uploads.jsonl")
+        try FileManager.default.createDirectory(at: o.outdir, withIntermediateDirectories: true)
+        let reader = OnlineReader(transport: transport, endpoint: endpoint, providerID: preset.id, model: model, key: key,
+                                  ticket: ticket, ledger: try FileLedger(uploads))
+        let byPage = Dictionary(uniqueKeysWithValues: pages.map { ($0.page, $0) })
+        o.uploadsPath = uploads
+        o.uploadBodies = bodies
+        o.vlmOnline = { pno in
+            guard let page = byPage[pno] else { throw OnlineError.emptyReply }
+            let sem = DispatchSemaphore(value: 0)
+            nonisolated(unsafe) var out: Result<String, Error> = .failure(OnlineError.emptyReply)
+            Task.detached {
+                do { out = .success(try await reader.read(page)) } catch { out = .failure(error) }
+                sem.signal()
+            }
+            sem.wait()
+            return try out.get()
+        }
+    }
 }
 
 /// 把分歧行从页面图里裁出来。只有这一行，不含整页。

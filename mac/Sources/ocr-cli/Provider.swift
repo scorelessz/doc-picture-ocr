@@ -37,11 +37,8 @@ func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) t
     guard p.dialect == .openAICompatible else { fail("\(p.name) 的适配还没有做", code: 2) }
     let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().load(p.id)
     guard let key else { fail("没有 \(p.id) 的 Key: 先跑 ocr-cli provider key set \(p.id)", code: 2) }
-    let endpoint = try Endpoint(p.baseURL)
-    let stem = o.pdf.deletingPathExtension().lastPathComponent
-    let dir = o.workdir.appendingPathComponent("\(stem).upload", isDirectory: true)
-    let pages = try prepareOnlinePages(pdf: o.pdf, model: model, maxEdge: 1792, forceOCR: o.forceOCR, into: dir, log: warn)
-    let m = onlineManifest(pages, providerID: p.id, providerName: p.name, host: endpoint.host, model: model)
+    let plan = try OnlinePlan.prepare(preset: p, model: model, pdf: o.pdf, forceOCR: o.forceOCR, workdir: o.workdir, log: warn)
+    let (endpoint, pages, m, dir) = (plan.endpoint, plan.pages, plan.manifest, plan.bodies)
     print("""
     将上传页面图片到非本机地址:
       服务商: \(p.name)  域名: \(endpoint.host)  模型: \(model)
@@ -78,16 +75,7 @@ func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) t
     let selection = ProviderSelection()
     selection.select(p.id)
     let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(allowed: true), selection: selection, gate: gate)
-    let uploads = o.outdir.appendingPathComponent("\(stem).uploads.jsonl")
-    try FileManager.default.createDirectory(at: o.outdir, withIntermediateDirectories: true)
-    let reader = OnlineReader(transport: t, endpoint: endpoint, providerID: p.id, model: model, key: key, ticket: ticket, ledger: try FileLedger(uploads))
-    let byPage = Dictionary(uniqueKeysWithValues: pages.map { ($0.page, $0) })
-    o.uploadsPath = uploads
-    o.uploadBodies = dir
-    o.vlmOnline = { pno in
-        guard let page = byPage[pno] else { throw OnlineError.emptyReply }
-        return try await_ { try await reader.read(page) }
-    }
+    try plan.attach(to: &o, transport: t, key: key, ticket: ticket)
 }
 
 /// adjudicate 子命令：对做完的 fused.json 裁决分歧行。任务就是裁决本身，确认在第一个请求之前。
