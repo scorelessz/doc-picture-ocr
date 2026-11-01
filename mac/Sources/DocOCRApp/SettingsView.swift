@@ -56,6 +56,7 @@ struct ProvidersTab: View {
     @EnvironmentObject var providers: ProviderSettings
     @State private var keys: [String: String] = [:]
     @State private var confirmingOn = false
+    @FocusState private var focused: String?
 
     var body: some View {
         Form {
@@ -73,6 +74,7 @@ struct ProvidersTab: View {
             }
         }
         .formStyle(.grouped)
+        .task(id: app.networkAllowed) { await providers.refreshAll() }
         .alert("开启联网功能", isPresented: $confirmingOn) {
             Button("仅本地使用", role: .cancel) {}
             Button("我了解风险，允许联网功能") { app.allowNetwork() }
@@ -89,20 +91,32 @@ struct ProvidersTab: View {
                 }
             }.disabled(!app.canUse(p))
             if let r = app.unavailableReason(p) { Text(r).font(.caption).foregroundStyle(.secondary) }
-            if let r = providers.keyProblem(p.id) { Text(r).font(.caption).foregroundStyle(.orange) }
             if app.selected.contains(p.id) {
+                Text("Key: " + providers.keyLine(p.id)).font(.caption)
+                if providers.needsAuthorization(p.id) {
+                    HStack {
+                        Text("这个 Key 是别的构建存的。").font(.caption).foregroundStyle(.orange)
+                        Button("授权读取旧 key") { providers.authorize(p.id) }.help(ProviderSettings.authorizeHint)
+                        Button("覆盖为新 key") { focused = p.id }
+                    }
+                    if !(keys[p.id] ?? "").isEmpty { Text(ProviderSettings.overwriteNote).font(.caption).foregroundStyle(.orange) }
+                }
                 HStack {
-                    SecureField(providers.hasKey(p.id) ? "Key 已保存在 Keychain" : "API Key", text: Binding(get: { keys[p.id] ?? "" }, set: { keys[p.id] = $0 }))
+                    SecureField("API Key", text: Binding(get: { keys[p.id] ?? "" }, set: { keys[p.id] = $0 })).focused($focused, equals: p.id)
                     Button("保存") {
                         providers.saveKey(keys[p.id] ?? "", for: p.id)
                         keys[p.id] = ""
+                        Task { await providers.refreshModels(p) }
                     }
-                    Button("删除") { providers.deleteKey(p.id) }.disabled(!providers.hasKey(p.id))
+                    Button("删除") { providers.deleteKey(p.id) }.disabled(providers.keyState(p.id) == .none)
                 }
-                HStack {
-                    TextField("模型名", text: Binding(get: { providers.models[p.id] ?? "" }, set: { providers.models[p.id] = $0 }))
-                    Button("测试连接") { providers.test(p) }.disabled(!providers.canTest(p)).help("只发程序生成的合成图")
+                if !p.textOnly {
+                    HStack {
+                        ModelField(preset: p, text: Binding(get: { providers.models[p.id] ?? "" }, set: { providers.setModel($0, for: p.id) }))
+                        Button("测试连接") { providers.test(p) }.disabled(!providers.canTest(p)).help("只发程序生成的合成图")
+                    }
                 }
+                if let n = providers.listNote(p) { Text(n).font(.caption).foregroundStyle(.secondary) }
             }
             if let r = providers.result[p.id] { Text(r).font(.caption) }
         }.disabled(!app.networkControlsEnabled && p.dialect == .openAICompatible && !app.selected.contains(p.id))

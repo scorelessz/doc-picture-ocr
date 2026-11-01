@@ -114,41 +114,126 @@ public final class ModelManager: ObservableObject {
 
 @MainActor
 public final class ProviderSettings: ObservableObject {
+    public static let overwriteNote = "检测到旧条目，将覆盖保存"
+    public static let authorizeHint = "系统会弹授权框，请选「始终允许」。没有授权时也可以直接填新 Key 覆盖。"
+
     @Published public var models: [String: String] = [:]
     @Published public private(set) var result: [String: String] = [:]
     @Published public private(set) var testing: Set<String> = []
-    private let app: AppModel
+    @Published public private(set) var lists: [String: CachedModels] = [:]
+    @Published public private(set) var profiles: [String: [CapabilityProfile]] = [:]
+    private let app: AppModel, store: KVStore, profileDir: URL
 
-    public init(app: AppModel) { self.app = app }
+    public init(app: AppModel, store: KVStore = DefaultsStore(), profileDir: URL = ProfileStore.defaultDirectory) {
+        self.app = app; self.store = store; self.profileDir = profileDir
+        for p in ProviderPresets.all {
+            models[p.id] = store.string("model." + p.id) ?? p.recommendedVision ?? ""
+            lists[p.id] = ProfileStore.models(p.id, in: profileDir)
+            profiles[p.id] = ProfileStore.profiles(p.id, in: profileDir)
+        }
+    }
 
-    public func hasKey(_ id: String) -> Bool { (try? app.secrets.load(id)) != nil }
+    public func setModel(_ m: String, for id: String) {
+        models[id] = m
+        store.set(m, "model." + id)
+    }
 
-    /// Key 读不出来时给界面的说明，比如旧版本 App 存的
-    public func keyProblem(_ id: String) -> String? {
-        do {
-            _ = try app.secrets.load(id)
-            return nil
-        } catch { return "\(error)" }
+    // MARK: Key
+
+    public func keyState(_ id: String) -> KeyState { (try? app.secrets.state(id)) ?? .none }
+
+    public func hasKey(_ id: String) -> Bool {
+        if case .readable = keyState(id) { return true }
+        return false
+    }
+
+    /// 永远不含明文
+    public func keyLine(_ id: String) -> String {
+        func when(_ d: Date?) -> String { d.map { "，修改于 " + Self.time($0) } ?? "" }
+        switch keyState(id) {
+        case .none: return "未设置"
+        case let .readable(p, n, d): return "已保存（本 App 可读）\(p)…，共 \(n) 位\(when(d))"
+        case let .needsAuthorization(d): return "已保存但需授权\(when(d))"
+        }
+    }
+
+    static func time(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        return f.string(from: d)
+    }
+
+    public func needsAuthorization(_ id: String) -> Bool {
+        if case .needsAuthorization = keyState(id) { return true }
+        return false
     }
 
     public func saveKey(_ key: String, for id: String) {
         let k = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !k.isEmpty else { return }
         do {
-            try app.secrets.save(k, for: id)
-            result[id] = "Key 已存入 Keychain"
+            let replaced = try app.secrets.save(k, for: id)
+            result[id] = replaced ? "已覆盖旧条目，Key 已存入 Keychain" : "Key 已存入 Keychain"
         } catch { result[id] = "保存失败: \(error)" }
         objectWillChange.send()
     }
 
     public func deleteKey(_ id: String) {
-        try? app.secrets.delete(id)
-        result[id] = "Key 已删除"
+        do {
+            try app.secrets.delete(id)
+            result[id] = "Key 已删除"
+        } catch { result[id] = "\(error)" }
         objectWillChange.send()
     }
 
+    /// 用户点按钮才走这里：会弹系统授权框，放后台，不卡界面
+    public func authorize(_ id: String) {
+        let s = app.secrets
+        result[id] = Self.authorizeHint
+        Task.detached {
+            let r: String
+            do {
+                r = try s.loadAuthorizing(id) != nil ? "授权成功" : "没有这个条目"
+            } catch { r = "没有授权成功: \(error)" }
+            await MainActor.run { [weak self] in
+                self?.result[id] = r
+                self?.objectWillChange.send()
+            }
+        }
+    }
+
+    // MARK: 模型列表
+
+    public func options(_ p: ProviderPreset) -> [ModelOption] {
+        ModelFilter.options(ids: lists[p.id]?.ids ?? [], profiles: profiles[p.id] ?? [], recommended: p.recommendedVision)
+    }
+
+    /// 没联网或没刷新到时显示缓存时间
+    public func listNote(_ p: ProviderPreset) -> String? {
+        if p.textOnly { return "\(p.name)只用于纯文本裁决，看图不稳定" }
+        guard let l = lists[p.id] else { return "还没有拉取过模型列表" }
+        return (app.networkAllowed ? "列表更新于 " : "没有联网，这是上次的列表，更新于 ") + Self.time(l.fetchedAt)
+    }
+
+    public func canRefresh(_ p: ProviderPreset) -> Bool { app.canUse(p) && app.selected.contains(p.id) && hasKey(p.id) }
+
+    /// 只发 GET /models，不发用户数据。条件不满足时一次请求都不发。
+    public func refreshModels(_ p: ProviderPreset) async {
+        guard canRefresh(p), let ep = try? Endpoint(p.baseURL) else { return }
+        let prober = CapabilityProber(transport: app.transport, endpoint: ep, providerID: p.id, key: try? app.secrets.load(p.id))
+        let ids = await prober.listModels()
+        guard !ids.isEmpty else { return }      // 拉取失败时保留缓存
+        let c = CachedModels(fetchedAt: Date(), ids: ids)
+        try? ProfileStore.saveModels(c, for: p.id, in: profileDir)
+        lists[p.id] = c
+    }
+
+    public func refreshAll() async {
+        for p in ProviderPresets.all { await refreshModels(p) }
+    }
+
     public func canTest(_ p: ProviderPreset) -> Bool {
-        app.canUse(p) && app.selected.contains(p.id) && hasKey(p.id) && !(models[p.id] ?? "").isEmpty && !testing.contains(p.id)
+        canRefresh(p) && !(models[p.id] ?? "").isEmpty && !testing.contains(p.id)
     }
 
     /// 只发合成图。总开关和选中状态由传输层再把一道。
@@ -157,12 +242,14 @@ public final class ProviderSettings: ObservableObject {
         testing.insert(p.id)
         result[p.id] = "测试中…（只发程序生成的合成图）"
         let prober = CapabilityProber(transport: app.transport, endpoint: ep, providerID: p.id, key: try? app.secrets.load(p.id))
+        let dir = profileDir
         Task {
             var text: String
             do {
-                let n = await prober.listModels().count, r = try await prober.probe(model: model)
-                try? ProfileStore.save(r)
-                text = "模型列表 \(n) 个；支持图片: \(r.supportsImage ? "是" : "否")；最大长边: \(r.maxLongEdge.map(String.init) ?? "-")"
+                let r = try await prober.probe(model: model)
+                try? ProfileStore.save(r, in: dir)
+                profiles[p.id] = ProfileStore.profiles(p.id, in: dir)
+                text = "支持图片: \(r.supportsImage ? "是" : "否")；最大长边: \(r.maxLongEdge.map(String.init) ?? "-")"
             } catch { text = "失败: \(error)" }
             testing.remove(p.id)
             result[p.id] = text

@@ -36,7 +36,7 @@ usage:
                      [--pages 1,2] [--confirm-upload 清单sha256] [--key-stdin] [--force]
   ocr-cli verify-uploads <report.md> <uploads.jsonl>
   ocr-cli provider list
-  ocr-cli provider key set|delete <id>        Key 从 stdin 读，不接受参数
+  ocr-cli provider key set|status|delete <id>   Key 从 stdin 读，不接受参数
   ocr-cli provider models <id> --allow-network [--key-stdin]
   ocr-cli provider probe <id> --allow-network --model m [--key-stdin]
   ocr-cli paddle-plan --models dir --out plan.json

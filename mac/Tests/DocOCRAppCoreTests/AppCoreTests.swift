@@ -98,7 +98,7 @@ final class AppCoreTests: XCTestCase {
 
     private func rig(network: Bool = true, online: Bool = true, status: Int = 200, store: Mem = Mem()) throws -> Rig {
         let w = CountingWire(status: status), s = MemorySecretStore(), a = AppModel(store: store, wire: w, secrets: s)
-        s.save("sk-test", for: "dashscope")
+        try s.save("sk-test", for: "dashscope")
         if network { a.allowNetwork() } else { a.chooseLocalOnly() }
         let b = FakeBackend(dir: dir)
         let q = QueueModel(app: a, backend: b, modelsDir: try models(), vlDirectory: dir.appendingPathComponent("vl"), history: History(url: dir.appendingPathComponent("h.json")), outdir: dir)
@@ -150,7 +150,7 @@ final class AppCoreTests: XCTestCase {
         let s = MemorySecretStore(), a = AppModel(store: Mem(), wire: CountingWire(), secrets: s)
         a.allowNetwork()
         a.setSelected(qwen, true)
-        s.save("k", for: qwen.id)
+        try? s.save("k", for: qwen.id)
         let p = ProviderSettings(app: a)
         p.models[qwen.id] = "m"
         XCTAssertTrue(p.canTest(qwen))
@@ -161,7 +161,7 @@ final class AppCoreTests: XCTestCase {
     func testTestConnectionNeedsSelection() {
         let s = MemorySecretStore(), w = CountingWire(), a = AppModel(store: Mem(), wire: w, secrets: s)
         a.allowNetwork()
-        s.save("k", for: qwen.id)
+        try? s.save("k", for: qwen.id)
         let p = ProviderSettings(app: a)
         p.models[qwen.id] = "m"
         XCTAssertFalse(p.canTest(qwen), "有 Key 但没选中")
@@ -293,7 +293,7 @@ final class AppCoreTests: XCTestCase {
 
     func testMissingKeyFailsWithoutRequest() async throws {
         let r = try rig()
-        r.secrets.delete("dashscope")
+        try r.secrets.delete("dashscope")
         r.q.add([pdf("a")])
         r.q.start()
         await r.q.waitUntilIdle()
@@ -304,7 +304,7 @@ final class AppCoreTests: XCTestCase {
     func testProviderFailureNeverSwitches() async throws {
         let r = try rig(status: 401)
         r.app.setSelected(ProviderPresets.find("deepseek")!, true)     // 另一家也选中、也有 Key
-        r.secrets.save("k", for: "deepseek")
+        try r.secrets.save("k", for: "deepseek")
         r.q.add([pdf("a")])
         r.q.start()
         await until { r.q.confirm != nil }
@@ -371,6 +371,109 @@ final class AppCoreTests: XCTestCase {
         let b = History(url: h)     // 模拟崩溃后重启
         XCTAssertEqual(b.records[0].state, "interrupted")
         XCTAssertEqual(b.records[0].outputs.count, 1)
+    }
+
+    // MARK: Key 状态
+
+    private func keyRig() -> (MemorySecretStore, ProviderSettings, AppModel, CountingWire) {
+        let s = MemorySecretStore(), w = CountingWire(), a = AppModel(store: Mem(), wire: w, secrets: s)
+        a.allowNetwork()
+        a.setSelected(qwen, true)
+        return (s, ProviderSettings(app: a, store: Mem(), profileDir: dir.appendingPathComponent("prof")), a, w)
+    }
+
+    func testKeyStatesNeverShowPlaintext() throws {
+        let (s, p, _, _) = keyRig()
+        XCTAssertEqual(p.keyLine("dashscope"), "未设置")
+        try s.save("sk-abcdefghij-secret", for: "dashscope")
+        let line = p.keyLine("dashscope")
+        XCTAssertTrue(line.hasPrefix("已保存（本 App 可读）sk-a…，共 20 位"), line)
+        XCTAssertFalse(line.contains("abcdefghij"))
+        s.locked = ["dashscope"]
+        XCTAssertTrue(p.keyLine("dashscope").hasPrefix("已保存但需授权"))
+        XCTAssertTrue(p.needsAuthorization("dashscope"))
+        XCTAssertFalse(p.keyLine("dashscope").contains("sk-a"))
+    }
+
+    func testLockedKeyCanBeOverwritten() throws {
+        let (s, p, _, _) = keyRig()
+        try s.save("old", for: "dashscope")
+        s.locked = ["dashscope"]
+        p.saveKey("new-key", for: "dashscope")
+        XCTAssertTrue(p.result["dashscope"]?.contains("覆盖") == true)
+        XCTAssertTrue(p.hasKey("dashscope"))
+    }
+
+    func testUndeletableOldEntryExplainsWhatToDo() throws {
+        let (s, p, _, _) = keyRig()
+        try s.save("old", for: "dashscope")
+        s.undeletable = ["dashscope"]
+        p.saveKey("new-key", for: "dashscope")
+        XCTAssertTrue(p.result["dashscope"]?.contains("钥匙串访问") == true)
+    }
+
+    func testAuthorizeUnlocks() async throws {
+        let (s, p, _, _) = keyRig()
+        try s.save("old", for: "dashscope")
+        s.locked = ["dashscope"]
+        p.authorize("dashscope")
+        await until { p.result["dashscope"] == "授权成功" }
+        XCTAssertTrue(p.hasKey("dashscope"))
+    }
+
+    func testLockedKeyBlocksRequests() async throws {
+        let (s, p, _, w) = keyRig()
+        try s.save("old", for: "dashscope")
+        s.locked = ["dashscope"]
+        p.models["dashscope"] = "m"
+        XCTAssertFalse(p.canTest(qwen))
+        await p.refreshModels(qwen)
+        XCTAssertEqual(w.count, 0)
+    }
+
+    // MARK: 模型列表
+
+    func testModelFilter() {
+        let o = ModelFilter.options(ids: ["z-chat", "text-embedding-3", "qwen-vl-ocr", "m-bad", "m-good"], profiles: [
+            CapabilityProfile(providerID: "p", model: "m-bad", probedAt: Date(), supportsImage: false, responseFormat: .text),
+            CapabilityProfile(providerID: "p", model: "m-good", probedAt: Date(), supportsImage: true, responseFormat: .text),
+        ], recommended: "rec")
+        XCTAssertEqual(o.map(\.id), ["rec", "m-good", "qwen-vl-ocr", "z-chat"])
+        XCTAssertEqual(o.map(\.status), [.recommended, .verified, .unverified, .unverified])
+    }
+
+    func testRecommendedDefaultsAndDeepSeekTextOnly() {
+        let a = AppModel(store: Mem(), wire: CountingWire(), secrets: MemorySecretStore())
+        let p = ProviderSettings(app: a, store: Mem(), profileDir: dir)
+        XCTAssertEqual(p.models["dashscope"], "qwen3.7-flash")
+        XCTAssertEqual(p.models["siliconflow"], "Qwen/Qwen3-VL-32B-Instruct")
+        XCTAssertEqual(p.models["deepseek"], "")
+        a.allowNetwork()
+        for x in ProviderPresets.all { a.setSelected(x, true) }
+        XCTAssertFalse(a.readableProviders.contains { $0.id == "deepseek" })
+        XCTAssertTrue(a.readableProviders.contains { $0.id == "dashscope" })
+    }
+
+    func testNoAutoFetchWhenOffOrUnselected() async throws {
+        let s = MemorySecretStore(), w = CountingWire(), a = AppModel(store: Mem(), wire: w, secrets: s)
+        try s.save("k", for: "dashscope")
+        let p = ProviderSettings(app: a, store: Mem(), profileDir: dir.appendingPathComponent("prof"))
+        await p.refreshAll()                // 总开关关
+        a.allowNetwork()
+        await p.refreshAll()                // 开了，但没选中（有 Key 也不算）
+        XCTAssertEqual(w.count, 0)
+        a.setSelected(qwen, true)
+        await p.refreshModels(qwen)
+        XCTAssertEqual(w.count, 1, "选中后只发一次 GET /models")
+    }
+
+    func testCachedListShownWhenOffline() throws {
+        let d = dir.appendingPathComponent("prof")
+        try ProfileStore.saveModels(CachedModels(fetchedAt: Date(), ids: ["a"]), for: "dashscope", in: d)
+        let a = AppModel(store: Mem(), wire: CountingWire(), secrets: MemorySecretStore())
+        let p = ProviderSettings(app: a, store: Mem(), profileDir: d)
+        XCTAssertTrue(p.options(qwen).contains { $0.id == "a" })
+        XCTAssertTrue(p.listNote(qwen)?.contains("没有联网") == true)
     }
 
     // MARK: 报告

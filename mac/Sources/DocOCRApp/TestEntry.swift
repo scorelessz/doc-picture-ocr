@@ -5,7 +5,7 @@ import SwiftUI
 
 // 测试入口，脚本用：
 //   --smoke <outdir> a.pdf b.pdf [--cancel-after 秒]   用和界面相同的 QueueModel 跑完，写 smoke.json 后退出
-//   --keychain-test write|read|overwrite|delete <结果文件>
+//   --keychain-test write|read|state|overwrite|delete <结果文件>
 //   --snapshot <dir>               把各界面渲染成 PNG 后退出
 
 final class MemoryStore: KVStore {
@@ -38,9 +38,15 @@ enum TestEntry {
                 r = "写入成功"
             case "read":
                 r = try k.load(id) != nil ? "读到" : "没有条目"
+            case "state":
+                switch try k.state(id) {
+                case .none: r = "未设置"
+                case .readable: r = "可读"
+                case .needsAuthorization: r = "需授权"
+                }
             case "overwrite":
-                try k.save("value-2", for: id)
-                r = "覆盖成功, " + (try k.load(id) != nil ? "读到" : "没有条目")
+                let had = try k.save("value-2", for: id)
+                r = "覆盖成功 旧条目=\(had), " + (try k.load(id) != nil ? "读到" : "没有条目")
             default:
                 try k.delete(id)
                 r = "已删除"

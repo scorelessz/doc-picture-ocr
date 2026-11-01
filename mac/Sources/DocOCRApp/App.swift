@@ -13,7 +13,7 @@ final class Env: ObservableObject {
         let out = outdir ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("DocOCR", isDirectory: true)
         queue = QueueModel(app: app, outdir: out)
         models = ModelManager()
-        providers = ProviderSettings(app: app)
+        providers = ProviderSettings(app: app, store: store)
         diagnostics = DiagnosticsModel()
     }
 }

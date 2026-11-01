@@ -153,12 +153,12 @@ final class CapabilityTests: XCTestCase {
         for p in ProviderPresets.all { XCTAssertFalse(s.isSelected(p.id)) }
     }
 
-    func testMemoryStoreRoundTrip() {
+    func testMemoryStoreRoundTrip() throws {
         let m = MemorySecretStore()
-        m.save("k", for: "p")
-        XCTAssertEqual(m.load("p")?.value, "k")
-        m.delete("p")
-        XCTAssertNil(m.load("p"))
+        try m.save("k", for: "p")
+        XCTAssertEqual(try m.load("p")?.value, "k")
+        try m.delete("p")
+        XCTAssertNil(try m.load("p"))
     }
 }
 #endif

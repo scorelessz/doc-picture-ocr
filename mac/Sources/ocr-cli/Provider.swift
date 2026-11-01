@@ -163,6 +163,12 @@ func runProvider(_ args: [String]) throws {
             guard !k.isEmpty else { fail("stdin 没有读到 Key", code: 2) }
             try KeychainStore().save(k, for: p.id)
             print("已存入 Keychain: \(p.id)")
+        case "status":
+            switch try KeychainStore().state(p.id) {
+            case .none: print("\(p.id): 未设置")
+            case let .readable(pre, n, d): print("\(p.id): 已保存（可读）\(pre)…，共 \(n) 位，修改于 \(d.map { "\($0)" } ?? "?")")
+            case let .needsAuthorization(d): print("\(p.id): 已保存但这个程序没有读取权限，修改于 \(d.map { "\($0)" } ?? "?")")
+            }
         case "delete":
             try KeychainStore().delete(p.id)
             print("已删除: \(p.id)")

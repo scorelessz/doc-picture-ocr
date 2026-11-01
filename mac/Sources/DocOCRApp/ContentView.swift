@@ -116,8 +116,30 @@ struct ConfirmView: View {
     }
 }
 
+/// 模型名：可手填，也可从列表选。输入时按文字筛选。
+struct ModelField: View {
+    let preset: ProviderPreset
+    @Binding var text: String
+    @EnvironmentObject var providers: ProviderSettings
+
+    var body: some View {
+        let all = providers.options(preset), q = text.lowercased()
+        let hit = all.filter { q.isEmpty || $0.id.lowercased().contains(q) }
+        HStack(spacing: 4) {
+            TextField("模型名", text: $text).frame(minWidth: 200)
+            Menu {
+                ForEach((hit.isEmpty ? all : hit).prefix(40)) { o in
+                    Button("\(o.id)（\(o.status.rawValue)）") { text = o.id }
+                }
+            } label: { Image(systemName: "chevron.down") }
+                .menuStyle(.borderlessButton).frame(width: 28).disabled(all.isEmpty)
+        }
+    }
+}
+
 struct QueueView: View {
     @EnvironmentObject var app: AppModel
+    @EnvironmentObject var providers: ProviderSettings
     @EnvironmentObject var queue: QueueModel
     @State private var targeted = false
 
@@ -223,11 +245,19 @@ struct QueueView: View {
             HStack {
                 Picker("在线读字", selection: $queue.onlineProviderID) {
                     Text("不使用").tag(String?.none)
-                    ForEach(ProviderPresets.all.filter { app.isUsable($0.id) }, id: \.id) { Text($0.name).tag(String?.some($0.id)) }
+                    ForEach(app.readableProviders, id: \.id) { Text($0.name).tag(String?.some($0.id)) }
                 }.frame(width: 260)
-                TextField("模型名", text: $queue.onlineModel).frame(width: 200)
+                if let p = queue.onlineProviderID.flatMap(ProviderPresets.find) {
+                    ModelField(preset: p, text: Binding(get: { queue.onlineModel }, set: {
+                        queue.onlineModel = $0
+                        providers.setModel($0, for: p.id)
+                    }))
+                }
             }.disabled(!app.networkControlsEnabled)
             if let r = app.networkDisabledReason { Text(r).font(.caption).foregroundStyle(.secondary) }
+        }
+        .onChange(of: queue.onlineProviderID) { _, id in
+            if let id { queue.onlineModel = providers.models[id] ?? "" }
         }
     }
 

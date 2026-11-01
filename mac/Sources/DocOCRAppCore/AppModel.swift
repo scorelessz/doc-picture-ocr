@@ -103,5 +103,8 @@ public final class AppModel: ObservableObject {
         store.set(selected.sorted().joined(separator: ","), "selectedProviders")
     }
 
+    /// 在线读字能选的：DeepSeek 这类只做纯文本的不列
+    public var readableProviders: [ProviderPreset] { ProviderPresets.all.filter { isUsable($0.id) && !$0.textOnly } }
+
     public func isUsable(_ id: String) -> Bool { networkAllowed && selected.contains(id) && ProviderPresets.find(id).map(canUse) == true }
 }

@@ -41,6 +41,19 @@ public struct CapabilityProfile: Sendable, Codable, Equatable {
     public var maxLongEdge: Int?
     public var responseFormat: ResponseFormat
     public var pricePerMTokens: String?
+
+    public init(providerID: String, model: String, probedAt: Date, supportsImage: Bool, maxLongEdge: Int? = nil,
+                responseFormat: ResponseFormat, pricePerMTokens: String? = nil) {
+        self.providerID = providerID; self.model = model; self.probedAt = probedAt; self.supportsImage = supportsImage
+        self.maxLongEdge = maxLongEdge; self.responseFormat = responseFormat; self.pricePerMTokens = pricePerMTokens
+    }
+}
+
+/// 上次拉到的模型列表，没联网时显示
+public struct CachedModels: Sendable, Codable, Equatable {
+    public let fetchedAt: Date, ids: [String]
+
+    public init(fetchedAt: Date, ids: [String]) { self.fetchedAt = fetchedAt; self.ids = ids }
 }
 
 public struct CapabilityProber: Sendable {
@@ -110,6 +123,31 @@ public struct CapabilityProber: Sendable {
 }
 
 public enum ProfileStore {
+    private static var decoder: JSONDecoder {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }
+
+    public static func profiles(_ providerID: String, in dir: URL = defaultDirectory) -> [CapabilityProfile] {
+        let prefix = safeName(providerID) + "--"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        return names.filter { $0.hasPrefix(prefix) }.compactMap {
+            (try? Data(contentsOf: dir.appendingPathComponent($0))).flatMap { try? decoder.decode(CapabilityProfile.self, from: $0) }
+        }
+    }
+
+    public static func saveModels(_ m: CachedModels, for providerID: String, in dir: URL = defaultDirectory) throws {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .iso8601
+        try enc.encode(m).write(to: dir.appendingPathComponent(safeName(providerID) + ".models"), options: .atomic)
+    }
+
+    public static func models(_ providerID: String, in dir: URL = defaultDirectory) -> CachedModels? {
+        (try? Data(contentsOf: dir.appendingPathComponent(safeName(providerID) + ".models"))).flatMap { try? decoder.decode(CachedModels.self, from: $0) }
+    }
+
     /// <Application Support>/DocOCR/providers
     public static var defaultDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("DocOCR/providers", isDirectory: true)
