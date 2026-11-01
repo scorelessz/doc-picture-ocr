@@ -41,6 +41,7 @@ usage:
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
                [--paddle coreml|python] [--models-dir dir] [--units ane|all|cpu|gpu]
                [--vlm [--vl-model dir] [--vlm-all] | --vlm-url http://127.0.0.1:端口/v1 [--vlm-model 名]]
+               [--vlm-provider id --vlm-model 名 --allow-network [--confirm-upload 清单sha256] [--key-stdin]]
                [--python .venv/bin/python] [--result result.json]
 
 
@@ -359,6 +360,10 @@ do {
             }
             o.vlmURL = u
             o.vlmModel = option(args, "--vlm-model") ?? "local"
+        }
+        if let id = option(args, "--vlm-provider") {
+            guard !args.contains("--vlm"), option(args, "--vlm-url") == nil else { fail("--vlm-provider 不能和 --vlm / --vlm-url 同用", code: 2) }
+            try prepareOnlineVLM(id, into: &o, args: args)
         }
         if args.contains("--vlm") {
             let dir = option(args, "--vl-model") ?? VLModel.directory(models: URL(fileURLWithPath: defaultModels, isDirectory: true)).path

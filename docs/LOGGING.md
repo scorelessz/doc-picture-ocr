@@ -60,6 +60,8 @@ macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE 
 
 `peak_rss_children_mb` 在 `--paddle coreml` 下是 0，因为不再有 Python 子进程。
 
+上传记录写在 `<stem>.uploads.jsonl`，每次状态变化追加一行，先写后发；同一 `seq` 以最后一行为准。
+
 ## 隐私
 
 没有 `--log-text` 时不写任何识别文本。`argv` 和 `warning` 里会有文件路径，所以书名会出现在日志里，发给别人前看一下。

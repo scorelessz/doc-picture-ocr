@@ -29,6 +29,10 @@ public struct BookOptions {
     public var vlmModel = "local"
     /// 进程内 VLM：灰度像素 → 文字。设了就优先于 vlmURL。
     public var vlmLocal: (([UInt8], Int, Int) -> String)?
+    /// 在线读字：页码 → 文字。出错只影响这一页，保留本地结果。
+    public var vlmOnline: ((Int) throws -> String)?
+    public var uploadsPath: URL?
+    public var uploadBodies: URL?
     public var vlmBreaks = false
     /// 默认只读有分歧行的页（别的页 VLM 翻转不了）；true 时每页都读，报告才有全书的独有片段
     public var vlmAll = false
@@ -304,7 +308,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
 
     // ---- VLM 第三票 ----
     var vlmReports: [VLMPageReport] = []
-    if o.vlmLocal != nil || o.vlmURL != nil {
+    if o.vlmLocal != nil || o.vlmURL != nil || o.vlmOnline != nil {
         try stage("vlm") {
             let doc2 = try PageRenderer.open(o.pdf)
             for i in fused.pages.indices {
@@ -323,15 +327,19 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                 }
                 let t0 = Date()
                 do {
-                    let r0 = try PageRenderer.render(doc2, page: pno, dpi: slots[i].dpi)
-                    var img = r0.image
-                    if let rot = fused.pages[i].pageRotation, let p = paddle { img = try p.rotatedImage(img, rot) }
                     let text: String
-                    if let f = o.vlmLocal {
-                        let (px, w, h) = try grayPixels(img)
-                        text = f(px, w, h)
+                    if let f = o.vlmOnline {
+                        text = try f(pno)       // 请求体在确认前就定好了，不在这里重新渲染
                     } else {
-                        text = try vlmRead(img, url: o.vlmURL!, model: o.vlmModel)
+                        let r0 = try PageRenderer.render(doc2, page: pno, dpi: slots[i].dpi)
+                        var img = r0.image
+                        if let rot = fused.pages[i].pageRotation, let p = paddle { img = try p.rotatedImage(img, rot) }
+                        if let f = o.vlmLocal {
+                            let (px, w, h) = try grayPixels(img)
+                            text = f(px, w, h)
+                        } else {
+                            text = try vlmRead(img, url: o.vlmURL!, model: o.vlmModel)
+                        }
                     }
                     let (p, r) = applyVLM(fused.pages[i], vlm: text)
                     fused.pages[i] = p
@@ -352,6 +360,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                                     "orphans": .i(vlmReports.map(\.orphans.count).reduce(0, +))])
         }
     }
+    if let d = o.uploadBodies { try? fm.removeItem(at: d) }
     try encodeJSON(fused).write(to: fURL)
     if Log.shared.enabled {
         let drops = Dictionary(grouping: flog.drops, by: \.page)
@@ -450,6 +459,10 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     ri.singleEnginePages = single
     ri.srcPages = n
     ri.vlm = vlmReports
+    if let u = o.uploadsPath, let rows = try? FileLedger.rows(u) {
+        let tf = ISO8601DateFormatter()
+        ri.uploads = rows.map { UploadRow(time: tf.string(from: $0.time), host: $0.host, model: $0.model, page: $0.page, bytes: $0.bytes, status: $0.status) }
+    }
     try buildReport(ri).write(to: reportURL, atomically: true, encoding: .utf8)
     res.outputs.append(reportURL.path)
 
@@ -461,6 +474,35 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     res.peakRSSSelfMB = (peakRSS(RUSAGE_SELF) * 10).rounded() / 10
     res.peakRSSChildrenMB = (peakRSS(RUSAGE_CHILDREN) * 10).rounded() / 10
     return res
+}
+
+/// 上传前的准备：渲染、缩放、编码成请求体落盘。跳过无墨迹页和用文字层的页。在做任何 OCR 之前调用。
+public func prepareOnlinePages(pdf: URL, model: String, maxEdge: Int, forceOCR: Bool, into dir: URL, log: (String) -> Void) throws -> [OnlinePage] {
+    let doc = try PageRenderer.open(pdf)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    var out: [OnlinePage] = []
+    for pno in 1...max(1, doc.pageCount) {
+        guard let page = doc.page(at: pno - 1) else { continue }
+        try autoreleasepool {
+            let r = try PageRenderer.render(doc, page: pno, dpi: PageInspect.chooseDPI(page))
+            let dark = PageInspect.darkRatio(r.image)
+            if dark >= 0, dark < RenderDefaults.noInkDark { return }
+            if PageInspect.hasNativeText(page), !forceOCR { return }
+            let g = try Gray(r.image)
+            let k = min(1, Double(maxEdge) / Double(max(g.w, g.h)))
+            let small = k < 1 ? g.resized(Int(Double(g.w) * k), Int(Double(g.h) * k)) : g
+            guard let cg = small.cgImage, let data = CFDataCreateMutable(nil, 0),
+                  let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else { throw PaddleError.badImage }
+            CGImageDestinationAddImage(dest, cg, nil)
+            guard CGImageDestinationFinalize(dest) else { throw PaddleError.badImage }
+            let body = try ChatBody.make(model: model, png: data as Data)
+            let f = dir.appendingPathComponent(String(format: "p%04d.json", pno))
+            try body.write(to: f)
+            out.append(OnlinePage(id: "p\(pno)", sourceFile: pdf.lastPathComponent, page: pno, body: f, bytes: body.count))
+        }
+        if pno % 50 == 0 { log("准备上传内容 \(pno)/\(doc.pageCount)") }
+    }
+    return out
 }
 
 /// 本地 OpenAI 兼容接口读一页。长边缩到 1792，提示词用 PaddleOCR-VL 的 "OCR:"。

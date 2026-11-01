@@ -18,6 +18,15 @@ public struct ReportPDF: Sendable {
     public init() {}
 }
 
+/// 一次上传。在线读字时逐页写进报告。
+public struct UploadRow: Sendable {
+    public let time: String, host: String, model: String, page: Int, bytes: Int, status: String
+
+    public init(time: String, host: String, model: String, page: Int, bytes: Int, status: String) {
+        self.time = time; self.host = host; self.model = model; self.page = page; self.bytes = bytes; self.status = status
+    }
+}
+
 public struct ReportInput: Sendable {
     public var source: String
     public var sourceSize: Int
@@ -34,6 +43,7 @@ public struct ReportInput: Sendable {
     public var singleEnginePages: [Int] = []
     public var srcPages: Int?
     public var vlm: [VLMPageReport] = []
+    public var uploads: [UploadRow] = []
 
     public init(source: String, sourceSize: Int, mdPath: String?, pdfPath: String?, fusedPath: String,
                 generatedAt: String, dpi: Double, fused: FusedDoc, log: FuseLog) {
@@ -213,6 +223,16 @@ public func buildReport(_ r: ReportInput) -> String {
         }
     }
     A()
+
+    // ---- 上传记录 ----
+    if !r.uploads.isEmpty {
+        H("上传记录")
+        A("页面图片被上传到了以下服务商, 这是逐次记录:")
+        A("")
+        A("| 时间 | 域名 | 模型 | 页 | 字节 | 结果 |")
+        A("|---|---|---|---|---|---|")
+        for u in r.uploads { A("| \(u.time) | \(u.host) | \(u.model) | \(u.page) | \(u.bytes) | \(u.status) |") }
+    }
 
     // ---- VLM ----
     if !r.vlm.isEmpty {

@@ -1,4 +1,5 @@
 import Foundation
+import OCREngines
 import OCRProviders
 
 // provider 子命令。联网默认关：--allow-network 开总开关，点名的服务商才算用户选中。
@@ -26,6 +27,66 @@ private func makeProber(_ p: ProviderPreset, _ args: [String]) throws -> Capabil
     selection.select(p.id)      // 命令行点名就是用户选中，只在这次运行有效
     let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(allowed: true), selection: selection, gate: UploadGate())
     return CapabilityProber(transport: t, endpoint: try Endpoint(p.baseURL), providerID: p.id, key: key)
+}
+
+/// book 的在线读字。在做任何 OCR 之前走完确认；不确认就退出，一页都不处理。
+func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) throws {
+    guard args.contains("--allow-network") else { fail("联网默认关闭: 在线读字要显式加 --allow-network", code: 2) }
+    guard let p = ProviderPresets.find(id), let model = option(args, "--vlm-model") else { fail("--vlm-provider 要配 --vlm-model，服务商见 ocr-cli provider list", code: 2) }
+    guard p.dialect == .openAICompatible else { fail("\(p.name) 的适配还没有做", code: 2) }
+    let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().load(p.id)
+    guard let key else { fail("没有 \(p.id) 的 Key: 先跑 ocr-cli provider key set \(p.id)", code: 2) }
+    let endpoint = try Endpoint(p.baseURL)
+    let stem = o.pdf.deletingPathExtension().lastPathComponent
+    let dir = o.workdir.appendingPathComponent("\(stem).upload", isDirectory: true)
+    let pages = try prepareOnlinePages(pdf: o.pdf, model: model, maxEdge: 1792, forceOCR: o.forceOCR, into: dir, log: warn)
+    let m = onlineManifest(pages, providerID: p.id, providerName: p.name, host: endpoint.host, model: model)
+    print("""
+    将上传页面图片到非本机地址:
+      服务商: \(p.name)  域名: \(endpoint.host)  模型: \(model)
+      文件: \(o.pdf.lastPathComponent)
+      最多 \(pages.count) 页，共 \(String(format: "%.1f", Double(m.totalBytes) / 1_048_576)) MB（有分歧的页才真正发送），请求约 \(m.estimatedRequests) 次，费用未知
+      清单 sha256: \(m.sha256)
+    """)
+    let gate = UploadGate()
+    let confirm = option(args, "--confirm-upload")
+    func stop(_ msg: String) -> Never {
+        try? FileManager.default.removeItem(at: dir)      // 请求体里是页面图片，不留
+        fail(msg, code: 3)
+    }
+    let interactive = isatty(STDIN_FILENO) == 1
+    let ticket: UploadTicket
+    if let confirm {
+        do {
+            ticket = try await_ {
+                await gate.request(m)
+                return try await gate.confirm(manifestSHA256: confirm)
+            }
+        } catch { stop("清单 sha256 不符，任务不开始") }
+    } else if interactive {
+        print("确认上传请手动输入完整域名（\(endpoint.host)），其他输入取消: ", terminator: "")
+        let ok = readLine(strippingNewline: true) == endpoint.host
+        guard ok else { stop("未确认，任务不开始") }
+        ticket = try await_ {
+            await gate.request(m)
+            return try await gate.confirm(checkbox: true, scope: .once)
+        }
+    } else {
+        stop("未确认，任务不开始。非交互运行请加 --confirm-upload <上面的清单 sha256>")
+    }
+    let selection = ProviderSelection()
+    selection.select(p.id)
+    let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(allowed: true), selection: selection, gate: gate)
+    let uploads = o.outdir.appendingPathComponent("\(stem).uploads.jsonl")
+    try FileManager.default.createDirectory(at: o.outdir, withIntermediateDirectories: true)
+    let reader = OnlineReader(transport: t, endpoint: endpoint, providerID: p.id, model: model, key: key, ticket: ticket, ledger: try FileLedger(uploads))
+    let byPage = Dictionary(uniqueKeysWithValues: pages.map { ($0.page, $0) })
+    o.uploadsPath = uploads
+    o.uploadBodies = dir
+    o.vlmOnline = { pno in
+        guard let page = byPage[pno] else { throw OnlineError.emptyReply }
+        return try await_ { try await reader.read(page) }
+    }
 }
 
 func runProvider(_ args: [String]) throws {
