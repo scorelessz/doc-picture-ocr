@@ -1,0 +1,38 @@
+{
+ "phase": "p5",
+ "name": "vlm-block",
+ "en": {
+  "pages": 9,
+  "crops": 23,
+  "whole_seconds": 98.4,
+  "block_seconds": 98.2,
+  "cer_two_engine": 0.00499,
+  "cer_whole": 0.00449,
+  "cer_block": 0.00429,
+  "flips_whole": 5,
+  "flips_block": 7,
+  "orphans_whole": 0,
+  "orphan_chars_whole": 0,
+  "orphans_block": 3,
+  "orphan_chars_block": 103,
+  "crops_over_length": 0,
+  "crops_looped": 0
+ },
+ "zh": {
+  "pages": 15,
+  "crops": 38,
+  "whole_seconds": 153.3,
+  "block_seconds": 237.0,
+  "cer_two_engine": 0.0049,
+  "cer_whole": 0.00397,
+  "cer_block": 0.0042,
+  "flips_whole": 6,
+  "flips_block": 5,
+  "orphans_whole": 0,
+  "orphan_chars_whole": 0,
+  "orphans_block": 0,
+  "orphan_chars_block": 0,
+  "crops_over_length": 0,
+  "crops_looped": 0
+ }
+}
