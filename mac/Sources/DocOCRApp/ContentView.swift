@@ -36,6 +36,21 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            // 测加入文件后界面是否还活着：脚本用
+            if let i = CommandLine.arguments.firstIndex(of: "--ui-add") {
+                queue.add([URL(fileURLWithPath: CommandLine.arguments[i + 1])])
+            }
+            // 把真实窗口的内容存成图后退出。不用录屏权限，只有本窗口。
+            if let i = CommandLine.arguments.firstIndex(of: "--window-shot") {
+                let path = CommandLine.arguments[i + 1]
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    if let v = NSApplication.shared.windows.first(where: { $0.isVisible })?.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) {
+                        v.cacheDisplay(in: v.bounds, to: rep)
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                    }
+                    NSApplication.shared.terminate(nil)
+                }
+            }
             // 测启动时间：窗口出现时写时间戳后退出
             if let i = CommandLine.arguments.firstIndex(of: "--startup-file") {
                 try? String(Date().timeIntervalSince1970).write(toFile: CommandLine.arguments[i + 1], atomically: true, encoding: .utf8)
@@ -186,13 +201,18 @@ struct QueueView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            dropZone
-            if !queue.jobs.isEmpty { jobsList }
-            options
-            footer
+        // 不能用 List：放在高度不定的容器里，它会把窗口内容撑到两千多点，整个界面变成空白
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    dropZone
+                    if !queue.jobs.isEmpty { jobsList }
+                    options
+                }.padding()
+            }
+            Divider()
+            footer.padding(12)
         }
-        .padding()
         .navigationTitle("处理队列")
     }
 
@@ -218,20 +238,23 @@ struct QueueView: View {
     }
 
     private var jobsList: some View {
-        List(queue.jobs) { j in
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(j.pdf.lastPathComponent).lineLimit(1)
-                    JobStatusView(status: j.status)
+        GroupBox("文件") {
+            VStack(spacing: 8) {
+                ForEach(queue.jobs) { j in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(j.pdf.lastPathComponent).lineLimit(1)
+                            JobStatusView(status: j.status)
+                        }
+                        Spacer()
+                        if let o = j.record?.outputs.first {
+                            Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: o)]) }
+                        }
+                        if !queue.isRunning { Button { queue.remove(j.id) } label: { Image(systemName: "xmark") }.buttonStyle(.borderless) }
+                    }
                 }
-                Spacer()
-                if let o = j.record?.outputs.first {
-                    Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: o)]) }
-                }
-                if !queue.isRunning { Button { queue.remove(j.id) } label: { Image(systemName: "xmark") }.buttonStyle(.borderless) }
-            }
+            }.padding(4)
         }
-        .frame(minHeight: 120)
     }
 
     private var options: some View {

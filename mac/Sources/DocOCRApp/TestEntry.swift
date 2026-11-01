@@ -163,6 +163,10 @@ enum TestEntry {
         }
         render(wrap(OnboardingView()), CGSize(width: 520, height: 240), dir.appendingPathComponent("onboarding.png"))
         render(wrap(QueueView()), CGSize(width: 760, height: 560), dir.appendingPathComponent("queue-offline.png"))
+        env.queue.adjudicateOn = true
+        render(wrap(QueueView()), CGSize(width: 620, height: 450), dir.appendingPathComponent("queue-small.png"))
+        render(wrap(ContentView()), CGSize(width: 860, height: 600), dir.appendingPathComponent("content-min.png"))
+        env.queue.adjudicateOn = false
         render(wrap(ProvidersTab()), CGSize(width: 700, height: 520), dir.appendingPathComponent("providers-offline.png"))
         render(wrap(ModelsTab()), CGSize(width: 700, height: 520), dir.appendingPathComponent("models.png"))
         render(wrap(DiagnosticsTab()), CGSize(width: 700, height: 520), dir.appendingPathComponent("diagnostics.png"))
