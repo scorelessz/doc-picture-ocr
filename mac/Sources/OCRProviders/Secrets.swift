@@ -101,23 +101,55 @@ public final class MemorySecretStore: SecretStore, @unchecked Sendable {
 #if canImport(Security)
 import Security
 
+/// 当前程序的 cdhash。ad-hoc 签名没有稳定身份，这就是它的身份。
+public func codeIdentity() -> String {
+    var code: SecCode?, sc: SecStaticCode?, info: CFDictionary?
+    guard SecCodeCopySelf([], &code) == errSecSuccess, let code, SecCodeCopyStaticCode(code, [], &sc) == errSecSuccess, let sc,
+          SecCodeCopySigningInformation(sc, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
+          let d = (info as? [String: Any])?[kSecCodeInfoUnique as String] as? Data else { return "unknown" }
+    return d.map { String(format: "%02x", $0) }.joined()
+}
+
 /// 只存本机，不进 iCloud 钥匙串和备份。ocr-cli 和 App 读写同一套条目。
+///
+/// 这类条目绑定写入者的 cdhash。别的构建读它时系统会弹授权框，kSecUseAuthenticationUIFail 拦不住（实测），
+/// 所以不能靠试读判断状态：写入时把 cdhash 记进条目属性，读属性不用解密、不弹框。
 public struct KeychainStore: SecretStore {
     public static let defaultService = "com.dococr.provider"
-    let service: String
+    let service: String, identity: String, granted: UserDefaults
 
-    public init(service: String = KeychainStore.defaultService) { self.service = service }
+    public init(service: String = KeychainStore.defaultService, identity: String = codeIdentity(), granted: UserDefaults = .standard) {
+        self.service = service; self.identity = identity; self.granted = granted
+    }
 
     private func query(_ id: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
          kSecAttrAccount as String: id, kSecAttrSynchronizable as String: false]
     }
 
-    private func read(_ id: String, ui: Bool) throws -> SecretKey? {
+    private func grantKey(_ id: String) -> String { "keychainGranted.\(service).\(id)" }
+
+    private func attributes(_ id: String) throws -> (date: Date?, writer: String?)? {
+        var q = query(id)
+        q[kSecReturnAttributes as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        let st = SecItemCopyMatching(q as CFDictionary, &out)
+        if st == errSecItemNotFound { return nil }
+        guard st == errSecSuccess else { throw SecretError.keychain(st) }
+        let a = out as? [String: Any]
+        return (a?[kSecAttrModificationDate as String] as? Date, (a?[kSecAttrGeneric as String] as? Data).map { String(decoding: $0, as: UTF8.self) })
+    }
+
+    /// 这个程序写的，或用户授权过这个程序
+    private func mayRead(_ a: (date: Date?, writer: String?)?, _ id: String) -> Bool {
+        a?.writer == identity || granted.string(forKey: grantKey(id)) == identity
+    }
+
+    private func read(_ id: String) throws -> SecretKey? {
         var q = query(id)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
-        if !ui { q[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail }
         var out: CFTypeRef?
         let st = SecItemCopyMatching(q as CFDictionary, &out)
         if st == errSecItemNotFound { return nil }
@@ -126,49 +158,52 @@ public struct KeychainStore: SecretStore {
         return SecretKey(String(decoding: d, as: UTF8.self))
     }
 
-    public func load(_ id: String) throws -> SecretKey? { try read(id, ui: false) }
-    public func loadAuthorizing(_ id: String) throws -> SecretKey? { try read(id, ui: true) }
+    public func load(_ id: String) throws -> SecretKey? {
+        guard let a = try attributes(id) else { return nil }
+        guard mayRead(a, id) else { throw SecretError.needsReentry }     // 不试读：试读就会弹框
+        return try read(id)
+    }
 
-    /// 属性不需要解密，查它不会弹框
-    private func modified(_ id: String) throws -> (exists: Bool, date: Date?) {
-        var q = query(id)
-        q[kSecReturnAttributes as String] = true
-        q[kSecMatchLimit as String] = kSecMatchLimitOne
-        q[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
-        var out: CFTypeRef?
-        let st = SecItemCopyMatching(q as CFDictionary, &out)
-        if st == errSecItemNotFound { return (false, nil) }
-        guard st == errSecSuccess else { throw SecretError.keychain(st) }
-        return (true, (out as? [String: Any])?[kSecAttrModificationDate as String] as? Date)
+    public func loadAuthorizing(_ id: String) throws -> SecretKey? {
+        let k = try read(id)
+        if k != nil { granted.set(identity, forKey: grantKey(id)) }
+        return k
     }
 
     public func state(_ id: String) throws -> KeyState {
-        let m = try modified(id)
-        guard m.exists else { return .none }
-        do {
-            guard let k = try load(id) else { return .none }
-            return .of(k.value, modified: m.date)
-        } catch SecretError.needsReentry {
-            return .needsAuthorization(modified: m.date)
-        }
+        guard let a = try attributes(id) else { return .none }
+        guard mayRead(a, id), let k = try read(id) else { return .needsAuthorization(modified: a.date) }
+        return .of(k.value, modified: a.date)
     }
 
     @discardableResult public func save(_ key: String, for id: String) throws -> Bool {
-        let had = try modified(id).exists
+        let had = try attributes(id) != nil
         try delete(id)
         var q = query(id)
         q[kSecValueData as String] = Data(key.utf8)
+        q[kSecAttrGeneric as String] = Data(identity.utf8)
         q[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         let st = SecItemAdd(q as CFDictionary, nil)
         guard st == errSecSuccess else { throw SecretError.keychain(st) }
+        granted.removeObject(forKey: grantKey(id))
         return had
     }
 
     public func delete(_ id: String) throws {
-        var q = query(id)
-        q[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
-        let st = SecItemDelete(q as CFDictionary)
-        guard st == errSecSuccess || st == errSecItemNotFound else { throw SecretError.cannotDelete(st) }
+        let st = SecItemDelete(query(id) as CFDictionary)
+        if st == errSecSuccess || st == errSecItemNotFound { return }
+        // 别的构建写的条目，这个程序没有删除权限（-25244）。系统的 security 工具不受这个限制。
+        guard st == errSecInvalidOwnerEdit else { throw SecretError.cannotDelete(st) }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        p.arguments = ["delete-generic-password", "-s", service, "-a", id]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do {
+            try p.run()
+            p.waitUntilExit()
+        } catch { throw SecretError.cannotDelete(st) }
+        guard p.terminationStatus == 0 else { throw SecretError.cannotDelete(st) }
     }
 }
 #endif

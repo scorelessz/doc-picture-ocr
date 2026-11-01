@@ -22,7 +22,7 @@ private func await_<T: Sendable>(_ f: @escaping @Sendable () async throws -> T) 
 
 private func makeProber(_ p: ProviderPreset, _ args: [String]) throws -> CapabilityProber {
     guard p.dialect == .openAICompatible else { fail("\(p.name) 的适配还没有做", code: 2) }
-    let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().load(p.id)
+    let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().loadAuthorizing(p.id)
     guard let key else { fail("没有 \(p.id) 的 Key: 先跑 ocr-cli provider key set \(p.id)", code: 2) }
     let selection = ProviderSelection()
     selection.select(p.id)      // 命令行点名就是用户选中，只在这次运行有效
@@ -35,7 +35,7 @@ func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) t
     guard args.contains("--allow-network") else { fail("联网默认关闭: 在线读字要显式加 --allow-network", code: 2) }
     guard let p = ProviderPresets.find(id), let model = option(args, "--vlm-model") else { fail("--vlm-provider 要配 --vlm-model，服务商见 ocr-cli provider list", code: 2) }
     guard p.dialect == .openAICompatible else { fail("\(p.name) 的适配还没有做", code: 2) }
-    let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().load(p.id)
+    let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().loadAuthorizing(p.id)
     guard let key else { fail("没有 \(p.id) 的 Key: 先跑 ocr-cli provider key set \(p.id)", code: 2) }
     let plan = try OnlinePlan.prepare(preset: p, model: model, pdf: o.pdf, forceOCR: o.forceOCR, workdir: o.workdir, log: warn)
     let (endpoint, pages, m, dir) = (plan.endpoint, plan.pages, plan.manifest, plan.bodies)
@@ -86,7 +86,7 @@ func runAdjudicate(_ args: [String]) throws {
     guard let mode = AdjudicationMode(rawValue: option(args, "--mode") ?? "image") else { fail(usage) }
     guard p.dialect == .openAICompatible else { fail("\(p.name) 的适配还没有做", code: 2) }
     if FileManager.default.fileExists(atPath: out), !args.contains("--force") { fail("\(out) 已存在, 拒绝覆盖（要覆盖请加 --force）") }
-    let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().load(p.id)
+    let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().loadAuthorizing(p.id)
     guard let key else { fail("没有 \(p.id) 的 Key: 先跑 ocr-cli provider key set \(p.id)", code: 2) }
     let doc = try JSONDecoder().decode(FusedDoc.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
     let pages = option(args, "--pages").map { Set($0.split(separator: ",").compactMap { Int($0) }) }
