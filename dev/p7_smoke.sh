@@ -4,6 +4,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 [[ $# -eq 2 ]] || { echo "用法: $0 英文书.pdf 中文书.pdf"; exit 2; }
+source dev/guard_instances.sh
 swift build -c release 2>&1 | tail -1
 W=work/p7/smoke; rm -rf $W; mkdir -p $W/out $W/cancel
 .venv/bin/python - "$1" "$2" "$W" <<'P'

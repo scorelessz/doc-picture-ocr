@@ -44,6 +44,11 @@ macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE 
 | `provider_refused` | warn | `reason` `host` `provider` 或 `item` |
 | `redirect_blocked` | warn | `from` `to` |
 | `upload_mismatch` | error | `detail` |
+| `app_start` | info | `pid` `path` `version` `commit` |
+| `app_exit` | info | `pid`（正常退出） |
+| `app_signal` | warn | `signal`（SIGTERM、SIGHUP） |
+| `app_exception` | error | `name` `reason` |
+| `provider_test_start` / `provider_test_end` | info | `provider` `model` / `provider` `result` |
 | `probe_rung` | debug | `edge` `want` `digits` `reply_chars`（只有合成图的随机码） |
 | `probe_result` | info | `host` `model` `supports_image` `max_long_edge` `response_format` |
 | `orientation` | debug | `rotation` `conf0` `best` |

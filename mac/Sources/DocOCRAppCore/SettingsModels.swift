@@ -241,6 +241,7 @@ public final class ProviderSettings: ObservableObject {
         guard canTest(p), let model = models[p.id], let ep = try? Endpoint(p.baseURL) else { return }
         testing.insert(p.id)
         result[p.id] = "测试中…（只发程序生成的合成图）"
+        Log.shared.info("provider_test_start", ["provider": .s(p.id), "model": .s(model)])
         let prober = CapabilityProber(transport: app.transport, endpoint: ep, providerID: p.id, key: try? app.secrets.load(p.id))
         let dir = profileDir
         Task {
@@ -253,6 +254,7 @@ public final class ProviderSettings: ObservableObject {
             } catch { text = "失败: \(error)" }
             testing.remove(p.id)
             result[p.id] = text
+            Log.shared.info("provider_test_end", ["provider": .s(p.id), "result": .s(text)])
         }
     }
 }

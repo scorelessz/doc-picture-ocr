@@ -1,5 +1,6 @@
 import AppKit
 import DocOCRAppCore
+import OCRCore
 import OCREngines
 import OCRProviders
 import SwiftUI
@@ -15,6 +16,31 @@ final class Env: ObservableObject {
         models = ModelManager()
         providers = ProviderSettings(app: app, store: store)
         diagnostics = DiagnosticsModel()
+        ExitTrace.install()
+    }
+}
+
+/// 闪退排查：有 app_start 没有 app_exit、也没有崩溃报告，就是被 SIGKILL。SIGTERM、SIGHUP 和未捕获异常都留一行。
+enum ExitTrace {
+    nonisolated(unsafe) private static var sources: [DispatchSourceSignal] = []
+
+    static func install() {
+        let info = Bundle.main.infoDictionary
+        Log.shared.info("app_start", ["pid": .i(Int(getpid())), "path": .s(Bundle.main.executablePath ?? "?"),
+                                      "version": .s(info?["CFBundleShortVersionString"] as? String ?? "dev"),
+                                      "commit": .s(info?["DocOCRGitCommit"] as? String ?? "dev")])
+        atexit { Log.shared.info("app_exit", ["pid": .i(Int(getpid()))]) }
+        NSSetUncaughtExceptionHandler { e in Log.shared.error("app_exception", ["name": .s(e.name.rawValue), "reason": .s(e.reason ?? "")]) }
+        for sig in [SIGTERM, SIGHUP] {
+            signal(sig, SIG_IGN)
+            let s = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            s.setEventHandler {
+                Log.shared.warn("app_signal", ["signal": .i(Int(sig))])
+                exit(128 + sig)
+            }
+            s.resume()
+            sources.append(s)
+        }
     }
 }
 
@@ -26,7 +52,7 @@ struct DocOCRApp: App {
         NSApplication.shared.setActivationPolicy(.regular)     // swift run 启动时没有 bundle，要手动成为前台 App
         DispatchQueue.main.async { NSApplication.shared.activate(ignoringOtherApps: true) }
         let a = CommandLine.arguments
-        if a.contains("--smoke") || a.contains("--snapshot") || a.contains("--keychain-test") {
+        if a.contains("--smoke") || a.contains("--snapshot") || a.contains("--keychain-test") || a.contains("--test-connection") {
             DispatchQueue.main.async { Task { @MainActor in await TestEntry.run(a) } }
         }
     }

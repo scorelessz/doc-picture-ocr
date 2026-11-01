@@ -5,6 +5,7 @@ import SwiftUI
 
 // 测试入口，脚本用：
 //   --smoke <outdir> a.pdf b.pdf [--cancel-after 秒]   用和界面相同的 QueueModel 跑完，写 smoke.json 后退出
+//   --test-connection <服务商> <结果文件>
 //   --keychain-test write|read|state|overwrite|delete <结果文件>
 //   --snapshot <dir>               把各界面渲染成 PNG 后退出
 
@@ -17,7 +18,9 @@ final class MemoryStore: KVStore {
 @MainActor
 enum TestEntry {
     static func run(_ a: [String]) async {
-        if let i = a.firstIndex(of: "--keychain-test"), i + 2 < a.count {
+        if let i = a.firstIndex(of: "--test-connection"), i + 2 < a.count {
+            await testConnection(a[i + 1], out: URL(fileURLWithPath: a[i + 2]))
+        } else if let i = a.firstIndex(of: "--keychain-test"), i + 2 < a.count {
             keychain(a[i + 1], out: URL(fileURLWithPath: a[i + 2]))
         } else if let i = a.firstIndex(of: "--smoke"), i + 1 < a.count {
             await smoke(out: URL(fileURLWithPath: a[i + 1]), pdfs: a[(i + 2)...].filter { $0.hasSuffix(".pdf") }.map { URL(fileURLWithPath: $0) })
@@ -53,6 +56,22 @@ enum TestEntry {
             }
         } catch { r = "错误: \(error)" }
         try? r.write(to: out, atomically: true, encoding: .utf8)
+    }
+
+    /// 走和「测试连接」按钮相同的 ProviderSettings.test，只发合成图。Key 从 stdin 读，只放内存。
+    private static func testConnection(_ id: String, out: URL) async {
+        guard let p = ProviderPresets.find(id), let key = readLine() else { return }
+        let s = MemorySecretStore()
+        try? s.save(key, for: id)
+        let store = MemoryStore(), dir = out.deletingLastPathComponent().appendingPathComponent("prof")
+        let app = AppModel(store: store, secrets: s)
+        app.allowNetwork()
+        app.setSelected(p, true)
+        let m = ProviderSettings(app: app, store: store, profileDir: dir)
+        await m.refreshModels(p)
+        m.test(p)
+        while m.testing.contains(id) { try? await Task.sleep(nanoseconds: 50_000_000) }
+        try? (m.result[id] ?? "无结果").write(to: out, atomically: true, encoding: .utf8)
     }
 
     private static func smoke(out: URL, pdfs: [URL]) async {
