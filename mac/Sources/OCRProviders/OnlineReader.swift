@@ -29,12 +29,12 @@ public enum ChatBody {
     }
 }
 
-/// 清单：列的是所有可能上传的页，是上界。字节上限给重试留一半余量。
+/// 清单：列的是所有可能上传的页，是上界。429 的请求体也算发出过，字节上限按每页最多重试次数算，否则一页被限流就会让整张票失效。
 public func onlineManifest(_ pages: [OnlinePage], providerID: String, providerName: String, host: String, model: String) -> UploadManifest {
     let items = pages.map { UploadItem(id: $0.id, sourceFile: $0.sourceFile, page: $0.page, bytes: $0.bytes) }
     let total = items.map(\.bytes).reduce(0, +)
     return UploadManifest(providerID: providerID, providerName: providerName, host: host, model: model, items: items,
-                          estimatedRequests: items.count, byteLimit: total + total / 2)
+                          estimatedRequests: items.count, byteLimit: total * OnlineReader.maxRateLimitAttempts)
 }
 
 public struct UploadRecord: Sendable, Codable, Equatable {
@@ -85,18 +85,21 @@ public enum OnlineError: Error, Equatable {
     case http(Int), emptyReply
 }
 
-/// 一家服务商、一张票据。没有备选服务商这个概念。
+/// 一家服务商、一张票据。没有备选服务商这个概念。并发请求共用这张票，每次都先写记录再发。
 public final class OnlineReader: @unchecked Sendable {
-    static let maxAttempts = 3
+    static let maxAttempts = 3, maxRateLimitAttempts = 5
+    static let maxWait = 120.0
     let transport: HTTPTransport, endpoint: Endpoint, providerID: String, model: String, key: SecretKey?
-    let ticket: UploadTicket, ledger: UploadLedger, backoff: @Sendable (Int) async -> Void
+    let ticket: UploadTicket, ledger: UploadLedger, sleep: @Sendable (Double) async -> Void
+    public let limiter: ConcurrencyLimiter
     private let lock = NSLock()
     private var seq = Int(Date().timeIntervalSince1970 * 1000)    // 同一份记录文件可能有多个 reader 写
 
     public init(transport: HTTPTransport, endpoint: Endpoint, providerID: String, model: String, key: SecretKey?, ticket: UploadTicket,
-                ledger: UploadLedger, backoff: @escaping @Sendable (Int) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0) * 2_000_000_000) }) {
+                ledger: UploadLedger, jobs: Int = 1, sleep: @escaping @Sendable (Double) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1e9)) }) {
         self.transport = transport; self.endpoint = endpoint; self.providerID = providerID; self.model = model
-        self.key = key; self.ticket = ticket; self.ledger = ledger; self.backoff = backoff
+        self.key = key; self.ticket = ticket; self.ledger = ledger; self.sleep = sleep
+        limiter = ConcurrencyLimiter(limit: jobs)
     }
 
     private func nextSeq() -> Int {
@@ -106,45 +109,61 @@ public final class OnlineReader: @unchecked Sendable {
         return seq
     }
 
-    private func retryable(_ status: Int) -> Bool { status == 429 || (500..<600).contains(status) }
+    private func logRequest(_ p: OnlinePage, bytes: Int, seconds: Double, status: Int, first: Double?) {
+        func r(_ v: Double) -> Double { (v * 1000).rounded() / 1000 }
+        Log.shared.info("online_request", ["provider": .s(providerID), "model": .s(model), "page": .i(p.page), "item": .s(p.id), "bytes": .i(bytes),
+                                           "first_byte_seconds": first.map { .d(r($0)) } ?? .null, "seconds": .d(r(seconds)), "status": .i(status)])
+    }
 
     public func read(_ p: OnlinePage) async throws -> String {
         let body = try Data(contentsOf: p.body)
-        var lastError: Error = OnlineError.emptyReply
         var scope = "once"
         if case .batch = ticket.scope { scope = "batch" }
-        for attempt in 1...Self.maxAttempts {
+        var attempt = 0
+        while true {
+            attempt += 1
             var rec = UploadRecord(seq: nextSeq(), time: Date(), host: endpoint.host, provider: providerID, model: model,
                                    ticket: String(ticket.id.uuidString.prefix(8)), scope: scope, page: p.page, item: p.id,
                                    bytes: body.count, status: "pending")
             try ledger.write(rec)       // 先写后发，崩溃也不漏记
+            let t0 = Date()
+            let reply: HTTPReply
             do {
-                let r = try await transport.send(OutboundRequest(endpoint: endpoint, providerID: providerID, path: "chat/completions",
+                reply = try await transport.send(OutboundRequest(endpoint: endpoint, providerID: providerID, path: "chat/completions",
                                                                  payload: .userData(body: body, ticket: ticket, itemID: p.id), key: key))
-                if r.status == 200, let t = ChatBody.text(r.body), !t.isEmpty {
-                    rec.status = "ok"
-                    try ledger.write(rec)
-                    return t
-                }
-                lastError = r.status == 200 ? OnlineError.emptyReply : OnlineError.http(r.status)
-                rec.status = "failed:http_\(r.status)"
-                try ledger.write(rec)
-                guard retryable(r.status), attempt < Self.maxAttempts else { throw lastError }
             } catch let e as URLError {
-                lastError = e
+                logRequest(p, bytes: body.count, seconds: Date().timeIntervalSince(t0), status: 0, first: nil)
                 rec.status = "failed:url_\(e.errorCode)"
                 try ledger.write(rec)
                 guard attempt < Self.maxAttempts else { throw e }
-            } catch let e as OnlineError {
-                throw e
+                await sleep(pow(2, Double(attempt)))
+                continue
             } catch {
                 rec.status = "failed:\(error)"      // 策略拒绝：不重试
                 try ledger.write(rec)
                 throw error
             }
-            await backoff(attempt)
+            logRequest(p, bytes: body.count, seconds: Date().timeIntervalSince(t0), status: reply.status, first: reply.firstByteSeconds)
+            if reply.status == 200, let t = ChatBody.text(reply.body), !t.isEmpty {
+                await limiter.succeeded()
+                rec.status = "ok"
+                try ledger.write(rec)
+                return t
+            }
+            rec.status = "failed:http_\(reply.status)"
+            try ledger.write(rec)
+            if reply.status == 429 {
+                let k = await limiter.rateLimited()
+                guard attempt < Self.maxRateLimitAttempts else { throw OnlineError.http(429) }
+                let wait = min(Self.maxWait, retryAfterSeconds(reply.retryAfter) ?? pow(2, Double(attempt)))
+                Log.shared.warn("rate_limited", ["provider": .s(providerID), "page": .i(p.page), "wait_seconds": .d(wait), "jobs": .i(k)])
+                await sleep(wait)
+                continue
+            }
+            let err: OnlineError = reply.status == 200 ? .emptyReply : .http(reply.status)
+            guard (500..<600).contains(reply.status), attempt < Self.maxAttempts else { throw err }
+            await sleep(pow(2, Double(attempt)))
         }
-        throw lastError
     }
 }
 #endif

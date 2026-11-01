@@ -44,7 +44,7 @@ final class OnlineReaderTests: XCTestCase {
         await g.request(onlineManifest(pages, providerID: "p", providerName: "P", host: host, model: "m"))
         let tk = try await g.confirm(checkbox: true, scope: .once)
         return (OnlineReader(transport: t, endpoint: try Endpoint("https://\(host)/v1"), providerID: "p", model: "m", key: nil,
-                             ticket: tk, ledger: ledger, backoff: { _ in }), w)
+                             ticket: tk, ledger: ledger, sleep: { _ in }), w)
     }
 
     func testReadsAndRecords() async throws {
@@ -82,7 +82,7 @@ final class OnlineReaderTests: XCTestCase {
             _ = try await r.read(p)
             XCTFail()
         } catch { }
-        XCTAssertLessThanOrEqual(w.count, OnlineReader.maxAttempts)
+        XCTAssertEqual(w.count, OnlineReader.maxAttempts)
         XCTAssertEqual(Set(w.requests.compactMap { $0.url?.host }), [host], "失败绝不换家")
     }
 
@@ -182,7 +182,7 @@ final class LogLeakTests: XCTestCase {
             await g.request(onlineManifest([page], providerID: "p", providerName: "P", host: "api.example.com", model: "m"))
             let tk = try await g.confirm(checkbox: true, scope: .once)
             let r = OnlineReader(transport: t, endpoint: try Endpoint("https://api.example.com/v1"), providerID: "p", model: "m",
-                                 key: SecretKey(canary), ticket: tk, ledger: try FileLedger(dir.appendingPathComponent("u.jsonl")), backoff: { _ in })
+                                 key: SecretKey(canary), ticket: tk, ledger: try FileLedger(dir.appendingPathComponent("u.jsonl")), sleep: { _ in })
             _ = try await r.read(page)
             XCTAssertEqual(w.requests[0].value(forHTTPHeaderField: "Authorization"), "Bearer \(canary)")
             _ = try Log.shared.configure(["--log-level", "error"], env: [:])

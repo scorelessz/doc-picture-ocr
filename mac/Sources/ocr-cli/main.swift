@@ -33,7 +33,7 @@ usage:
   ocr-cli models fetch [--models-dir dir] [--url u] [--sha256 h]
   ocr-cli models fetch --vl [--models-dir dir] [--url 基址]
   ocr-cli adjudicate <fused.json> --provider id --model m --out o.json --allow-network [--mode image|text] [--pdf p]
-                     [--pages 1,2] [--confirm-upload 清单sha256] [--key-stdin] [--force]
+                     [--pages 1,2] [--online-jobs 1-8] [--confirm-upload 清单sha256] [--key-stdin] [--force]
   ocr-cli verify-uploads <report.md> <uploads.jsonl>
   ocr-cli provider list
   ocr-cli provider key set|status|delete <id>   Key 从 stdin 读，不接受参数
@@ -44,7 +44,7 @@ usage:
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
                [--paddle coreml|python] [--models-dir dir] [--units ane|all|cpu|gpu]
                [--vlm [--vl-model dir] [--vlm-all] | --vlm-url http://127.0.0.1:端口/v1 [--vlm-model 名]]
-               [--vlm-provider id --vlm-model 名 --allow-network [--confirm-upload 清单sha256] [--key-stdin]]
+               [--vlm-provider id --vlm-model 名 --allow-network [--online-jobs 1-8] [--confirm-upload 清单sha256] [--key-stdin]]
                [--python .venv/bin/python] [--result result.json]
 
 

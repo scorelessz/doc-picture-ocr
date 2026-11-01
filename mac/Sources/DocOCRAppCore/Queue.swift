@@ -72,10 +72,10 @@ public struct ConfirmRequest: Equatable, Sendable {
         case adjudication(lines: Int, chars: Int, crops: Int)
     }
 
-    public let manifest: UploadManifest, fileName: String, kind: Kind
+    public let manifest: UploadManifest, fileName: String, kind: Kind, jobs: Int
 
-    public init(manifest: UploadManifest, fileName: String, kind: Kind = .pages) {
-        self.manifest = manifest; self.fileName = fileName; self.kind = kind
+    public init(manifest: UploadManifest, fileName: String, kind: Kind = .pages, jobs: Int = OnlineJobs.default) {
+        self.manifest = manifest; self.fileName = fileName; self.kind = kind; self.jobs = jobs
     }
 
     public var providerName: String { manifest.providerName }
@@ -88,9 +88,9 @@ public struct ConfirmRequest: Equatable, Sendable {
     }
     public var contentText: String {
         switch kind {
-        case .pages: return "最多 \(pages) 页（有分歧的页才发送）"
+        case .pages: return "将上传 \(pages) 页，并发 \(jobs)（有分歧的页才真正发送）"
         case let .adjudication(n, m, k):
-            return "\(n) 处分歧，约 \(m) 字" + (k > 0 ? " / \(k) 张裁切图" : "，不传图片")
+            return "\(n) 处分歧，约 \(m) 字" + (k > 0 ? " / \(k) 张裁切图" : "，不传图片") + "，并发 \(jobs)"
         }
     }
     public var contentLabel: String { kind == .pages ? "页数" : "内容" }
@@ -123,7 +123,7 @@ private func blocking<T: Sendable>(_ f: @escaping @Sendable () async throws -> T
 }
 
 public struct BackendContext: Sendable {
-    public let transport: HTTPTransport, key: SecretKey?, vl: VLHandle?
+    public let transport: HTTPTransport, key: SecretKey?, vl: VLHandle?, onlineJobs: Int
 }
 
 /// 进程内 VLM 只载入一次，批次结束释放。
@@ -149,7 +149,7 @@ public struct LocalBackend: BookBackend {
         return try await Task.detached(priority: .userInitiated) {
             var o = opts
             if let vl = app.vl { o.vlmLocal = { vl.read($0, $1, $2) } }
-            if let plan, let ticket { try plan.attach(to: &o, transport: app.transport, key: app.key, ticket: ticket) }
+            if let plan, let ticket { try plan.attach(to: &o, transport: app.transport, key: app.key, ticket: ticket, jobs: app.onlineJobs) }
             return try runBook(o) { _ in }
         }.value
     }
@@ -335,7 +335,7 @@ public final class QueueModel: ObservableObject {
                     ticket = t
                 } else {
                     set(job.id, .awaitingConfirm)
-                    confirm = ConfirmRequest(manifest: p.manifest, fileName: job.pdf.lastPathComponent)
+                    confirm = ConfirmRequest(manifest: p.manifest, fileName: job.pdf.lastPathComponent, jobs: jobs(id))
                     let (ok, scope) = await withCheckedContinuation { self.answer = $0 }
                     confirm = nil
                     guard ok, let scope else {
@@ -388,7 +388,7 @@ public final class QueueModel: ObservableObject {
         record(rec)
         set(job.id, .running(stage: BookStage.ocr.rawValue, done: 0, total: 0))
         do {
-            let r = try await backend.run(o, plan: plan, ticket: ticket, app: BackendContext(transport: app.transport, key: key, vl: vl))
+            let r = try await backend.run(o, plan: plan, ticket: ticket, app: BackendContext(transport: app.transport, key: key, vl: vl, onlineJobs: jobs(onlineProviderID)))
             rec.state = "done"
             rec.outputs = r.outputs
             rec.report = r.outputs.first { $0.hasSuffix(".report.md") }
@@ -419,7 +419,8 @@ public final class QueueModel: ObservableObject {
 
     /// 本地 OCR 跑完后才知道有多少分歧。这里在工作线程上，问用户时界面不卡；不确认就只保留本地结果。
     private func adjudicationHook(job: Job, preset: ProviderPreset, key: SecretKey?, work: URL, uploads: URL) -> (FusedDoc) throws -> (FusedDoc, AdjudicationSummary)? {
-        let (backend, app, model, mode, id, pdf) = (backend, app, adjudicateModel, adjudicateMode, job.id, job.pdf)
+        let (backend, app, model, mode, id, pdf, flag) = (backend, app, adjudicateModel, adjudicateMode, job.id, job.pdf, cancelFlag)
+        let k = jobs(preset.id)
         let bodies = work.appendingPathComponent("adjudication", isDirectory: true)
         return { [weak self] doc in
             let plan = try blocking { try await backend.adjudicationPlan(doc: doc, pdf: pdf, preset: preset, model: model, mode: mode, bodies: bodies) }
@@ -429,8 +430,8 @@ public final class QueueModel: ObservableObject {
             guard let ticket else { return (doc, plan.declinedSummary()) }
             let transport = try blocking { await app.transport }
             let reader = OnlineReader(transport: transport, endpoint: plan.endpoint, providerID: preset.id, model: model, key: key,
-                                      ticket: ticket, ledger: try FileLedger(uploads))
-            let out = try blocking { await plan.run(doc, reader: reader) }
+                                      ticket: ticket, ledger: try FileLedger(uploads), jobs: k)
+            let out = try blocking { await plan.run(doc, reader: reader, isCancelled: { flag.value }) }
             return (out.doc, plan.summary(out))
         }
     }
@@ -440,7 +441,7 @@ public final class QueueModel: ObservableObject {
         if case .confirmed(let t) = st { return t }     // 同一批次、同一域名
         set(jobID, .awaitingConfirm)
         confirm = ConfirmRequest(manifest: plan.manifest, fileName: fileName,
-                                 kind: .adjudication(lines: plan.questions.count, chars: plan.chars, crops: plan.crops))
+                                 kind: .adjudication(lines: plan.questions.count, chars: plan.chars, crops: plan.crops), jobs: jobs(plan.preset.id))
         let (ok, scope) = await withCheckedContinuation { self.answer = $0 }
         confirm = nil
         set(jobID, .running(stage: BookStage.adjudicate.rawValue, done: 0, total: 0))
@@ -449,6 +450,11 @@ public final class QueueModel: ObservableObject {
             return nil
         }
         return try? await app.gate.confirm(checkbox: true, scope: scope)
+    }
+
+    /// 设置 → 服务商里每家单独设的并发数
+    private func jobs(_ id: String?) -> Int {
+        id.flatMap { prefs.string("jobs." + $0) }.flatMap(Int.init).map(OnlineJobs.clamp) ?? OnlineJobs.default
     }
 
     private func record(_ r: HistoryRecord) {

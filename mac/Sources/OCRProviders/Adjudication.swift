@@ -106,15 +106,42 @@ extension AdjudicationOutcome {
     }
 }
 
-/// 逐条裁决。鉴权之类的硬失败立刻停，其余条目保留本地读法；不换家，不退回别的方式。
+private final class StopFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var v = false
+    var value: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return v }
+        set { lock.lock(); v = newValue; lock.unlock() }
+    }
+}
+
+/// 逐条裁决，并发数看 reader。鉴权之类的硬失败立刻停，其余条目保留本地读法；不换家，不退回别的方式。结果按问题顺序写回。
 public func runAdjudication(_ doc: FusedDoc, questions: [AdjudicationQuestion], pages: [OnlinePage], mode: AdjudicationMode,
-                            reader: OnlineReader, providerID: String, model: String) async -> AdjudicationOutcome {
+                            reader: OnlineReader, providerID: String, model: String, isCancelled: @escaping @Sendable () -> Bool = { false }) async -> AdjudicationOutcome {
     var o = AdjudicationOutcome(doc: doc)
     let byID = Dictionary(uniqueKeysWithValues: pages.map { ($0.id, $0) })
-    for (n, q) in questions.enumerated() {
-        guard let p = byID[q.id] else { continue }
+    let todo = questions.filter { byID[$0.id] != nil }
+    let hard = StopFlag()
+    func soft(_ e: Error) -> Bool {
+        if case OnlineError.http(let c)? = e as? OnlineError, c == 429 || c >= 500 { return true }
+        return e is URLError || e as? OnlineError == .emptyReply
+    }
+    let results: [Result<String, Error>?] = await runConcurrently(todo, limiter: reader.limiter, shouldStop: { hard.value || isCancelled() }) { q in
         do {
-            let reply = try await reader.read(p)
+            return .success(try await reader.read(byID[q.id]!))
+        } catch {
+            if !soft(error) { hard.value = true }
+            return .failure(error)
+        }
+    }
+    for (q, r) in zip(todo, results) {
+        switch r {
+        case nil:
+            o.undecided["not_sent", default: 0] += 1
+        case .failure(let e)?:
+            o.undecided["request_failed", default: 0] += 1
+            if !soft(e), o.stoppedEarly == nil { o.stoppedEarly = "\(e)" }
+        case .success(let reply)?:
             let a = AdjudicationBody.parse(reply, order: q.order)
             var f: [String: LogValue] = ["page": .i(q.page), "item": .s(q.id), "evidence": .s(mode.evidence),
                                          "result": .s({ if case .chosen(let i) = a { return "chosen:\(i)" }; return "undecided" }())]
@@ -127,16 +154,9 @@ public func runAdjudication(_ doc: FusedDoc, questions: [AdjudicationQuestion], 
                     Adjudication(provider: providerID, model: model, evidence: mode.evidence, from: line.text))
                 o.chosen += 1
                 if i != 0 { o.changed += 1 }
-            case .undecided(let r):
-                o.undecided[r, default: 0] += 1
+            case .undecided(let why):
+                o.undecided[why, default: 0] += 1
             }
-        } catch {
-            o.undecided["request_failed", default: 0] += 1
-            if case OnlineError.http(let c)? = error as? OnlineError, c == 429 || c >= 500 { continue }
-            if error is URLError || error as? OnlineError == .emptyReply { continue }
-            o.stoppedEarly = "\(error)"
-            o.undecided["not_sent", default: 0] += questions.count - n - 1
-            break
         }
     }
     return o

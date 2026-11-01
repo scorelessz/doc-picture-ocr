@@ -136,6 +136,8 @@ struct ProvidersTab: View {
                     }
                     Button("删除") { providers.deleteKey(p.id) }.disabled(providers.keyState(p.id) == .none)
                 }
+                Stepper("并发数：\(providers.jobs(p.id))", value: Binding(get: { providers.jobs(p.id) }, set: { providers.setJobs($0, for: p.id) }), in: OnlineJobs.range)
+                    .help("同时发几个请求。设成 1 就是逐个发。被限流时会自动降低，不会换服务商。")
                 if !p.textOnly {
                     HStack {
                         ModelField(preset: p, text: Binding(get: { providers.models[p.id] ?? "" }, set: { providers.setModel($0, for: p.id) }))

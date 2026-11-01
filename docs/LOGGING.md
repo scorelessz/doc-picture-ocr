@@ -50,6 +50,8 @@ macOS 版本、磁盘、Vision、PDFKit、写权限、模型文件，以及 ANE 
 | `app_exception` | error | `name` `reason` |
 | `provider_test_start` / `provider_test_end` | info | `provider` `model` / `provider` `result` |
 | `provider_models` | info / warn | `provider` `ok` `count` 或 `reason` |
+| `online_request` | info | `provider` `model` `page` `item` `bytes` `first_byte_seconds` `seconds` `status`（0 表示没有收到响应） |
+| `rate_limited` | warn | `provider` `page` `wait_seconds` `jobs` |
 | `probe_rung` | debug | `edge` `want` `digits` `reply_chars`（只有合成图的随机码） |
 | `probe_result` | info | `host` `model` `supports_image` `max_long_edge` `response_format` |
 | `orientation` | debug | `rotation` `conf0` `best` |

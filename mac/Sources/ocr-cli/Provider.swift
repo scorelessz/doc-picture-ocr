@@ -30,6 +30,13 @@ private func makeProber(_ p: ProviderPreset, _ args: [String]) throws -> Capabil
     return CapabilityProber(transport: t, endpoint: try Endpoint(p.baseURL), providerID: p.id, key: key)
 }
 
+/// --online-jobs：默认 3，范围 1～8
+func onlineJobs(_ args: [String]) -> Int {
+    guard let v = option(args, "--online-jobs") else { return OnlineJobs.default }
+    guard let n = Int(v), OnlineJobs.range.contains(n) else { fail("--online-jobs 要在 1 到 8 之间", code: 2) }
+    return n
+}
+
 /// book 的在线读字。在做任何 OCR 之前走完确认；不确认就退出，一页都不处理。
 func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) throws {
     guard args.contains("--allow-network") else { fail("联网默认关闭: 在线读字要显式加 --allow-network", code: 2) }
@@ -43,7 +50,7 @@ func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) t
     将上传页面图片到非本机地址:
       服务商: \(p.name)  域名: \(endpoint.host)  模型: \(model)
       文件: \(o.pdf.lastPathComponent)
-      最多 \(pages.count) 页，共 \(String(format: "%.1f", Double(m.totalBytes) / 1_048_576)) MB（有分歧的页才真正发送），请求约 \(m.estimatedRequests) 次，费用未知
+      最多 \(pages.count) 页，共 \(String(format: "%.1f", Double(m.totalBytes) / 1_048_576)) MB（有分歧的页才真正发送），并发 \(onlineJobs(args))，请求约 \(m.estimatedRequests) 次，费用未知
       清单 sha256: \(m.sha256)
     """)
     let gate = UploadGate()
@@ -75,7 +82,7 @@ func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) t
     let selection = ProviderSelection()
     selection.select(p.id)
     let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(allowed: true), selection: selection, gate: gate)
-    try plan.attach(to: &o, transport: t, key: key, ticket: ticket)
+    try plan.attach(to: &o, transport: t, key: key, ticket: ticket, jobs: onlineJobs(args))
 }
 
 /// adjudicate 子命令：对做完的 fused.json 裁决分歧行。任务就是裁决本身，确认在第一个请求之前。
@@ -101,7 +108,7 @@ func runAdjudicate(_ args: [String]) throws {
     print("""
     将上传分歧行到非本机地址:
       服务商: \(p.name)  域名: \(endpoint.host)  模型: \(model)  方式: \(mode == .image ? "看图" : "仅文本")
-      \(qs.count) 处分歧，约 \(chars) 字\(mode == .image ? " / \(qs.count) 张裁切图" : "")，共 \(String(format: "%.2f", Double(m.totalBytes) / 1_048_576)) MB，费用未知
+      \(qs.count) 处分歧，约 \(chars) 字\(mode == .image ? " / \(qs.count) 张裁切图" : "")，共 \(String(format: "%.2f", Double(m.totalBytes) / 1_048_576)) MB，并发 \(onlineJobs(args))，费用未知
       清单 sha256: \(m.sha256)
     """)
     let gate = UploadGate()
@@ -131,7 +138,7 @@ func runAdjudicate(_ args: [String]) throws {
     selection.select(p.id)
     let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(allowed: true), selection: selection, gate: gate)
     let reader = OnlineReader(transport: t, endpoint: endpoint, providerID: p.id, model: model, key: key, ticket: ticket,
-                              ledger: try FileLedger(URL(fileURLWithPath: out + ".uploads.jsonl")))
+                              ledger: try FileLedger(URL(fileURLWithPath: out + ".uploads.jsonl")), jobs: onlineJobs(args))
     let r = try await_ { await plan.run(doc, reader: reader) }
     let enc = JSONEncoder()
     enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

@@ -5,10 +5,13 @@ import OCRCore
 // 工程里唯一发 HTTP 的地方。GuardedTransport 做全部检查，WireClient 才真正发包。
 
 public struct HTTPReply: Sendable {
-    public let status: Int, body: Data, location: String?
+    public let status: Int, body: Data, location: String?, retryAfter: String?
+    /// 从发出到收到响应头的秒数
+    public let firstByteSeconds: Double?
 
-    public init(status: Int, body: Data = Data(), location: String? = nil) {
+    public init(status: Int, body: Data = Data(), location: String? = nil, retryAfter: String? = nil, firstByteSeconds: Double? = nil) {
         self.status = status; self.body = body; self.location = location
+        self.retryAfter = retryAfter; self.firstByteSeconds = firstByteSeconds
     }
 }
 
@@ -209,9 +212,14 @@ public final class URLSessionWire: NSObject, WireClient, URLSessionTaskDelegate,
     private lazy var session = URLSession(configuration: Self.configuration, delegate: self, delegateQueue: nil)
 
     public func perform(_ r: URLRequest) async throws -> HTTPReply {
-        let (d, resp) = try await session.data(for: r)
+        let t0 = Date()
+        let (bytes, resp) = try await session.bytes(for: r)
+        let first = Date().timeIntervalSince(t0)
         guard let h = resp as? HTTPURLResponse else { throw TransportError.badResponse }
-        return HTTPReply(status: h.statusCode, body: d, location: h.value(forHTTPHeaderField: "Location"))
+        var d = Data()
+        for try await b in bytes { d.append(b) }
+        return HTTPReply(status: h.statusCode, body: d, location: h.value(forHTTPHeaderField: "Location"),
+                         retryAfter: h.value(forHTTPHeaderField: "Retry-After"), firstByteSeconds: first)
     }
 
     public func cancelAll() {

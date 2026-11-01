@@ -78,10 +78,8 @@ final class FakeBackend: BookBackend, @unchecked Sendable {
         }
         if let plan, let ticket {
             try plan.attach(to: &o, transport: app.transport, key: app.key, ticket: ticket)
-            let f = o.vlmOnline
-            try await Task.detached { [f] in
-                do { _ = try f?(1) } catch OnlineError.http { }     // 真流程里这是一页降级，不是任务失败
-            }.value
+            nonisolated(unsafe) let f = o.vlmOnlineBatch
+            await Task.detached { _ = f?([1]) { _ in } }.value
         }
         var r = BookResult()
         r.adjudication = adjudicated
@@ -465,6 +463,39 @@ final class AppCoreTests: XCTestCase {
         XCTAssertEqual(r.wire.count, 0)
     }
 
+    // MARK: 并发设置
+
+    func testJobsPerProviderDefaultAndClamp() {
+        let a = AppModel(store: Mem(), wire: CountingWire(), secrets: MemorySecretStore())
+        let p = ProviderSettings(app: a, store: Mem(), profileDir: dir)
+        XCTAssertEqual(p.jobs("dashscope"), 3)
+        p.setJobs(99, for: "dashscope")
+        XCTAssertEqual(p.jobs("dashscope"), 8)
+        p.setJobs(0, for: "siliconflow")
+        XCTAssertEqual(p.jobs("siliconflow"), 1)
+        XCTAssertEqual(p.jobs("deepseek"), 3)
+    }
+
+    func testConfirmShowsJobs() async throws {
+        let st = Mem()
+        st.set("5", "jobs.dashscope")
+        let w = CountingWire(), s = MemorySecretStore(), a = AppModel(store: Mem(), wire: w, secrets: s)
+        try s.save("k", for: "dashscope")
+        a.allowNetwork()
+        a.setSelected(qwen, true)
+        let q = QueueModel(app: a, backend: FakeBackend(dir: dir), modelsDir: try models(), vlDirectory: dir.appendingPathComponent("vl"),
+                           history: History(url: dir.appendingPathComponent("j.json")), prefs: st, outdir: dir)
+        q.onlineProviderID = "dashscope"
+        q.onlineModel = "m"
+        q.add([pdf("a")])
+        q.start()
+        await until { q.confirm != nil }
+        XCTAssertEqual(q.confirm?.contentText, "将上传 1 页，并发 5（有分歧的页才真正发送）")
+        XCTAssertEqual(w.count, 0)
+        q.declineUpload()
+        await q.waitUntilIdle()
+    }
+
     // MARK: 在线裁决
 
     private func fusedDoc() throws -> FusedDoc {
@@ -531,7 +562,7 @@ final class AppCoreTests: XCTestCase {
         r.q.start()
         await until { r.q.confirm != nil }
         XCTAssertEqual(r.wire.count, 0)
-        XCTAssertEqual(r.q.confirm?.contentText, "1 处分歧，约 2 字，不传图片")
+        XCTAssertEqual(r.q.confirm?.contentText, "1 处分歧，约 2 字，不传图片，并发 3")
         XCTAssertEqual(r.q.confirm?.host, "dashscope.aliyuncs.com")
         r.q.confirmUpload(checkbox: false, forBatch: false)
         try await Task.sleep(nanoseconds: 50_000_000)

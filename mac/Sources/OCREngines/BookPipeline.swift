@@ -29,8 +29,8 @@ public struct BookOptions {
     public var vlmModel = "local"
     /// 进程内 VLM：灰度像素 → 文字。设了就优先于 vlmURL。
     public var vlmLocal: (([UInt8], Int, Int) -> String)?
-    /// 在线读字：页码 → 文字。出错只影响这一页，保留本地结果。
-    public var vlmOnline: ((Int) throws -> String)?
+    /// 在线读字：一批页码 → 文字，并发在里面做，第二个参数报告已完成的页数。出错只影响那一页，保留本地结果。
+    public var vlmOnlineBatch: (([Int], @escaping @Sendable (Int) -> Void) -> [Int: Result<String, Error>])?
     public var uploadsPath: URL?
     public var uploadBodies: URL?
     /// 在线裁决：融合之后、写产物之前调用，改过的读法才进得了 md 和 PDF。返回 nil 表示不用裁决。
@@ -336,13 +336,22 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
 
     // ---- VLM 第三票 ----
     var vlmReports: [VLMPageReport] = []
-    if o.vlmLocal != nil || o.vlmURL != nil || o.vlmOnline != nil {
+    if o.vlmLocal != nil || o.vlmURL != nil || o.vlmOnlineBatch != nil {
         try stage("vlm") {
             let doc2 = try PageRenderer.open(o.pdf)
             let dpiOf = Dictionary(slots.map { ($0.pno, $0.dpi) }, uniquingKeysWith: { a, _ in a })
+            // 在线的先并发读完，下面的循环按页号顺序取结果，融合逻辑和串行时完全一样
+            var online: [Int: Result<String, Error>] = [:]
+            if let f = o.vlmOnlineBatch {
+                let need = fused.pages.filter { p in
+                    p.noInk != true && p.textSource != "native_text" && (o.vlmAll || p.lines.contains { $0.flag == "divergent" })
+                }.map(\.page)
+                let progress = o.progress
+                online = f(need) { progress?(.vlm, $0, need.count) }
+            }
             for i in fused.pages.indices {
                 if o.isCancelled?() == true { throw BookError.cancelled }
-                o.progress?(.vlm, i, fused.pages.count)
+                if o.vlmOnlineBatch == nil { o.progress?(.vlm, i, fused.pages.count) }
                 let pno = fused.pages[i].page
                 if fused.pages[i].noInk == true || fused.pages[i].textSource == "native_text" {
                     let (p, r) = applyVLM(fused.pages[i], vlm: nil)
@@ -359,8 +368,9 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                 let t0 = Date()
                 do {
                     let text: String
-                    if let f = o.vlmOnline {
-                        text = try f(pno)       // 请求体在确认前就定好了，不在这里重新渲染
+                    if o.vlmOnlineBatch != nil {
+                        guard let r = online[pno] else { throw OnlineError.emptyReply }
+                        text = try r.get()      // 请求体在确认前就定好了，不在这里重新渲染
                     } else {
                         let r0 = try PageRenderer.render(doc2, page: pno, dpi: dpiOf[pno] ?? RenderDefaults.baseDPI)
                         var img = r0.image
@@ -554,25 +564,29 @@ public struct OnlinePlan: Sendable {
     /// 请求体里是页面图片，不确认就删
     public func discard() { try? FileManager.default.removeItem(at: bodies) }
 
-    public func attach(to o: inout BookOptions, transport: HTTPTransport, key: SecretKey?, ticket: UploadTicket) throws {
+    public func attach(to o: inout BookOptions, transport: HTTPTransport, key: SecretKey?, ticket: UploadTicket, jobs: Int = OnlineJobs.default) throws {
         let stem = o.pdf.deletingPathExtension().lastPathComponent
         let uploads = o.outdir.appendingPathComponent("\(stem).uploads.jsonl")
         try FileManager.default.createDirectory(at: o.outdir, withIntermediateDirectories: true)
         let reader = OnlineReader(transport: transport, endpoint: endpoint, providerID: preset.id, model: model, key: key,
-                                  ticket: ticket, ledger: try FileLedger(uploads))
+                                  ticket: ticket, ledger: try FileLedger(uploads), jobs: jobs)
         let byPage = Dictionary(uniqueKeysWithValues: pages.map { ($0.page, $0) })
         o.uploadsPath = uploads
         o.uploadBodies = bodies
-        o.vlmOnline = { pno in
-            guard let page = byPage[pno] else { throw OnlineError.emptyReply }
+        let cancelled = o.isCancelled
+        o.vlmOnlineBatch = { pnos, onDone in
             let sem = DispatchSemaphore(value: 0)
-            nonisolated(unsafe) var out: Result<String, Error> = .failure(OnlineError.emptyReply)
+            nonisolated(unsafe) var out: [Int: Result<String, Error>] = [:]
             Task.detached {
-                do { out = .success(try await reader.read(page)) } catch { out = .failure(error) }
+                let list = pnos.compactMap { byPage[$0] }
+                let rs: [Result<String, Error>?] = await runConcurrently(list, limiter: reader.limiter, shouldStop: { cancelled?() == true }, onDone: onDone) { p in
+                    do { return .success(try await reader.read(p)) } catch { return .failure(error) }
+                }
+                for (p, r) in zip(list, rs) { if let r { out[p.page] = r } }
                 sem.signal()
             }
             sem.wait()
-            return try out.get()
+            return out
         }
     }
 }
@@ -610,8 +624,8 @@ public struct AdjudicationPlan: Sendable {
 
     public func discard() { try? FileManager.default.removeItem(at: bodies) }
 
-    public func run(_ doc: FusedDoc, reader: OnlineReader) async -> AdjudicationOutcome {
-        await runAdjudication(doc, questions: questions, pages: pages, mode: mode, reader: reader, providerID: preset.id, model: model)
+    public func run(_ doc: FusedDoc, reader: OnlineReader, isCancelled: @escaping @Sendable () -> Bool = { false }) async -> AdjudicationOutcome {
+        await runAdjudication(doc, questions: questions, pages: pages, mode: mode, reader: reader, providerID: preset.id, model: model, isCancelled: isCancelled)
     }
 
     public func summary(_ o: AdjudicationOutcome) -> AdjudicationSummary {

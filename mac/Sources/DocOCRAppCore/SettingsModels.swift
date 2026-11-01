@@ -135,6 +135,15 @@ public final class ProviderSettings: ObservableObject {
         }
     }
 
+    public func jobs(_ id: String) -> Int {
+        store.string("jobs." + id).flatMap(Int.init).map(OnlineJobs.clamp) ?? OnlineJobs.default
+    }
+
+    public func setJobs(_ n: Int, for id: String) {
+        store.set(String(OnlineJobs.clamp(n)), "jobs." + id)
+        objectWillChange.send()
+    }
+
     public func setModel(_ m: String, for id: String) {
         models[id] = m
         store.set(m, "model." + id)

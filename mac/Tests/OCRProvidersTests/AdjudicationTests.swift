@@ -112,7 +112,7 @@ final class AdjudicationTests: XCTestCase {
         await g.request(onlineManifest(pages, providerID: "p", providerName: "P", host: "api.example.com", model: "m"))
         let tk = try await g.confirm(checkbox: true, scope: .once)
         let r = OnlineReader(transport: t, endpoint: try Endpoint("https://api.example.com/v1"), providerID: "p", model: "m", key: nil,
-                             ticket: tk, ledger: MemoryLedger(), backoff: { _ in })
+                             ticket: tk, ledger: MemoryLedger(), sleep: { _ in })
         return (q, pages, r, w)
     }
 
