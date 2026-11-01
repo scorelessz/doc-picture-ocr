@@ -645,6 +645,7 @@ public struct AdjudicationPlan: Sendable {
 /// 把分歧行从页面图里裁出来。只有这一行，不含整页。
 public final class LineCropper {
     private let doc: PDFDocument, zoom: [Int: Double]
+    private var cached: (page: Int, image: CGImage)?       // 分歧行按页排列，一页十来处，不能每处都重新渲染
 
     public init(pdf: URL, doc fused: FusedDoc) throws {
         doc = try PageRenderer.open(pdf)
@@ -652,9 +653,12 @@ public final class LineCropper {
     }
 
     public func crop(page: Int, line: FusedLine) throws -> Data {
-        let r = try PageRenderer.render(doc, page: page, dpi: (zoom[page] ?? 300.0 / 72) * 72)
-        let c = lineCropRect(line, imageWidth: r.image.width, imageHeight: r.image.height)
-        guard let img = r.image.cropping(to: CGRect(x: c.x, y: c.y, width: c.w, height: c.h)), let data = CFDataCreateMutable(nil, 0),
+        if cached?.page != page {
+            cached = (page, try PageRenderer.render(doc, page: page, dpi: (zoom[page] ?? 300.0 / 72) * 72).image)
+        }
+        let image = cached!.image
+        let c = lineCropRect(line, imageWidth: image.width, imageHeight: image.height)
+        guard let img = image.cropping(to: CGRect(x: c.x, y: c.y, width: c.w, height: c.h)), let data = CFDataCreateMutable(nil, 0),
               let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else { throw PaddleError.badImage }
         CGImageDestinationAddImage(dest, img, nil)
         guard CGImageDestinationFinalize(dest) else { throw PaddleError.badImage }
