@@ -17,8 +17,9 @@ final class CountingWire: WireClient, @unchecked Sendable {
     private var n = 0, hosts = Set<String>()
     let reply: HTTPReply
 
-    init(status: Int = 200) {
-        reply = HTTPReply(status: status, body: try! JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": "读到的字"]]]]))
+    init(status: Int = 200, models: [String]? = nil, raw: Data? = nil) {
+        let o: [String: Any] = models.map { ["data": $0.map { ["id": $0] }] } ?? ["choices": [["message": ["content": "读到的字"]]]]
+        reply = HTTPReply(status: status, body: raw ?? (try! JSONSerialization.data(withJSONObject: o)))
     }
 
     var count: Int { lock.lock(); defer { lock.unlock() }; return n }
@@ -630,13 +631,87 @@ final class AppCoreTests: XCTestCase {
 
     // MARK: 模型列表
 
-    func testModelFilter() {
+    func testModelFilterListsEverything() {
         let o = ModelFilter.options(ids: ["z-chat", "text-embedding-3", "qwen-vl-ocr", "m-bad", "m-good"], profiles: [
             CapabilityProfile(providerID: "p", model: "m-bad", probedAt: Date(), supportsImage: false, responseFormat: .text),
             CapabilityProfile(providerID: "p", model: "m-good", probedAt: Date(), supportsImage: true, responseFormat: .text),
         ], recommended: "rec")
-        XCTAssertEqual(o.map(\.id), ["rec", "m-good", "qwen-vl-ocr", "z-chat"])
-        XCTAssertEqual(o.map(\.status), [.recommended, .verified, .unverified, .unverified])
+        XCTAssertEqual(o.map(\.id), ["rec", "m-good", "qwen-vl-ocr", "z-chat", "text-embedding-3", "m-bad"])
+        XCTAssertEqual(o.map(\.status), [.recommended, .verified, .unverified, .unverified, .unverified, .unsupported])
+    }
+
+    private func listRig(wire: CountingWire, network: Bool = true, select: Bool = true, key: Bool = true) throws -> (ProviderSettings, CountingWire) {
+        let s = MemorySecretStore(), a = AppModel(store: Mem(), wire: wire, secrets: s)
+        if key { try s.save("k", for: qwen.id) }
+        if network { a.allowNetwork() }
+        if select { a.setSelected(qwen, true) }
+        return (ProviderSettings(app: a, store: Mem(), profileDir: dir.appendingPathComponent("prof-\(UUID().uuidString)")), wire)
+    }
+
+    func testLongListIsFullySelectable() async throws {
+        let ids = (0..<184).map { "qwen-model-\($0)" } + ["qwen3.7-flash", "qwen3.7-flash-2026-07-15"]
+        let (p, w) = try listRig(wire: CountingWire(models: ids))
+        await p.refreshModels(qwen)
+        XCTAssertEqual(w.count, 1)
+        let all = p.options(qwen)
+        XCTAssertEqual(all.count, 186, "不能截断，也不能只留推荐和已验证")
+        XCTAssertEqual(all.first?.id, "qwen3.7-flash")
+        XCTAssertNil(p.listError["dashscope"])
+    }
+
+    func testCurrentModelNameDoesNotFilterList() async throws {
+        let (p, _) = try listRig(wire: CountingWire(models: ["a", "b", "qwen3.7-flash", "qwen3.7-flash-x"]))
+        await p.refreshModels(qwen)
+        XCTAssertEqual(p.models["dashscope"], "qwen3.7-flash")
+        XCTAssertEqual(ModelFilter.search(p.options(qwen), "").count, 4, "搜索框是空的就显示全部")
+        XCTAssertEqual(ModelFilter.search(p.options(qwen), " QWEN3.7 ").count, 2)
+    }
+
+    func testListFailureIsShownAndKeepsCache() async throws {
+        let (p, _) = try listRig(wire: CountingWire(models: ["a", "b"]))
+        await p.refreshModels(qwen)
+        XCTAssertEqual(p.options(qwen).count, 3)
+        let bad = CountingWire(status: 401)
+        let s = MemorySecretStore(), a = AppModel(store: Mem(), wire: bad, secrets: s), d = dir.appendingPathComponent("prof-keep")
+        try ProfileStore.saveModels(CachedModels(fetchedAt: Date(), ids: ["a", "b"]), for: qwen.id, in: d)
+        try s.save("k", for: qwen.id)
+        a.allowNetwork()
+        a.setSelected(qwen, true)
+        let q = ProviderSettings(app: a, store: Mem(), profileDir: d)
+        await q.refreshModels(qwen)
+        XCTAssertTrue(q.listError["dashscope"]?.contains("401") == true)
+        XCTAssertEqual(q.options(qwen).count, 3, "失败时保留缓存")
+    }
+
+    func testListBadBodyAndEmptyAreReported() async throws {
+        let (p, _) = try listRig(wire: CountingWire(raw: Data("<html>".utf8)))
+        await p.refreshModels(qwen)
+        XCTAssertNotNil(p.listError["dashscope"])
+        let (q, _) = try listRig(wire: CountingWire(models: []))
+        await q.refreshModels(qwen)
+        XCTAssertEqual(q.listError["dashscope"], "服务商返回了空列表")
+    }
+
+    func testRetryClearsError() async throws {
+        let (p, _) = try listRig(wire: CountingWire(models: ["a"]), key: false)
+        await p.refreshModels(qwen)
+        XCTAssertEqual(p.listError["dashscope"], "还没有填 Key")
+        p.saveKey("k", for: "dashscope")
+        await p.refreshModels(qwen)
+        XCTAssertNil(p.listError["dashscope"])
+    }
+
+    func testNoKeyZeroRequests() async throws {
+        let (p, w) = try listRig(wire: CountingWire(models: ["a"]), key: false)
+        await p.refreshModels(qwen)
+        XCTAssertEqual(w.count, 0)
+    }
+
+    func testNetworkOffZeroRequestsAndSaysWhy() async throws {
+        let (p, w) = try listRig(wire: CountingWire(models: ["a"]), network: false, select: false)
+        await p.refreshModels(qwen)
+        XCTAssertEqual(w.count, 0)
+        XCTAssertEqual(p.listError["dashscope"], AppModel.offReason)
     }
 
     func testRecommendedDefaultsAndDeepSeekTextOnly() {

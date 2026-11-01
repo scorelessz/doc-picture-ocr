@@ -31,7 +31,7 @@ public enum ProviderPresets {
 }
 
 public enum ModelStatus: String, Sendable {
-    case recommended = "推荐", verified = "已验证可看图", unverified = "未验证"
+    case recommended = "推荐", verified = "已验证可看图", unverified = "未验证", unsupported = "已测不支持看图"
 }
 
 public struct ModelOption: Sendable, Equatable, Identifiable {
@@ -39,27 +39,33 @@ public struct ModelOption: Sendable, Equatable, Identifiable {
 }
 
 public enum ModelFilter {
-    /// /models 没有「能否看图」字段，只能排除名字上明显不是对话模型的
+    /// /models 没有「能否看图」字段，只能靠名字排序。这些排到最后，但不隐藏：判断可能错，用户要能选到。
     static let notChat = ["embed", "rerank", "tts", "asr", "whisper", "speech", "audio", "voice", "sora", "wan2", "wanx", "dall-e",
                           "flux", "stable-diffusion", "kolors", "video", "translate", "moderation"]
     static let likelyVision = ["vl", "ocr", "vision", "vlm"]
 
-    /// 探测过不支持的不列；推荐、已验证排前面，其余标未验证
+    /// 全部列出，推荐和已验证排前面
     public static func options(ids: [String], profiles: [CapabilityProfile], recommended: String?) -> [ModelOption] {
         let probed = Dictionary(profiles.map { ($0.model, $0.supportsImage) }, uniquingKeysWith: { _, b in b })
-        func keep(_ m: String) -> Bool {
-            let l = m.lowercased()
-            return probed[m] != false && !notChat.contains { l.contains($0) }
-        }
         func rank(_ m: String) -> Int {
+            let l = m.lowercased()
+            if probed[m] == false { return 5 }
             if m == recommended { return 0 }
             if probed[m] == true { return 1 }
-            return likelyVision.contains { m.lowercased().contains($0) } ? 2 : 3
+            if notChat.contains(where: { l.contains($0) }) { return 4 }
+            return likelyVision.contains { l.contains($0) } ? 2 : 3
         }
-        var all = ids
+        var all = Array(Set(ids))
         if let recommended, !all.contains(recommended) { all.append(recommended) }
-        return all.filter(keep).sorted { (rank($0), $0) < (rank($1), $1) }.map { m in
-            ModelOption(id: m, status: probed[m] == true ? .verified : (m == recommended ? .recommended : .unverified))
+        return all.sorted { (rank($0), $0) < (rank($1), $1) }.map { m in
+            let st: ModelStatus = probed[m] == false ? .unsupported : (probed[m] == true ? .verified : (m == recommended ? .recommended : .unverified))
+            return ModelOption(id: m, status: st)
         }
+    }
+
+    /// 搜索。搜索词和当前模型名是两回事：不能拿模型名去筛列表。
+    public static func search(_ options: [ModelOption], _ query: String) -> [ModelOption] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        return q.isEmpty ? options : options.filter { $0.id.lowercased().contains(q) }
     }
 }

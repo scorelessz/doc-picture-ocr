@@ -143,6 +143,12 @@ struct ProvidersTab: View {
                     }
                 }
                 if let n = providers.listNote(p) { Text(n).font(.caption).foregroundStyle(.secondary) }
+                if let e = providers.listError[p.id] {
+                    HStack {
+                        Text("模型列表没有加载成功：\(e)").font(.caption).foregroundStyle(.orange)
+                        Button("重新加载") { Task { await providers.refreshModels(p) } }.disabled(providers.loading.contains(p.id))
+                    }
+                }
             }
             if let r = providers.result[p.id] { Text(r).font(.caption) }
         }.disabled(!app.networkControlsEnabled && p.dialect == .openAICompatible && !app.selected.contains(p.id))

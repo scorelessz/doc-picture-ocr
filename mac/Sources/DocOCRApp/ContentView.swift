@@ -117,24 +117,50 @@ struct ConfirmView: View {
     }
 }
 
-/// 模型名：可手填，也可从列表选。输入时按文字筛选。
+/// 模型名可以手填，也可以点按钮打开列表搜索。搜索词单独一个框：拿模型名去筛，列表就只剩它自己。
 struct ModelField: View {
     let preset: ProviderPreset
     @Binding var text: String
     @EnvironmentObject var providers: ProviderSettings
+    @State private var open = false
+    @State private var query = ""
 
     var body: some View {
-        let all = providers.options(preset), q = text.lowercased()
-        let hit = all.filter { q.isEmpty || $0.id.lowercased().contains(q) }
         HStack(spacing: 4) {
             TextField("模型名", text: $text).frame(minWidth: 200)
-            Menu {
-                ForEach((hit.isEmpty ? all : hit).prefix(40)) { o in
-                    Button("\(o.id)（\(o.status.rawValue)）") { text = o.id }
-                }
-            } label: { Image(systemName: "chevron.down") }
-                .menuStyle(.borderlessButton).frame(width: 28).disabled(all.isEmpty)
+            Button { open = true } label: { Image(systemName: "list.bullet") }
+                .help("从模型列表选")
+                .popover(isPresented: $open, arrowEdge: .bottom) { panel }
         }
+    }
+
+    private var panel: some View {
+        let all = providers.options(preset), hit = ModelFilter.search(all, query)
+        return VStack(alignment: .leading, spacing: 6) {
+            TextField("搜索模型", text: $query).textFieldStyle(.roundedBorder)
+            HStack {
+                Text(query.isEmpty ? "共 \(all.count) 个" : "匹配 \(hit.count) / \(all.count) 个").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(providers.loading.contains(preset.id) ? "加载中…" : "重新加载") { Task { await providers.refreshModels(preset) } }
+                    .disabled(providers.loading.contains(preset.id))
+            }
+            if let e = providers.listError[preset.id] { Text(e).font(.caption).foregroundStyle(.orange) }
+            List(hit) { o in
+                Button {
+                    text = o.id
+                    open = false
+                } label: {
+                    HStack {
+                        Text(o.id).lineLimit(1)
+                        Spacer()
+                        Text(o.status.rawValue).font(.caption).foregroundStyle(o.status == .unverified ? .secondary : (o.status == .unsupported ? Color.orange : Color.green))
+                    }.contentShape(Rectangle())
+                }.buttonStyle(.plain)
+            }
+            if let n = providers.listNote(preset) { Text(n).font(.caption).foregroundStyle(.secondary) }
+        }
+        .padding(10)
+        .frame(width: 420, height: 420)
     }
 }
 

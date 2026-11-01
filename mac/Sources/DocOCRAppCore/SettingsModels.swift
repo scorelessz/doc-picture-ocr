@@ -121,6 +121,8 @@ public final class ProviderSettings: ObservableObject {
     @Published public private(set) var result: [String: String] = [:]
     @Published public private(set) var testing: Set<String> = []
     @Published public private(set) var lists: [String: CachedModels] = [:]
+    @Published public private(set) var listError: [String: String] = [:]
+    @Published public private(set) var loading: Set<String> = []
     @Published public private(set) var profiles: [String: [CapabilityProfile]] = [:]
     private let app: AppModel, store: KVStore, profileDir: URL
 
@@ -215,21 +217,54 @@ public final class ProviderSettings: ObservableObject {
         return (app.networkAllowed ? "列表更新于 " : "没有联网，这是上次的列表，更新于 ") + Self.time(l.fetchedAt)
     }
 
-    public func canRefresh(_ p: ProviderPreset) -> Bool { app.canUse(p) && app.selected.contains(p.id) && hasKey(p.id) }
+    public func canRefresh(_ p: ProviderPreset) -> Bool { refreshBlock(p) == nil }
+
+    /// 为什么现在不能拉列表。nil 表示可以。
+    public func refreshBlock(_ p: ProviderPreset) -> String? {
+        if !app.networkAllowed { return AppModel.offReason }
+        if p.dialect != .openAICompatible { return "这家的适配还没有做" }
+        if !app.selected.contains(p.id) { return "还没有选中这家服务商" }
+        switch keyState(p.id) {
+        case .none: return "还没有填 Key"
+        case .needsAuthorization: return "Key 需要先授权或重新保存"
+        case .readable: return nil
+        }
+    }
 
     /// 只发 GET /models，不发用户数据。条件不满足时一次请求都不发。
     public func refreshModels(_ p: ProviderPreset) async {
-        guard canRefresh(p), let ep = try? Endpoint(p.baseURL) else { return }
+        if let why = refreshBlock(p) {
+            listError[p.id] = why
+            Log.shared.info("provider_models", ["provider": .s(p.id), "ok": .b(false), "reason": .s(why)])
+            return
+        }
+        guard !loading.contains(p.id), let ep = try? Endpoint(p.baseURL) else { return }
+        loading.insert(p.id)
+        defer { loading.remove(p.id) }
         let prober = CapabilityProber(transport: app.transport, endpoint: ep, providerID: p.id, key: try? app.secrets.load(p.id))
-        let ids = await prober.listModels()
-        guard !ids.isEmpty else { return }      // 拉取失败时保留缓存
-        let c = CachedModels(fetchedAt: Date(), ids: ids)
-        try? ProfileStore.saveModels(c, for: p.id, in: profileDir)
-        lists[p.id] = c
+        switch await prober.fetchModels() {
+        case .success(let ids) where !ids.isEmpty:
+            let c = CachedModels(fetchedAt: Date(), ids: ids)
+            try? ProfileStore.saveModels(c, for: p.id, in: profileDir)
+            lists[p.id] = c
+            listError[p.id] = nil
+            Log.shared.info("provider_models", ["provider": .s(p.id), "ok": .b(true), "count": .i(ids.count)])
+        case .success:
+            fail(p, "服务商返回了空列表")
+        case .failure(let e):
+            fail(p, "\(e)")
+        }
     }
 
+    /// 失败时保留上次的缓存
+    private func fail(_ p: ProviderPreset, _ why: String) {
+        listError[p.id] = why
+        Log.shared.warn("provider_models", ["provider": .s(p.id), "ok": .b(false), "reason": .s(why)])
+    }
+
+    /// 只刷新已选中的，没选中的不算失败
     public func refreshAll() async {
-        for p in ProviderPresets.all { await refreshModels(p) }
+        for p in ProviderPresets.all where app.selected.contains(p.id) { await refreshModels(p) }
     }
 
     public func canTest(_ p: ProviderPreset) -> Bool {

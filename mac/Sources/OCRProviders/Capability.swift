@@ -56,6 +56,19 @@ public struct CachedModels: Sendable, Codable, Equatable {
     public init(fetchedAt: Date, ids: [String]) { self.fetchedAt = fetchedAt; self.ids = ids }
 }
 
+public enum ModelListError: Error, Equatable, CustomStringConvertible {
+    case http(Int), badResponse, request(String)
+
+    public var description: String {
+        switch self {
+        case .http(401), .http(403): return "服务商拒绝了这个 Key（HTTP 401/403）"
+        case .http(let c): return "服务商返回 HTTP \(c)"
+        case .badResponse: return "服务商的返回看不懂"
+        case .request(let s): return "请求失败: \(s)"
+        }
+    }
+}
+
 public struct CapabilityProber: Sendable {
     public static let ladder = [512, 1024, 1792, 2048, 4096]
     static let rungRetries = 1
@@ -81,13 +94,22 @@ public struct CapabilityProber: Sendable {
         self.transport = transport; self.endpoint = endpoint; self.providerID = providerID; self.key = key
     }
 
-    /// 拉不到列表返回空，调用方允许手填
-    public func listModels() async -> [String] {
-        guard let r = try? await transport.send(OutboundRequest(endpoint: endpoint, providerID: providerID, path: "models", payload: .metadata, key: key)),
-              r.status == 200, let o = try? JSONSerialization.jsonObject(with: r.body) as? [String: Any],
-              let d = o["data"] as? [[String: Any]] else { return [] }
-        return d.compactMap { $0["id"] as? String }
+    /// 拉模型列表。失败时带上原因，调用方要显示给用户。
+    public func fetchModels() async -> Result<[String], ModelListError> {
+        do {
+            let r = try await transport.send(OutboundRequest(endpoint: endpoint, providerID: providerID, path: "models", payload: .metadata, key: key))
+            guard r.status == 200 else { return .failure(.http(r.status)) }
+            guard let o = try? JSONSerialization.jsonObject(with: r.body) as? [String: Any], let d = o["data"] as? [[String: Any]] else {
+                return .failure(.badResponse)
+            }
+            return .success(d.compactMap { $0["id"] as? String })
+        } catch {
+            return .failure(.request("\(error)"))
+        }
     }
+
+    /// 拉不到列表返回空，调用方允许手填
+    public func listModels() async -> [String] { (try? await fetchModels().get()) ?? [] }
 
     private func chat(_ p: ProbeRequest) async throws -> String? {
         let r = try await transport.send(OutboundRequest(endpoint: endpoint, providerID: providerID, path: "chat/completions", payload: .probe(p), key: key))
