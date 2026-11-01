@@ -105,7 +105,7 @@ public struct ConfirmRequest: Equatable, Sendable {
 
 /// 可替换的后端，单测用假的。
 public protocol BookBackend: Sendable {
-    func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, workdir: URL) async throws -> OnlinePlan
+    func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, workdir: URL) async throws -> OnlinePlan
     func adjudicationPlan(doc: FusedDoc, pdf: URL, preset: ProviderPreset, model: String, mode: AdjudicationMode, bodies: URL) async throws -> AdjudicationPlan
     func run(_ o: BookOptions, plan: OnlinePlan?, ticket: UploadTicket?, app: BackendContext) async throws -> BookResult
 }
@@ -136,8 +136,8 @@ public final class VLHandle: @unchecked Sendable {
 public struct LocalBackend: BookBackend {
     public init() {}
 
-    public func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, workdir: URL) async throws -> OnlinePlan {
-        try await Task.detached { try OnlinePlan.prepare(preset: preset, model: model, pdf: pdf, forceOCR: forceOCR, workdir: workdir, log: { _ in }) }.value
+    public func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, workdir: URL) async throws -> OnlinePlan {
+        try await Task.detached { try OnlinePlan.prepare(preset: preset, model: model, pdf: pdf, forceOCR: forceOCR, pagesSpec: pagesSpec, workdir: workdir, log: { _ in }) }.value
     }
 
     public func adjudicationPlan(doc: FusedDoc, pdf: URL, preset: ProviderPreset, model: String, mode: AdjudicationMode, bodies: URL) async throws -> AdjudicationPlan {
@@ -178,6 +178,16 @@ public final class QueueModel: ObservableObject {
     @Published public var highPrecision = false
     @Published public var onlineProviderID: String?
     @Published public var onlineModel = ""
+    /// 留空表示全部页
+    @Published public var pagesText = ""
+    // 下面这些是设置页里的选项，要记住
+    @Published public var unitsLabel: String { didSet { prefs.set(unitsLabel, "units") } }
+    @Published public var vlmAll: Bool { didSet { prefs.set(vlmAll ? "1" : "0", "vlmAll") } }
+    @Published public var vlmBreaks: Bool { didSet { prefs.set(vlmBreaks ? "1" : "0", "vlmBreaks") } }
+    @Published public var keepPages: Bool { didSet { prefs.set(keepPages ? "1" : "0", "keepPages") } }
+    @Published public var useLocalService: Bool { didSet { prefs.set(useLocalService ? "1" : "0", "useLocalService") } }
+    @Published public var localURL: String { didSet { prefs.set(localURL, "localURL") } }
+    @Published public var localModel: String { didSet { prefs.set(localModel, "localModel") } }
     @Published public var adjudicateOn = false
     @Published public var adjudicateMode: AdjudicationMode = .image
     @Published public var adjudicateProviderID: String?
@@ -186,7 +196,7 @@ public final class QueueModel: ObservableObject {
     @Published public private(set) var confirm: ConfirmRequest?
     @Published public private(set) var history: [HistoryRecord]
 
-    private let app: AppModel, backend: BookBackend, modelsDir: URL, store: History
+    private let app: AppModel, backend: BookBackend, modelsDir: URL, store: History, prefs: KVStore
     /// VL 模型按需下载，App 包只读，永远在 Application Support
     public let vlDirectory: URL
     private var worker: Task<Void, Never>?
@@ -196,14 +206,30 @@ public final class QueueModel: ObservableObject {
 
     public init(app: AppModel, backend: BookBackend = LocalBackend(), modelsDir: URL = ModelStore.resolvedDirectory,
                 vlDirectory: URL = VLModel.directory(models: ModelStore.defaultDirectory),
-                history: History = History(url: AppPaths.history), outdir: URL) {
+                history: History = History(url: AppPaths.history), prefs: KVStore = DefaultsStore(), outdir: URL) {
         self.vlDirectory = vlDirectory
+        self.prefs = prefs
+        unitsLabel = prefs.string("units") ?? "ane"
+        vlmAll = prefs.string("vlmAll") == "1"
+        vlmBreaks = prefs.string("vlmBreaks") == "1"
+        keepPages = prefs.string("keepPages") == "1"
+        useLocalService = prefs.string("useLocalService") == "1"
+        localURL = prefs.string("localURL") ?? ""
+        localModel = prefs.string("localModel") ?? ""
         self.app = app; self.backend = backend; self.modelsDir = modelsDir; self.store = history; self.outdir = outdir
         self.history = history.records
     }
 
     public var vlInstalled: Bool { FileManager.default.fileExists(atPath: vlDirectory.appendingPathComponent("model.safetensors").path) }
-    public var needsVLModel: Bool { highPrecision && !vlInstalled }
+    public var needsVLModel: Bool { highPrecision && !useLocalService && !vlInstalled }
+    private var pagesSpec: String? {
+        let t = pagesText.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : t
+    }
+
+    /// 只接受本机地址，不走上传确认，不受总开关限制
+    public var localEndpoint: Endpoint? { (try? Endpoint(localURL)).flatMap { $0.isLoopback ? $0 : nil } }
+    public var pageDirectory: URL { outdir.appendingPathComponent(".work", isDirectory: true) }
     public var coreMLInstalled: Bool { ModelStore.installed(modelsDir) }
 
     /// 总开关关掉或取消选中后，在线读字自动失效
@@ -218,6 +244,11 @@ public final class QueueModel: ObservableObject {
 
     public var blockReason: String? {
         if !makeMarkdown, !makePDF { return "至少选一种产物" }
+        if let s = pagesSpec, (try? parsePages(s, count: .max)) == nil { return "页范围写法不对，例如 1-20 或 3,5,8" }
+        if highPrecision, useLocalService {
+            if localEndpoint == nil { return "本机服务只接受本机地址，例如 http://127.0.0.1:11434/v1" }
+            if localModel.isEmpty { return "本机服务要填模型名" }
+        }
         if !coreMLInstalled { return "还没有识别模型，请到设置 → 模型下载" }
         if needsVLModel { return "高精度模式需要 VL 模型，请到设置 → 模型下载" }
         if highPrecision, onlineEnabled { return "高精度模式和在线读字只能选一个" }
@@ -277,7 +308,7 @@ public final class QueueModel: ObservableObject {
     private func runAll() async {
         defer { isRunning = false; confirm = nil }
         var vl: VLHandle?
-        if highPrecision { vl = try? await Task.detached { [dir = vlDirectory] in try VLHandle(directory: dir) }.value }
+        if highPrecision, !useLocalService { vl = try? await Task.detached { [dir = vlDirectory] in try VLHandle(directory: dir) }.value }
         batchID = UUID()
         while let i = jobs.firstIndex(where: { $0.status == .queued }) {
             if cancelFlag.value { break }
@@ -298,7 +329,7 @@ public final class QueueModel: ObservableObject {
             do {
                 key = try app.secrets.load(id)
                 guard key != nil else { throw BookError.failed("没有 \(preset.name) 的 Key，请到设置里填写") }
-                let p = try await backend.prepare(preset: preset, model: onlineModel, pdf: job.pdf, forceOCR: forceOCR, workdir: work)
+                let p = try await backend.prepare(preset: preset, model: onlineModel, pdf: job.pdf, forceOCR: forceOCR, pagesSpec: pagesSpec, workdir: work)
                 let st = await app.gate.request(p.manifest)
                 if case .confirmed(let t) = st {        // 同一批次、同一域名
                     ticket = t
@@ -327,6 +358,16 @@ public final class QueueModel: ObservableObject {
         o.pageMarks = pageMarks
         o.force = overwrite
         o.forceOCR = forceOCR
+        o.pagesSpec = pagesSpec
+        o.keepPages = keepPages
+        o.vlmAll = vlmAll
+        o.vlmBreaks = vlmBreaks
+        o.unitsLabel = unitsLabel
+        o.units = computeUnits(unitsLabel) ?? .cpuAndNeuralEngine
+        if highPrecision, useLocalService, let e = localEndpoint {
+            o.vlmURL = e.baseURL
+            o.vlmModel = localModel
+        }
         o.coreml = modelsDir
         let flag = cancelFlag, id = job.id
         o.isCancelled = { flag.value }

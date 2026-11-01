@@ -54,3 +54,24 @@ final class ContractTests: XCTestCase {
         XCTAssertEqual(parseTSV(s).first?.text, "a b")
     }
 }
+
+final class PageSpecTests: XCTestCase {
+    func testForms() throws {
+        XCTAssertEqual(try parsePages("3-5", count: 9), [3, 4, 5])
+        XCTAssertEqual(try parsePages("7,2,3", count: 9), [2, 3, 7])
+        XCTAssertEqual(try parsePages("1-2, 2-3, 9", count: 9), [1, 2, 3, 9])
+        XCTAssertEqual(try parsePages("5", count: 9), [5], "单个数字就是那一页")
+    }
+
+    func testBad() {
+        for s in ["", "a", "5-3", "0", "-3", "1-2-3", "1,,2", "2-"] {
+            XCTAssertThrowsError(try parsePages(s, count: 9), s)
+        }
+        XCTAssertThrowsError(try parsePages("8-10", count: 9)) { XCTAssertEqual($0 as? PageSpecError, .outOfRange(page: 10, count: 9)) }
+    }
+
+    func testCompact() {
+        XCTAssertEqual(compactPages([1, 2, 3, 7, 9, 10]), "1-3, 7, 9-10")
+        XCTAssertEqual(compactPages([]), "")
+    }
+}

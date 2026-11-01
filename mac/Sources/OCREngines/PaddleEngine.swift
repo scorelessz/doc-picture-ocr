@@ -417,6 +417,11 @@ public struct DevicePlan: Encodable, Sendable {
 }
 
 /// MLComputePlan：Core ML 打算把每个算子放在哪。
+/// --units 的取值
+public func computeUnits(_ label: String) -> MLComputeUnits? {
+    ["ane": .cpuAndNeuralEngine, "all": .all, "cpu": .cpuOnly, "gpu": .cpuAndGPU][label]
+}
+
 @available(macOS 14.4, *)
 public func computePlan(_ compiled: URL, name: String, units: MLComputeUnits, label: String) async throws -> DevicePlan {
     let cfg = MLModelConfiguration()

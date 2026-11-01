@@ -9,8 +9,33 @@ struct SettingsView: View {
         TabView {
             ModelsTab().tabItem { Label("模型", systemImage: "shippingbox") }
             ProvidersTab().tabItem { Label("服务商", systemImage: "network") }
+            AdvancedTab().tabItem { Label("高级", systemImage: "slider.horizontal.3") }
             DiagnosticsTab().tabItem { Label("诊断", systemImage: "stethoscope") }
         }.padding()
+    }
+}
+
+struct AdvancedTab: View {
+    @EnvironmentObject var queue: QueueModel
+
+    var body: some View {
+        Form {
+            Section("计算单元") {
+                Picker("Core ML", selection: $queue.unitsLabel) {
+                    Text("ANE（默认）").tag("ane")
+                    Text("全部").tag("all")
+                    Text("GPU").tag("gpu")
+                    Text("CPU").tag("cpu")
+                }
+                Text("遇到兼容问题时切换。").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("高精度模式") {
+                Toggle("对所有页调用大模型", isOn: $queue.vlmAll)
+                Text("默认只读有分歧的页。实测两本书都只多 2 页。").font(.caption).foregroundStyle(.secondary)
+                Toggle("段落切分听大模型（实验）", isOn: $queue.vlmBreaks)
+                Text("实测没有改善，中文不加保护时还会错并段落。").font(.caption).foregroundStyle(.secondary)
+            }
+        }.formStyle(.grouped)
     }
 }
 
@@ -69,6 +94,7 @@ struct ProvidersTab: View {
                     Button("去开启…") { confirmingOn = true }
                 }
             }
+            LocalServiceSection()
             Section("服务商（默认一家都不启用，亲自选中才生效）") {
                 ForEach(ProviderPresets.all, id: \.id) { p in row(p) }
             }
@@ -123,8 +149,30 @@ struct ProvidersTab: View {
     }
 }
 
+/// Ollama、LM Studio、mlx-vlm 这类本机服务：不算联网，不受总开关限制，不走上传确认
+struct LocalServiceSection: View {
+    @EnvironmentObject var queue: QueueModel
+
+    var body: some View {
+        Section("本机服务（仅本机）") {
+            TextField("地址", text: $queue.localURL, prompt: Text("http://127.0.0.1:11434/v1"))
+            TextField("模型名", text: $queue.localModel)
+            HStack {
+                Button("Ollama") { queue.localURL = "http://127.0.0.1:11434/v1" }
+                Button("LM Studio") { queue.localURL = "http://127.0.0.1:1234/v1" }
+                Button("mlx-vlm") { queue.localURL = "http://127.0.0.1:8080/v1" }
+            }
+            if !queue.localURL.isEmpty, queue.localEndpoint == nil {
+                Text("只接受本机地址。").foregroundStyle(.orange)
+            }
+            Text("只连这台 Mac 上的服务，文件不离开本机。在高精度模式里选「本机服务」后使用。").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
 struct DiagnosticsTab: View {
     @EnvironmentObject var d: DiagnosticsModel
+    @EnvironmentObject var queue: QueueModel
 
     private func export() {
         let p = NSSavePanel()
@@ -139,6 +187,11 @@ struct DiagnosticsTab: View {
                 Toggle("日志包含正文", isOn: $d.logText)
                 if d.logText { Text(DiagnosticsModel.textWarning).foregroundStyle(.red) }
                 Button("导出日志…", action: export)
+            }
+            Section("中间文件") {
+                Toggle("保留中间页图", isOn: $queue.keepPages)
+                Text("每页一张图，整本要占几 GB 磁盘，处理完需要手动清理。").font(.caption).foregroundStyle(.secondary)
+                Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([queue.pageDirectory]) }
             }
             Section("这台 Mac") {
                 LabeledContent("芯片", value: d.system.chip)

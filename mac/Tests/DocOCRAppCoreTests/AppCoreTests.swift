@@ -44,7 +44,7 @@ final class FakeBackend: BookBackend, @unchecked Sendable {
 
     init(dir: URL) { self.dir = dir }
 
-    func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, workdir: URL) async throws -> OnlinePlan {
+    func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, workdir: URL) async throws -> OnlinePlan {
         let bodies = dir.appendingPathComponent(pdf.lastPathComponent + ".upload", isDirectory: true)
         try FileManager.default.createDirectory(at: bodies, withIntermediateDirectories: true)
         let f = bodies.appendingPathComponent("p1.json")
@@ -61,10 +61,11 @@ final class FakeBackend: BookBackend, @unchecked Sendable {
 
     /// 裁决挂钩要在工作线程上调，和 runBook 一样
     var fused: FusedDoc?
+    nonisolated(unsafe) var last: BookOptions?
     private(set) var adjudicated: AdjudicationSummary?
 
     func run(_ opts: BookOptions, plan: OnlinePlan?, ticket: UploadTicket?, app: BackendContext) async throws -> BookResult {
-        lock.lock(); ran.append(opts.pdf); lock.unlock()
+        lock.lock(); ran.append(opts.pdf); last = opts; lock.unlock()
         if opts.isCancelled?() == true { throw BookError.cancelled }
         if let error { throw error }
         var o = opts
@@ -117,7 +118,7 @@ final class AppCoreTests: XCTestCase {
         try s.save("sk-test", for: "dashscope")
         if network { a.allowNetwork() } else { a.chooseLocalOnly() }
         let b = FakeBackend(dir: dir)
-        let q = QueueModel(app: a, backend: b, modelsDir: try models(), vlDirectory: dir.appendingPathComponent("vl"), history: History(url: dir.appendingPathComponent("h.json")), outdir: dir)
+        let q = QueueModel(app: a, backend: b, modelsDir: try models(), vlDirectory: dir.appendingPathComponent("vl"), history: History(url: dir.appendingPathComponent("h.json")), prefs: Mem(), outdir: dir)
         if online {
             a.setSelected(qwen, true)
             q.onlineProviderID = "dashscope"
@@ -352,7 +353,7 @@ final class AppCoreTests: XCTestCase {
 
     func testVLDirectoryIsNeverInsideBundledModels() {
         let q = QueueModel(app: AppModel(store: Mem(), wire: CountingWire(), secrets: MemorySecretStore()), backend: FakeBackend(dir: dir),
-                           modelsDir: dir, history: History(url: dir.appendingPathComponent("h.json")), outdir: dir)
+                           modelsDir: dir, history: History(url: dir.appendingPathComponent("h.json")), prefs: Mem(), outdir: dir)
         XCTAssertFalse(q.vlDirectory.path.hasPrefix(dir.path))
         XCTAssertTrue(q.vlDirectory.path.contains("Application Support"))
     }
@@ -387,6 +388,80 @@ final class AppCoreTests: XCTestCase {
         let b = History(url: h)     // 模拟崩溃后重启
         XCTAssertEqual(b.records[0].state, "interrupted")
         XCTAssertEqual(b.records[0].outputs.count, 1)
+    }
+
+    // MARK: 高级选项与部分页
+
+    func testAdvancedOptionsReachBook() async throws {
+        let r = try rig(online: false)
+        r.q.unitsLabel = "cpu"
+        r.q.vlmAll = true
+        r.q.vlmBreaks = true
+        r.q.keepPages = true
+        r.q.pagesText = " 2-3 "
+        r.q.add([pdf("a")])
+        r.q.start()
+        await r.q.waitUntilIdle()
+        let o = try XCTUnwrap(r.backend.last)
+        XCTAssertEqual(o.units, .cpuOnly)
+        XCTAssertEqual(o.unitsLabel, "cpu")
+        XCTAssertTrue(o.vlmAll && o.vlmBreaks && o.keepPages)
+        XCTAssertEqual(o.pagesSpec, "2-3")
+    }
+
+    func testDefaultsAreConservative() async throws {
+        let r = try rig(online: false)
+        r.q.add([pdf("a")])
+        r.q.start()
+        await r.q.waitUntilIdle()
+        let o = try XCTUnwrap(r.backend.last)
+        XCTAssertEqual(o.units, .cpuAndNeuralEngine)
+        XCTAssertFalse(o.vlmAll || o.vlmBreaks || o.keepPages)
+        XCTAssertNil(o.pagesSpec)
+    }
+
+    func testPreferencesPersist() throws {
+        let p = Mem(), a = AppModel(store: Mem(), wire: CountingWire(), secrets: MemorySecretStore())
+        func q() throws -> QueueModel {
+            QueueModel(app: a, backend: FakeBackend(dir: dir), modelsDir: try models(), history: History(url: dir.appendingPathComponent("p.json")), prefs: p, outdir: dir)
+        }
+        let one = try q()
+        one.unitsLabel = "gpu"
+        one.localURL = "http://127.0.0.1:1234/v1"
+        XCTAssertEqual(try q().unitsLabel, "gpu")
+        XCTAssertEqual(try q().localURL, "http://127.0.0.1:1234/v1")
+    }
+
+    func testBadPageSpecBlocksStart() throws {
+        let r = try rig(online: false)
+        r.q.add([pdf("a")])
+        r.q.pagesText = "abc"
+        XCTAssertFalse(r.q.canStart)
+        r.q.pagesText = "1-3,7"
+        XCTAssertTrue(r.q.canStart)
+    }
+
+    func testLocalServiceOnlyLoopbackAndNeedsNoNetwork() async throws {
+        let r = try rig(network: false, online: false)
+        r.q.add([pdf("a")])
+        r.q.highPrecision = true
+        r.q.useLocalService = true
+        XCTAssertFalse(r.q.needsVLModel, "本机服务不需要进程内模型")
+        r.q.localURL = "https://api.example.com/v1"
+        r.q.localModel = "m"
+        XCTAssertNil(r.q.localEndpoint)
+        XCTAssertFalse(r.q.canStart)
+        r.q.localURL = "http://127.0.0.1.evil.com/v1"
+        XCTAssertNil(r.q.localEndpoint)
+        r.q.localURL = "http://192.168.1.2:11434/v1"
+        XCTAssertNil(r.q.localEndpoint)
+        r.q.localURL = "http://127.0.0.1:11434/v1"
+        XCTAssertTrue(r.q.canStart, "总开关关着也能用")
+        r.q.start()
+        await r.q.waitUntilIdle()
+        XCTAssertEqual(r.backend.last?.vlmURL?.absoluteString, "http://127.0.0.1:11434/v1")
+        XCTAssertNil(r.q.confirm)
+        XCTAssertEqual(r.wire.count, 0)
     }
 
     // MARK: 在线裁决

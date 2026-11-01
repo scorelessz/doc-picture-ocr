@@ -4,10 +4,19 @@ import OCRProviders
 import SwiftUI
 
 // 测试入口，脚本用：
-//   --smoke <outdir> a.pdf b.pdf [--cancel-after 秒]   用和界面相同的 QueueModel 跑完，写 smoke.json 后退出
+//   --smoke <outdir> a.pdf b.pdf [--cancel-after 秒] [--pages 范围] [--keep-pages] [--adjudicate 服务商 模型 image|text [--stub-wire]]   用和界面相同的 QueueModel 跑完，写 smoke.json 后退出
 //   --test-connection <服务商> <结果文件>
 //   --keychain-test write|read|state|overwrite|delete <结果文件>
 //   --snapshot <dir>               把各界面渲染成 PNG 后退出
+
+/// 假线路：不出网，裁决永远回答 1 号。验证真实 runBook 的裁决流程用。
+final class StubWire: WireClient, @unchecked Sendable {
+    func perform(_ r: URLRequest) async throws -> HTTPReply {
+        HTTPReply(status: 200, body: try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": "{\"choice\": 1}"]]]]))
+    }
+
+    func cancelAll() {}
+}
 
 final class MemoryStore: KVStore {
     private var d: [String: String] = [:]
@@ -75,9 +84,29 @@ enum TestEntry {
     }
 
     private static func smoke(out: URL, pdfs: [URL]) async {
-        let app = AppModel(store: MemoryStore(), secrets: MemorySecretStore())
-        let q = QueueModel(app: app, history: History(url: out.appendingPathComponent("history.json")), outdir: out)
+        let secrets = MemorySecretStore(), args = CommandLine.arguments
+        let stub = args.contains("--stub-wire")
+        let app = stub ? AppModel(store: MemoryStore(), wire: StubWire(), secrets: secrets) : AppModel(store: MemoryStore(), secrets: secrets)
+        let q = QueueModel(app: app, history: History(url: out.appendingPathComponent("history.json")), prefs: MemoryStore(), outdir: out)
         q.overwrite = true
+        if let i = args.firstIndex(of: "--pages") { q.pagesText = args[i + 1] }
+        q.keepPages = args.contains("--keep-pages")
+        // --adjudicate <服务商> <模型> <image|text>：Key 从 stdin 读，确认窗自动确认
+        if let i = args.firstIndex(of: "--adjudicate"), let p = ProviderPresets.find(args[i + 1]), let key = stub ? "stub" : readLine() {
+            try? secrets.save(key, for: p.id)
+            app.allowNetwork()
+            app.setSelected(p, true)
+            q.adjudicateOn = true
+            q.adjudicateProviderID = p.id
+            q.adjudicateModel = args[i + 2]
+            q.adjudicateMode = AdjudicationMode(rawValue: args[i + 3]) ?? .image
+            Task { @MainActor in
+                while !Task.isCancelled {
+                    if q.confirm != nil { q.confirmUpload(checkbox: true, forBatch: false) }
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+            }
+        }
         q.forceOCR = true
         q.highPrecision = CommandLine.arguments.contains("--high-precision")
         q.add(pdfs)
@@ -105,7 +134,8 @@ enum TestEntry {
         beat.cancel()
         let rows = q.jobs.map { j -> [String: Any] in
             ["seconds": Date().timeIntervalSince(t0), "main_thread_max_gap": maxGap, "cancel_seconds": cancelSeconds, "pdf": j.pdf.lastPathComponent, "status": "\(j.status)", "pages": j.record?.pages ?? 0, "sec_per_page": j.record?.secPerPage ?? 0,
-             "outputs": j.record?.outputs.count ?? 0, "degraded": j.record?.degraded ?? []]
+             "outputs": j.record?.outputs.count ?? 0, "degraded": j.record?.degraded ?? [],
+             "adjudication": j.record?.adjudication.map { "总 \($0.total) 裁决 \($0.chosen) 改 \($0.changed) 判断不了 \($0.undecided) 失败 \($0.failed)" } ?? ""]
         }
         let d = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys])
         try? d?.write(to: out.appendingPathComponent("smoke.json"))

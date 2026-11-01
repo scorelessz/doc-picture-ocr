@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # 组装 DocOCR.app：swift build → 拼包 → 打入 Core ML 模型 → ad-hoc 签名 → ditto 压缩。
-#   packaging/build_app.sh               产物在 dist/DocOCR.app 和 dist/DocOCR-<版本>.zip
+#   packaging/build_app.sh               产物是 dist/DocOCR-<版本>.zip
 #   packaging/build_app.sh --skip-build  用现成的 .build/release
+#   packaging/build_app.sh --keep-app    保留 dist/DocOCR.app（默认删掉：系统会把它当成第二个 App 索引）
 # 没有开发者账号，只做本机签名，不做公证。PaddleOCR-VL 不打包，按需下载。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-SKIP=0; [ "${1:-}" = "--skip-build" ] && SKIP=1
+SKIP=0; KEEP=0
+for a in "$@"; do
+  case "$a" in
+    --skip-build) SKIP=1 ;;
+    --keep-app) KEEP=1 ;;
+    *) echo "未知参数: $a"; exit 2 ;;
+  esac
+done
 MODELS="${DOCOCR_MODELS:-$HOME/Library/Application Support/DocOCR/models}"
 [ -f "$MODELS/keys.txt" ] || { echo "✗ 没有模型: $MODELS（先跑 ocr-cli models fetch）"; exit 1; }
 [ "$SKIP" = 1 ] || swift build -c release --product DocOCRApp
@@ -59,3 +67,4 @@ rm -f dist/DocOCR-*.zip
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 echo "✓ $APP  $(du -sh "$APP" | cut -f1)"
 echo "✓ $ZIP  $(du -sh "$ZIP" | cut -f1)"
+[ "$KEEP" = 1 ] || rm -rf "$APP"

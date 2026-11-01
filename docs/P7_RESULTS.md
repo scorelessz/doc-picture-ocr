@@ -19,7 +19,7 @@
 | 设置：模型、服务商、诊断、加速信息 | 完成 |
 | 不阻塞主线程，可取消，崩溃后能看到已完成的产物 | 完成 |
 | ViewModel 单测和冒烟脚本 | 完成 |
-| 在线裁决的界面 | 未做，命令行有 `ocr-cli adjudicate` |
+| 在线裁决的界面 | 完成，见下 |
 
 ## 冒烟（`dev/p7_smoke.sh`）
 
@@ -47,10 +47,33 @@
 - 运行前用 `dev/guard_instances.sh` 检查，有实例在跑就停下问用户。
 - 用户开着 App 时不要替换 `~/Applications/DocOCR.app`：实测运行中替换后，实例会挂住。
 
-## 待办（用户 2026-11-01）
+## 在线裁决（App）
 
-1. **高精度模式开关旁加简短说明**（下次改界面时做），内容按 P5 实测：
-   「普通模式：两个本地引擎交叉核对，整本约 3 分钟，错误率约 0.5%。
-   高精度模式：再加本地大模型逐页投票，错误率再降约 0.05–0.1 个百分点（中文 0.49% → 0.40%，英文 0.50% → 0.45%），
-   但整本约 1 小时（慢约 20 倍），内存多约 1–3 GB。不赶时间、要求逐字精确时再开。」
-2. **在线裁决的界面**（P7 第一版没做，目前只有 `ocr-cli adjudicate`）：用户在 App 里找不到开关。
+放在主界面选项里，默认关，总开关关时灰掉并写原因。融合之后、写产物之前执行，所以改过的读法会进入 Markdown 和 PDF。
+流程：本地 OCR 跑完 → 统计分歧行 → 确认窗写明 N 处分歧、约 M 字 / K 张裁切图、域名、费用 → 勾选后才发。不确认就只保留本地结果，任务照常完成。
+和在线读字不同：在线读字不确认时任务不开始，因为它在 OCR 之前问；裁决要 OCR 后才知道分歧数。
+
+## App 与命令行功能对照
+
+| 功能 | App | 命令行 |
+|---|---|---|
+| 可搜索 PDF、Markdown | 主界面 | `book`，`--no-pdf`，`--no-md` |
+| 分页标记 | 主界面 | `--page-marks` |
+| 输出目录 | 主界面 | `--outdir` |
+| 覆盖已有产物 | 主界面 | `--force` |
+| 只处理部分页 | 主界面「页范围」 | `--pages A-B` 或 `a,b,c` |
+| 忽略文字层重新 OCR | 主界面 | `--force-ocr` |
+| 高精度（进程内） | 主界面 | `--vlm`，`--vl-model` |
+| 高精度（本机服务） | 主界面 + 设置 → 服务商 | `--vlm-url`，`--vlm-model` |
+| 高精度读全部页 | 设置 → 高级 | `--vlm-all` |
+| 段落切分听大模型（实验） | 设置 → 高级 | `--vlm-breaks` |
+| 计算单元 | 设置 → 高级 | `--units` |
+| 保留中间页图 | 设置 → 诊断 | `--keep-pages` |
+| 在线读字 | 主界面 | `--vlm-provider`，`--vlm-model`，`--allow-network` |
+| 在线裁决 | 主界面，融合后执行 | `adjudicate`，处理做完的 `fused.json` |
+| 模型下载、校验、删除 | 设置 → 模型 | `models fetch`（校验看 `doctor`，没有删除） |
+| 服务商、Key | 设置 → 服务商 | `provider list`，`provider key`，`provider probe` |
+| 环境自检、日志 | 设置 → 诊断 | `doctor`，`--log-level`，`--log-file`，`--log-text` |
+| 只有命令行 | 无 | 调试子命令（`vision`、`render`、`recognize`、`page-info`、`fuse`、`md`、`pdf`、`paddle`、`paddle-plan`、`vl`、`vlm-fuse`），`--clobber`，`--paddle python`，`models fetch --url`，`verify-uploads`，`provider models`，`--result` |
+
+`book --pages` 里单个数字就是那一页。旧子命令的 `--pages 20` 仍表示 1 到 20 页，没有改，避免影响现有基准脚本。

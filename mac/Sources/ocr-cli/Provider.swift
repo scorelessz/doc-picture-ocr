@@ -37,7 +37,7 @@ func prepareOnlineVLM(_ id: String, into o: inout BookOptions, args: [String]) t
     guard p.dialect == .openAICompatible else { fail("\(p.name) 的适配还没有做", code: 2) }
     let key = args.contains("--key-stdin") ? SecretKey(readKeyFromStdin()) : try KeychainStore().loadAuthorizing(p.id)
     guard let key else { fail("没有 \(p.id) 的 Key: 先跑 ocr-cli provider key set \(p.id)", code: 2) }
-    let plan = try OnlinePlan.prepare(preset: p, model: model, pdf: o.pdf, forceOCR: o.forceOCR, workdir: o.workdir, log: warn)
+    let plan = try OnlinePlan.prepare(preset: p, model: model, pdf: o.pdf, forceOCR: o.forceOCR, pagesSpec: o.pagesSpec, workdir: o.workdir, log: warn)
     let (endpoint, pages, m, dir) = (plan.endpoint, plan.pages, plan.manifest, plan.bodies)
     print("""
     将上传页面图片到非本机地址:

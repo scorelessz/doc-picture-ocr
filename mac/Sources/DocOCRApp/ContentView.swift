@@ -222,6 +222,10 @@ struct QueueView: View {
                     Spacer()
                 }
                 HStack {
+                    Text("页范围").foregroundStyle(.secondary)
+                    TextField("留空为全部，例如 1-20 或 3,5,8", text: $queue.pagesText).frame(width: 260)
+                }
+                HStack {
                     Text("输出目录").foregroundStyle(.secondary)
                     Text(queue.outdir.path).lineLimit(1).truncationMode(.middle)
                     Button("更改…", action: pickOutdir)
@@ -232,6 +236,11 @@ struct QueueView: View {
                 Toggle("高精度模式", isOn: $queue.highPrecision)
                 Text(QueueModel.highPrecisionNote).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if queue.highPrecision {
+                    Picker("大模型来源", selection: $queue.useLocalService) {
+                        Text("进程内（默认）").tag(false)
+                        Text("本机服务").tag(true)
+                    }.pickerStyle(.segmented).frame(width: 300)
+                    if queue.useLocalService { Text("本机服务在设置 → 服务商里配置，仅本机。").font(.caption).foregroundStyle(.secondary) }
                     if queue.needsVLModel {
                         SettingsLink { Text("高精度模型还没装，去模型管理") }
                     }

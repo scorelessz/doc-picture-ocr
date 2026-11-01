@@ -36,6 +36,8 @@ public struct BookOptions {
     /// 在线裁决：融合之后、写产物之前调用，改过的读法才进得了 md 和 PDF。返回 nil 表示不用裁决。
     public var adjudicate: ((FusedDoc) throws -> (FusedDoc, AdjudicationSummary)?)?
     public var vlmBreaks = false
+    /// 只处理这些页：A-B 或 a,b,c。nil 表示全部
+    public var pagesSpec: String?
     /// 进度：阶段名、已完成、总数。在工作线程上回调。
     public var progress: (@Sendable (BookStage, Int, Int) -> Void)?
     /// 轮询取消。在每批页面、每页 VLM 之间检查。
@@ -144,11 +146,14 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     }
 
     let doc = try PageRenderer.open(o.pdf)
-    let n = doc.pageCount
+    let srcPages = doc.pageCount
+    let list = try o.pagesSpec.map { try parsePages($0, count: srcPages) } ?? Array(1...max(1, srcPages))
+    let n = srcPages == 0 ? 0 : list.count
     var degraded: [String] = []
 
     // ---- 渲染 + 白页闸门 + Vision：分批，渲染串行（PDFDocument 不保证线程安全），Vision 和存图并行 ----
     final class Slot: @unchecked Sendable {
+        var pno = 0
         var doc: PageDoc?
         var png: URL?
         var failed = false
@@ -167,11 +172,11 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     if let paddle { logComputePlan(paddle, units: o.units, label: o.unitsLabel) }
     var dpis = Set<Double>()
     try stage("render+vision") {
-        for start in stride(from: 1, through: n, by: o.jobs) {
+        for start in stride(from: 0, to: n, by: o.jobs) {
             if o.isCancelled?() == true { throw BookError.cancelled }
-            o.progress?(.ocr, start - 1, n)
+            o.progress?(.ocr, start, n)
             var batch: [(Int, Slot)] = []
-            for pno in start...min(n, start + o.jobs - 1) {
+            for pno in list[start..<min(n, start + o.jobs)] {
                 guard let page = doc.page(at: pno - 1) else { throw BookError.failed("读不到第 \(pno) 页") }
                 let dpi = PageInspect.chooseDPI(page)
                 dpis.insert(dpi)
@@ -184,6 +189,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                 let noInk = dark >= 0 && dark < RenderDefaults.noInkDark
                 if noInk { p.noInk = true }
                 let slot = Slot()
+                slot.pno = pno
                 slot.dpi = dpi
                 slot.dark = dark
                 if native, noInk || !o.forceOCR {
@@ -245,7 +251,12 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                     }
                     s.visionSec = Date().timeIntervalSince(tv)
                     s.upright = nil
-                    if o.coreml != nil { s.image = nil }
+                    if o.coreml != nil {
+                        if o.keepPages {
+                            do { try PageRenderer.writePNG(s.image!, to: pagesDir.appendingPathComponent(String(format: "p%04d.png", pno))) } catch { s.error = "\(error)" }
+                        }
+                        s.image = nil
+                    }
                     if o.coreml == nil {
                         let png = pagesDir.appendingPathComponent(String(format: "p%04d.png", pno))
                         do {
@@ -258,12 +269,12 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                     }
                 }
             }
-            if start % (o.jobs * 10) == 1 { log("渲染+Vision \(min(n, start + o.jobs - 1))/\(n)") }
+            if start % (o.jobs * 10) == 0 { log("渲染+Vision \(min(n, start + o.jobs))/\(n)") }
         }
     }
     var vDoc = EngineDoc(source: o.pdf.path, engine: "vision", dpi: dpis.count == 1 ? dpis.first! : RenderDefaults.baseDPI,
                          pages: slots.map { $0.doc! })
-    let visionFailed = slots.enumerated().filter(\.element.failed).map { $0.offset + 1 }
+    let visionFailed = slots.filter(\.failed).map(\.pno)
 
     // ---- RapidOCR ----
     var rDoc = EngineDoc(source: o.pdf.path, engine: "rapidocr", dpi: vDoc.dpi,
@@ -284,8 +295,8 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                                   "rec": .d(paddle!.timing.rec), "canvas_fallbacks": .i(paddle!.canvasFallbacks)])
     } else {
       try stage("rapidocr") {
-        let manifest = slots.enumerated().compactMap { (i, s) -> [String: String]? in
-            s.png.map { ["page": "\(i + 1)", "png": $0.path] }
+        let manifest = slots.compactMap { s -> [String: String]? in
+            s.png.map { ["page": "\(s.pno)", "png": $0.path] }
         }.map { d -> [String: AnyCodable] in ["page": .int(Int(d["page"]!)!), "png": .string(d["png"]!)] }
         let mf = o.workdir.appendingPathComponent("\(stem).rapid-manifest.json")
         let of = o.workdir.appendingPathComponent("\(stem).rapid-lines.json")
@@ -328,6 +339,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     if o.vlmLocal != nil || o.vlmURL != nil || o.vlmOnline != nil {
         try stage("vlm") {
             let doc2 = try PageRenderer.open(o.pdf)
+            let dpiOf = Dictionary(slots.map { ($0.pno, $0.dpi) }, uniquingKeysWith: { a, _ in a })
             for i in fused.pages.indices {
                 if o.isCancelled?() == true { throw BookError.cancelled }
                 o.progress?(.vlm, i, fused.pages.count)
@@ -350,7 +362,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                     if let f = o.vlmOnline {
                         text = try f(pno)       // 请求体在确认前就定好了，不在这里重新渲染
                     } else {
-                        let r0 = try PageRenderer.render(doc2, page: pno, dpi: slots[i].dpi)
+                        let r0 = try PageRenderer.render(doc2, page: pno, dpi: dpiOf[pno] ?? RenderDefaults.baseDPI)
                         var img = r0.image
                         if let rot = fused.pages[i].pageRotation, let p = paddle { img = try p.rotatedImage(img, rot) }
                         if let f = o.vlmLocal {
@@ -394,7 +406,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     if Log.shared.enabled {
         let drops = Dictionary(grouping: flog.drops, by: \.page)
         for (i, s) in slots.enumerated() {
-            let pno = i + 1
+            let pno = s.pno
             let fp = fused.pages.first { $0.page == pno }
             var f: [String: LogValue] = [
                 "page": .i(pno), "dpi": .d(s.dpi), "width": .i(s.doc?.width ?? 0), "height": .i(s.doc?.height ?? 0),
@@ -489,7 +501,8 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     ri.degraded = degraded
     ri.failedPages = bothFailed
     ri.singleEnginePages = single
-    ri.srcPages = n
+    ri.srcPages = srcPages
+    if o.pagesSpec != nil { ri.processedPages = list }
     ri.vlm = vlmReports
     ri.adjudication = adjudication
     res.adjudication = adjudication
@@ -529,11 +542,11 @@ public struct OnlinePlan: Sendable {
         self.pages = pages; self.manifest = manifest; self.bodies = bodies
     }
 
-    public static func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, workdir: URL, log: (String) -> Void) throws -> OnlinePlan {
+    public static func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String? = nil, workdir: URL, log: (String) -> Void) throws -> OnlinePlan {
         let endpoint = try Endpoint(preset.baseURL)
         let stem = pdf.deletingPathExtension().lastPathComponent
         let dir = workdir.appendingPathComponent("\(stem).upload", isDirectory: true)
-        let pages = try prepareOnlinePages(pdf: pdf, model: model, maxEdge: 1792, forceOCR: forceOCR, into: dir, log: log)
+        let pages = try prepareOnlinePages(pdf: pdf, model: model, maxEdge: 1792, forceOCR: forceOCR, pagesSpec: pagesSpec, into: dir, log: log)
         let m = onlineManifest(pages, providerID: preset.id, providerName: preset.name, host: endpoint.host, model: model)
         return OnlinePlan(preset: preset, endpoint: endpoint, model: model, pages: pages, manifest: m, bodies: dir)
     }
@@ -634,11 +647,11 @@ public final class LineCropper {
 }
 
 /// 上传前的准备：渲染、缩放、编码成请求体落盘。跳过无墨迹页和用文字层的页。在做任何 OCR 之前调用。
-public func prepareOnlinePages(pdf: URL, model: String, maxEdge: Int, forceOCR: Bool, into dir: URL, log: (String) -> Void) throws -> [OnlinePage] {
+public func prepareOnlinePages(pdf: URL, model: String, maxEdge: Int, forceOCR: Bool, pagesSpec: String? = nil, into dir: URL, log: (String) -> Void) throws -> [OnlinePage] {
     let doc = try PageRenderer.open(pdf)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     var out: [OnlinePage] = []
-    for pno in 1...max(1, doc.pageCount) {
+    for pno in try pagesSpec.map({ try parsePages($0, count: doc.pageCount) }) ?? Array(1...max(1, doc.pageCount)) {
         guard let page = doc.page(at: pno - 1) else { continue }
         try autoreleasepool {
             let r = try PageRenderer.render(doc, page: pno, dpi: PageInspect.chooseDPI(page))

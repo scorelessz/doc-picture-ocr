@@ -283,6 +283,8 @@ numpy / shapely BSD，PyInstaller GPLv2 但有明确的「允许打包并分发�
 - 每个新版本第一次访问「桌面」「文稿」时，系统都会询问一次，这是正常的。用文件选择窗或拖入的文件不会问，但默认输出目录在「文稿」下。
 - 换版本后，之前保存的 API Key 需要在设置里授权一次或重新填写。
 
+App 和命令行的功能对照见 `docs/P7_RESULTS.md`。
+
 ### 从源码运行
 
 需要 macOS 14+、Xcode 和 Metal Toolchain（`xcodebuild -downloadComponent MetalToolchain`）。还没有签名和打包，先在本机运行：

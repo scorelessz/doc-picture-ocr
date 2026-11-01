@@ -40,7 +40,7 @@ usage:
   ocr-cli provider models <id> --allow-network [--key-stdin]
   ocr-cli provider probe <id> --allow-network --model m [--key-stdin]
   ocr-cli paddle-plan --models dir --out plan.json
-  ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
+  ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf] [--pages A-B|a,b,c]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
                [--paddle coreml|python] [--models-dir dir] [--units ane|all|cpu|gpu]
                [--vlm [--vl-model dir] [--vlm-all] | --vlm-url http://127.0.0.1:端口/v1 [--vlm-model 名]]
@@ -350,6 +350,7 @@ do {
         o.searchable = !args.contains("--no-pdf")
         o.pageMarks = option(args, "--page-marks") ?? "comment"
         o.vlmBreaks = args.contains("--vlm-breaks")
+        o.pagesSpec = option(args, "--pages")
         o.vlmAll = args.contains("--vlm-all")
         guard ["none", "comment", "rule"].contains(o.pageMarks) else { fail(usage) }
         o.force = args.contains("--force")
@@ -362,8 +363,7 @@ do {
                 fail("找不到 Core ML 模型: \(dir)（先跑 ocr-cli models fetch，或用 --models-dir 指定）", code: 2)
             }
             o.coreml = URL(fileURLWithPath: dir, isDirectory: true)
-            let units: [String: MLComputeUnits] = ["ane": .cpuAndNeuralEngine, "all": .all, "cpu": .cpuOnly, "gpu": .cpuAndGPU]
-            guard let u = units[option(args, "--units") ?? "ane"] else { fail(usage) }
+            guard let u = computeUnits(option(args, "--units") ?? "ane") else { fail(usage) }
             o.units = u
             o.unitsLabel = option(args, "--units") ?? "ane"
         }

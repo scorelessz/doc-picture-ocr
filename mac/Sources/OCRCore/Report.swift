@@ -18,6 +18,42 @@ public struct ReportPDF: Sendable {
     public init() {}
 }
 
+public enum PageSpecError: Error, Equatable, CustomStringConvertible {
+    case invalid(String), outOfRange(page: Int, count: Int)
+
+    public var description: String {
+        switch self {
+        case .invalid(let s): return "页范围写法不对: \(s)（例如 1-20 或 3,5,8）"
+        case let .outOfRange(p, n): return "第 \(p) 页超出范围，这本书共 \(n) 页"
+        }
+    }
+}
+
+/// 页范围：A-B、a,b,c，可以混用。单个数字就是那一页。结果升序去重。
+public func parsePages(_ spec: String, count: Int) throws -> [Int] {
+    var out = Set<Int>()
+    let parts = spec.split(separator: ",", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+    for part in parts {
+        let ab = part.split(separator: "-", omittingEmptySubsequences: false).map { Int($0) }
+        guard ab.count <= 2, ab.allSatisfy({ $0 != nil }), let a = ab.first ?? nil, let b = ab.last ?? nil, a >= 1, a <= b else { throw PageSpecError.invalid(spec) }
+        if b > count { throw PageSpecError.outOfRange(page: b, count: count) }
+        out.formUnion(a...b)
+    }
+    return out.sorted()
+}
+
+/// [1,2,3,7] → "1-3, 7"
+public func compactPages(_ pages: [Int]) -> String {
+    var out: [String] = [], i = 0
+    while i < pages.count {
+        var j = i
+        while j + 1 < pages.count, pages[j + 1] == pages[j] + 1 { j += 1 }
+        out.append(i == j ? "\(pages[i])" : "\(pages[i])-\(pages[j])")
+        i = j + 1
+    }
+    return out.joined(separator: ", ")
+}
+
 /// 一次上传。在线读字时逐页写进报告。
 public struct UploadRow: Sendable {
     public let time: String, host: String, model: String, page: Int, bytes: Int, status: String
@@ -59,6 +95,8 @@ public struct ReportInput: Sendable {
     public var failedPages: [Int] = []
     public var singleEnginePages: [Int] = []
     public var srcPages: Int?
+    /// 只处理部分页时的页码；nil 表示全部
+    public var processedPages: [Int]?
     public var vlm: [VLMPageReport] = []
     public var uploads: [UploadRow] = []
     public var adjudication: AdjudicationSummary?
@@ -136,6 +174,7 @@ public func buildReport(_ r: ReportInput) -> String {
     let rotated = f.pages.compactMap { p in p.pageRotation.map { "第 \(p.page) 页 \($0)°" } }
     let newDrops = r.log.drops.filter(\.newRuleOnly)
 
+    if let p = r.processedPages { A("- 处理的页: \(compactPages(p))（共 \(p.count) 页，源文件 \(r.srcPages ?? p.count) 页，其余页没有处理）") }
     H("识别与融合")
     A("| 项 | 值 |")
     A("|---|---|")

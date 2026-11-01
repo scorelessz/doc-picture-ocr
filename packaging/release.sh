@@ -57,7 +57,7 @@ else
   if [ "$PY" = 1 ]; then
     packaging/build.sh --version "$VERSION"
   else
-    DOCOCR_VERSION="$VERSION" packaging/build_app.sh
+    DOCOCR_VERSION="$VERSION" packaging/build_app.sh --keep-app
   fi
 fi
 codesign --verify --deep "$APP" 2>&1 | sed 's/^/  /' || { echo "✗ 签名校验不过"; exit 1; }

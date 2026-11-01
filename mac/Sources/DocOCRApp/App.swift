@@ -12,7 +12,7 @@ final class Env: ObservableObject {
     init(store: KVStore = DefaultsStore(), secrets: SecretStore = KeychainStore(), outdir: URL? = nil) {
         app = AppModel(store: store, secrets: secrets)
         let out = outdir ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("DocOCR", isDirectory: true)
-        queue = QueueModel(app: app, outdir: out)
+        queue = QueueModel(app: app, prefs: store, outdir: out)
         models = ModelManager()
         providers = ProviderSettings(app: app, store: store)
         diagnostics = DiagnosticsModel()
