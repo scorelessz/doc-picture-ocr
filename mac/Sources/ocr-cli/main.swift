@@ -31,6 +31,10 @@ usage:
   ocr-cli doctor [--models-dir dir] [--outdir output] [--out checks.json]
   ocr-cli models fetch [--models-dir dir] [--url u] [--sha256 h]
   ocr-cli models fetch --vl [--models-dir dir] [--url 基址]
+  ocr-cli provider list
+  ocr-cli provider key set|delete <id>        Key 从 stdin 读，不接受参数
+  ocr-cli provider models <id> --allow-network [--key-stdin]
+  ocr-cli provider probe <id> --allow-network --model m [--key-stdin]
   ocr-cli paddle-plan --models dir --out plan.json
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
@@ -150,6 +154,9 @@ do {
         try enc.encode(res).write(to: URL(fileURLWithPath: out))
         print(String(format: "总 %.1fs  加载 %.2fs  均值 %.2fs/页  峰值内存 %.0f MB", Date().timeIntervalSince(t0), vl.loadSeconds,
                      secs.reduce(0, +) / Double(max(1, secs.count)), peakRSSMB().own))
+
+    case "provider":
+        try runProvider(args)
 
     case "models":
         guard args.first == "fetch" else { fail(usage) }

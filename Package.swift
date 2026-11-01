@@ -22,7 +22,7 @@ let package = Package(
         ], path: "mac/Sources/OCRVL"),
         .target(name: "OCREngines", dependencies: ["OCRCore"], path: "mac/Sources/OCREngines"),
         .target(name: "OCRProviders", dependencies: ["OCRCore"], path: "mac/Sources/OCRProviders"),
-        .executableTarget(name: "ocr-cli", dependencies: ["OCRCore", "OCREngines", "OCRVL"],
+        .executableTarget(name: "ocr-cli", dependencies: ["OCRCore", "OCREngines", "OCRVL", "OCRProviders"],
                           path: "mac/Sources/ocr-cli"),
         .testTarget(name: "OCRCoreTests", dependencies: ["OCRCore"], path: "mac/Tests/OCRCoreTests"),
         .testTarget(name: "OCREnginesTests", dependencies: ["OCREngines", "OCRCore"], path: "mac/Tests/OCREnginesTests"),
