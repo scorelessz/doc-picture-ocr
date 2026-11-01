@@ -27,6 +27,23 @@ public struct UploadRow: Sendable {
     }
 }
 
+/// 在线裁决的汇总，界面和报告共用。
+public struct AdjudicationSummary: Codable, Sendable, Equatable {
+    public struct Row: Codable, Sendable, Equatable {
+        public let page: Int, from: String, to: String
+
+        public init(page: Int, from: String, to: String) { self.page = page; self.from = from; self.to = to }
+    }
+
+    public var provider: String, model: String, mode: String
+    public var total = 0, chosen = 0, changed = 0, failed = 0, undecided = 0
+    public var declined = false
+    public var stopped: String?
+    public var rows: [Row] = []
+
+    public init(provider: String, model: String, mode: String) { self.provider = provider; self.model = model; self.mode = mode }
+}
+
 public struct ReportInput: Sendable {
     public var source: String
     public var sourceSize: Int
@@ -44,6 +61,7 @@ public struct ReportInput: Sendable {
     public var srcPages: Int?
     public var vlm: [VLMPageReport] = []
     public var uploads: [UploadRow] = []
+    public var adjudication: AdjudicationSummary?
 
     public init(source: String, sourceSize: Int, mdPath: String?, pdfPath: String?, fusedPath: String,
                 generatedAt: String, dpi: Double, fused: FusedDoc, log: FuseLog) {
@@ -223,6 +241,28 @@ public func buildReport(_ r: ReportInput) -> String {
         }
     }
     A()
+
+    // ---- 在线裁决 ----
+    if let a = r.adjudication {
+        H("在线裁决")
+        A("| 项 | 值 |")
+        A("|---|---|")
+        A("| 服务商 / 模型 | \(a.provider) / \(a.model) |")
+        A("| 方式 | \(a.mode) |")
+        A("| 分歧处 | \(a.total) |")
+        A("| 用户确认上传 | \(a.declined ? "否, 保留本地结果" : "是") |")
+        A("| 裁决了 | \(a.chosen) |")
+        A("| 改了读法 | \(a.changed) |")
+        A("| 模型判断不了 | \(a.undecided) |")
+        A("| 失败或没有发送 | \(a.failed) |")
+        if let s = a.stopped { A("| 提前停止 | \(cell(s)) |") }
+        if !a.rows.isEmpty {
+            A("")
+            A("| 页 | 原读法 | 改为 |")
+            A("|---|---|---|")
+            for x in a.rows { A("| \(x.page) | \(cell(x.from)) | \(cell(x.to)) |") }
+        }
+    }
 
     // ---- 上传记录 ----
     if !r.uploads.isEmpty {

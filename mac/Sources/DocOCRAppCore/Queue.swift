@@ -29,6 +29,7 @@ public struct HistoryRecord: Codable, Equatable, Sendable, Identifiable {
     public var report: String?
     public var pages = 0, secPerPage = 0.0
     public var degraded: [String] = []
+    public var adjudication: AdjudicationSummary?
 
     public init(pdf: String, outdir: String, startedAt: Date, state: String) {
         self.pdf = pdf; self.outdir = outdir; self.startedAt = startedAt; self.state = state
@@ -66,9 +67,16 @@ public final class History: @unchecked Sendable {
 }
 
 public struct ConfirmRequest: Equatable, Sendable {
-    public let manifest: UploadManifest, fileName: String
+    public enum Kind: Equatable, Sendable {
+        case pages
+        case adjudication(lines: Int, chars: Int, crops: Int)
+    }
 
-    public init(manifest: UploadManifest, fileName: String) { self.manifest = manifest; self.fileName = fileName }
+    public let manifest: UploadManifest, fileName: String, kind: Kind
+
+    public init(manifest: UploadManifest, fileName: String, kind: Kind = .pages) {
+        self.manifest = manifest; self.fileName = fileName; self.kind = kind
+    }
 
     public var providerName: String { manifest.providerName }
     public var host: String { manifest.host }
@@ -78,13 +86,40 @@ public struct ConfirmRequest: Equatable, Sendable {
         if case .estimated(let s) = manifest.estimatedCost { return s }
         return "未知"
     }
-    public var checkboxLabel: String { "我确认将以上 \(pages) 页图片上传到 \(host)" }
+    public var contentText: String {
+        switch kind {
+        case .pages: return "最多 \(pages) 页（有分歧的页才发送）"
+        case let .adjudication(n, m, k):
+            return "\(n) 处分歧，约 \(m) 字" + (k > 0 ? " / \(k) 张裁切图" : "，不传图片")
+        }
+    }
+    public var contentLabel: String { kind == .pages ? "页数" : "内容" }
+    public var cancelTitle: String { kind == .pages ? "取消，不上传" : "不上传，只保留本地结果" }
+    public var checkboxLabel: String {
+        switch kind {
+        case .pages: return "我确认将以上 \(pages) 页图片上传到 \(host)"
+        case let .adjudication(n, _, _): return "我确认将以上 \(n) 处分歧上传到 \(host)"
+        }
+    }
 }
 
 /// 可替换的后端，单测用假的。
 public protocol BookBackend: Sendable {
     func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, workdir: URL) async throws -> OnlinePlan
+    func adjudicationPlan(doc: FusedDoc, pdf: URL, preset: ProviderPreset, model: String, mode: AdjudicationMode, bodies: URL) async throws -> AdjudicationPlan
     func run(_ o: BookOptions, plan: OnlinePlan?, ticket: UploadTicket?, app: BackendContext) async throws -> BookResult
+}
+
+/// runBook 是同步的，挂钩在工作线程上等异步结果
+private func blocking<T: Sendable>(_ f: @escaping @Sendable () async throws -> T) throws -> T {
+    let sem = DispatchSemaphore(value: 0)
+    nonisolated(unsafe) var out: Result<T, Error>?
+    Task.detached {
+        do { out = .success(try await f()) } catch { out = .failure(error) }
+        sem.signal()
+    }
+    sem.wait()
+    return try out!.get()
 }
 
 public struct BackendContext: Sendable {
@@ -103,6 +138,10 @@ public struct LocalBackend: BookBackend {
 
     public func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, workdir: URL) async throws -> OnlinePlan {
         try await Task.detached { try OnlinePlan.prepare(preset: preset, model: model, pdf: pdf, forceOCR: forceOCR, workdir: workdir, log: { _ in }) }.value
+    }
+
+    public func adjudicationPlan(doc: FusedDoc, pdf: URL, preset: ProviderPreset, model: String, mode: AdjudicationMode, bodies: URL) async throws -> AdjudicationPlan {
+        try AdjudicationPlan.prepare(doc: doc, pdf: mode == .image ? pdf : nil, source: pdf.lastPathComponent, preset: preset, model: model, mode: mode, bodies: bodies)
     }
 
     public func run(_ o: BookOptions, plan: OnlinePlan?, ticket: UploadTicket?, app: BackendContext) async throws -> BookResult {
@@ -127,7 +166,7 @@ private final class Flag: @unchecked Sendable {
 
 @MainActor
 public final class QueueModel: ObservableObject {
-    public static let highPrecisionNote = "高精度模式整页读一遍，一本书约 1 小时，需要约 8–10 GB 内存；日常建议关闭。"
+    public static let highPrecisionNote = "普通模式：两个本地引擎交叉核对，整本约 3 分钟，错误率约 0.5%。\n高精度模式：再加本地大模型逐页投票，错误率再降约 0.05–0.1 个百分点（中文 0.49% → 0.40%，英文 0.50% → 0.45%），但整本约 1 小时（慢约 20 倍），内存多约 1–3 GB。不赶时间、要求逐字精确时再开。"
 
     @Published public private(set) var jobs: [Job] = []
     @Published public var makeMarkdown = true
@@ -139,6 +178,10 @@ public final class QueueModel: ObservableObject {
     @Published public var highPrecision = false
     @Published public var onlineProviderID: String?
     @Published public var onlineModel = ""
+    @Published public var adjudicateOn = false
+    @Published public var adjudicateMode: AdjudicationMode = .image
+    @Published public var adjudicateProviderID: String?
+    @Published public var adjudicateModel = ""
     @Published public private(set) var isRunning = false
     @Published public private(set) var confirm: ConfirmRequest?
     @Published public private(set) var history: [HistoryRecord]
@@ -166,12 +209,20 @@ public final class QueueModel: ObservableObject {
     /// 总开关关掉或取消选中后，在线读字自动失效
     public var onlineEnabled: Bool { onlineProviderID.map(app.isUsable) == true && !onlineModel.isEmpty }
 
+    public var adjudicateProviders: [ProviderPreset] { app.adjudicationProviders(adjudicateMode) }
+
+    /// 总开关关掉、取消选中、Key 没了，都自动失效
+    public var adjudicateReady: Bool {
+        adjudicateOn && !adjudicateModel.isEmpty && adjudicateProviders.contains { $0.id == adjudicateProviderID }
+    }
+
     public var blockReason: String? {
         if !makeMarkdown, !makePDF { return "至少选一种产物" }
         if !coreMLInstalled { return "还没有识别模型，请到设置 → 模型下载" }
         if needsVLModel { return "高精度模式需要 VL 模型，请到设置 → 模型下载" }
         if highPrecision, onlineEnabled { return "高精度模式和在线读字只能选一个" }
         if onlineProviderID != nil, !onlineEnabled { return app.networkAllowed ? "在线读字要选中服务商并填模型名" : AppModel.offReason }
+        if adjudicateOn, !adjudicateReady { return app.networkAllowed ? "在线裁决要选服务商和模型" : AppModel.offReason }
         return nil
     }
 
@@ -282,6 +333,16 @@ public final class QueueModel: ObservableObject {
         o.progress = { [weak self] stage, done, total in
             Task { @MainActor in self?.set(id, .running(stage: stage.rawValue, done: done, total: total)) }
         }
+        if adjudicateReady, let id = adjudicateProviderID, let preset = ProviderPresets.find(id) {
+            let k: SecretKey?
+            do { k = try app.secrets.load(id) } catch {
+                set(job.id, .failed("\(error)"))
+                return true
+            }
+            let uploads = outdir.appendingPathComponent("\(stem).uploads.jsonl")
+            o.uploadsPath = uploads
+            o.adjudicate = adjudicationHook(job: job, preset: preset, key: k, work: work, uploads: uploads)
+        }
         var rec = HistoryRecord(pdf: job.pdf.path, outdir: outdir.path, startedAt: Date(), state: "running")
         record(rec)
         set(job.id, .running(stage: BookStage.ocr.rawValue, done: 0, total: 0))
@@ -293,6 +354,7 @@ public final class QueueModel: ObservableObject {
             rec.pages = r.pages
             rec.secPerPage = r.secPerPage
             rec.degraded = r.degraded
+            rec.adjudication = r.adjudication
             record(rec)
             await Task.yield()
             set(job.id, .done)
@@ -312,6 +374,40 @@ public final class QueueModel: ObservableObject {
             set(job.id, .failed("\(error)"))
             return true
         }
+    }
+
+    /// 本地 OCR 跑完后才知道有多少分歧。这里在工作线程上，问用户时界面不卡；不确认就只保留本地结果。
+    private func adjudicationHook(job: Job, preset: ProviderPreset, key: SecretKey?, work: URL, uploads: URL) -> (FusedDoc) throws -> (FusedDoc, AdjudicationSummary)? {
+        let (backend, app, model, mode, id, pdf) = (backend, app, adjudicateModel, adjudicateMode, job.id, job.pdf)
+        let bodies = work.appendingPathComponent("adjudication", isDirectory: true)
+        return { [weak self] doc in
+            let plan = try blocking { try await backend.adjudicationPlan(doc: doc, pdf: pdf, preset: preset, model: model, mode: mode, bodies: bodies) }
+            defer { plan.discard() }
+            guard !plan.questions.isEmpty else { return (doc, plan.summary(AdjudicationOutcome(doc: doc))) }
+            let ticket: UploadTicket? = try blocking { await self?.askAdjudication(plan, jobID: id, fileName: pdf.lastPathComponent) }
+            guard let ticket else { return (doc, plan.declinedSummary()) }
+            let transport = try blocking { await app.transport }
+            let reader = OnlineReader(transport: transport, endpoint: plan.endpoint, providerID: preset.id, model: model, key: key,
+                                      ticket: ticket, ledger: try FileLedger(uploads))
+            let out = try blocking { await plan.run(doc, reader: reader) }
+            return (out.doc, plan.summary(out))
+        }
+    }
+
+    private func askAdjudication(_ plan: AdjudicationPlan, jobID: UUID, fileName: String) async -> UploadTicket? {
+        let st = await app.gate.request(plan.manifest)
+        if case .confirmed(let t) = st { return t }     // 同一批次、同一域名
+        set(jobID, .awaitingConfirm)
+        confirm = ConfirmRequest(manifest: plan.manifest, fileName: fileName,
+                                 kind: .adjudication(lines: plan.questions.count, chars: plan.chars, crops: plan.crops))
+        let (ok, scope) = await withCheckedContinuation { self.answer = $0 }
+        confirm = nil
+        set(jobID, .running(stage: BookStage.adjudicate.rawValue, done: 0, total: 0))
+        guard ok, let scope else {
+            await app.gate.decline()
+            return nil
+        }
+        return try? await app.gate.confirm(checkbox: true, scope: scope)
     }
 
     private func record(_ r: HistoryRecord) {

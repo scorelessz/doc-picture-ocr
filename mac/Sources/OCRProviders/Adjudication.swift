@@ -8,6 +8,7 @@ public enum AdjudicationMode: String, Sendable {
     case image, text
 
     public var evidence: String { self == .image ? "image" : "text_only" }
+    public var title: String { self == .image ? "看图裁决" : "纯文本裁决（仅文本依据）" }
 }
 
 public struct AdjudicationQuestion: Sendable {
@@ -83,6 +84,26 @@ public struct AdjudicationOutcome: Sendable {
     public var chosen = 0, changed = 0
     public var undecided: [String: Int] = [:]
     public var stoppedEarly: String?
+
+    public init(doc: FusedDoc) { self.doc = doc }
+}
+
+extension AdjudicationOutcome {
+    public func summary(provider: String, model: String, mode: AdjudicationMode, total: Int) -> AdjudicationSummary {
+        var s = AdjudicationSummary(provider: provider, model: model, mode: mode.title)
+        s.total = total
+        s.chosen = chosen
+        s.changed = changed
+        s.failed = (undecided["request_failed"] ?? 0) + (undecided["not_sent"] ?? 0)
+        s.undecided = undecided.filter { !["request_failed", "not_sent"].contains($0.key) }.values.reduce(0, +)
+        s.stopped = stoppedEarly
+        s.rows = doc.pages.flatMap { p in
+            p.lines.compactMap { l in
+                l.adjudication.flatMap { $0.from == l.text ? nil : AdjudicationSummary.Row(page: p.page, from: $0.from, to: l.text) }
+            }
+        }
+        return s
+    }
 }
 
 /// 逐条裁决。鉴权之类的硬失败立刻停，其余条目保留本地读法；不换家，不退回别的方式。

@@ -127,7 +127,7 @@ public final class ProviderSettings: ObservableObject {
     public init(app: AppModel, store: KVStore = DefaultsStore(), profileDir: URL = ProfileStore.defaultDirectory) {
         self.app = app; self.store = store; self.profileDir = profileDir
         for p in ProviderPresets.all {
-            models[p.id] = store.string("model." + p.id) ?? p.recommendedVision ?? ""
+            models[p.id] = store.string("model." + p.id) ?? p.recommendedVision ?? p.recommendedText ?? ""
             lists[p.id] = ProfileStore.models(p.id, in: profileDir)
             profiles[p.id] = ProfileStore.profiles(p.id, in: profileDir)
         }
@@ -205,7 +205,7 @@ public final class ProviderSettings: ObservableObject {
     // MARK: 模型列表
 
     public func options(_ p: ProviderPreset) -> [ModelOption] {
-        ModelFilter.options(ids: lists[p.id]?.ids ?? [], profiles: profiles[p.id] ?? [], recommended: p.recommendedVision)
+        ModelFilter.options(ids: lists[p.id]?.ids ?? [], profiles: profiles[p.id] ?? [], recommended: p.recommendedVision ?? p.recommendedText)
     }
 
     /// 没联网或没刷新到时显示缓存时间

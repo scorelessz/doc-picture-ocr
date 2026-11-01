@@ -12,13 +12,15 @@ public struct ProviderPreset: Sendable, Equatable {
     public var recommendedVision: String? = nil
     /// 只用于纯文本裁决：P6 实测看图不稳定
     public var textOnly = false
+    /// 纯文本裁决的推荐模型
+    public var recommendedText: String? = nil
 }
 
 public enum ProviderPresets {
     public static let all = [
         ProviderPreset(id: "dashscope", name: "阿里云百炼", baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1", dialect: .openAICompatible, recommendedVision: "qwen3.7-flash"),
         ProviderPreset(id: "siliconflow", name: "硅基流动", baseURL: "https://api.siliconflow.cn/v1", dialect: .openAICompatible, recommendedVision: "Qwen/Qwen3-VL-32B-Instruct"),
-        ProviderPreset(id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/v1", dialect: .openAICompatible, textOnly: true),
+        ProviderPreset(id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/v1", dialect: .openAICompatible, textOnly: true, recommendedText: "deepseek-flash"),
         ProviderPreset(id: "openai", name: "OpenAI", baseURL: "https://api.openai.com/v1", dialect: .openAICompatible),
         ProviderPreset(id: "gemini", name: "Google Gemini", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", dialect: .openAICompatible),
         ProviderPreset(id: "openrouter", name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1", dialect: .openAICompatible),

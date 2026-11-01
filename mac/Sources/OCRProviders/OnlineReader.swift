@@ -91,7 +91,7 @@ public final class OnlineReader: @unchecked Sendable {
     let transport: HTTPTransport, endpoint: Endpoint, providerID: String, model: String, key: SecretKey?
     let ticket: UploadTicket, ledger: UploadLedger, backoff: @Sendable (Int) async -> Void
     private let lock = NSLock()
-    private var seq = 0
+    private var seq = Int(Date().timeIntervalSince1970 * 1000)    // 同一份记录文件可能有多个 reader 写
 
     public init(transport: HTTPTransport, endpoint: Endpoint, providerID: String, model: String, key: SecretKey?, ticket: UploadTicket,
                 ledger: UploadLedger, backoff: @escaping @Sendable (Int) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0) * 2_000_000_000) }) {
@@ -170,8 +170,8 @@ public func reconcileUploads(report: String, rows: [UploadRecord]) -> [String] {
     }
     out += left.map { "上传记录里有、报告里没有: \($0)" }
     out += rows.filter { $0.status == "pending" }.map { "第 \($0.page) 页的上传没有结果（可能发出后中断）" }
-    let ok = Set(rows.filter { $0.status == "ok" }.map(\.page))
-    if let calledPages, !rows.isEmpty, calledPages != ok.count { out.append("报告调用页数 \(calledPages)，上传成功 \(ok.count) 页") }
+    let ok = Set(rows.filter { $0.status == "ok" && !$0.item.contains("-l") }.map(\.page))     // 裁决的条目是 p12-l3，不算读字
+    if let calledPages, !ok.isEmpty, calledPages != ok.count { out.append("报告调用页数 \(calledPages)，上传成功 \(ok.count) 页") }
     return out
 }
 #endif

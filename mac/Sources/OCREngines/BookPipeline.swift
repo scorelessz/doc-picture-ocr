@@ -33,6 +33,8 @@ public struct BookOptions {
     public var vlmOnline: ((Int) throws -> String)?
     public var uploadsPath: URL?
     public var uploadBodies: URL?
+    /// 在线裁决：融合之后、写产物之前调用，改过的读法才进得了 md 和 PDF。返回 nil 表示不用裁决。
+    public var adjudicate: ((FusedDoc) throws -> (FusedDoc, AdjudicationSummary)?)?
     public var vlmBreaks = false
     /// 进度：阶段名、已完成、总数。在工作线程上回调。
     public var progress: (@Sendable (BookStage, Int, Int) -> Void)?
@@ -47,7 +49,7 @@ public struct BookOptions {
 }
 
 public enum BookStage: String, Sendable {
-    case ocr = "识别", vlm = "读字", fuse = "融合", markdown = "写 Markdown", pdf = "写 PDF", report = "写报告"
+    case ocr = "识别", vlm = "读字", fuse = "融合", adjudicate = "在线裁决", markdown = "写 Markdown", pdf = "写 PDF", report = "写报告"
 }
 
 public struct BookResult: Encodable {
@@ -56,11 +58,12 @@ public struct BookResult: Encodable {
     public var peakRSSSelfMB = 0.0, peakRSSChildrenMB = 0.0
     public var pages = 0, degraded: [String] = []
     public var outputs: [String] = []
+    public var adjudication: AdjudicationSummary?
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case seconds, pages, degraded, outputs
+        case seconds, pages, degraded, outputs, adjudication
         case totalSeconds = "total_seconds", secPerPage = "sec_per_page"
         case peakRSSSelfMB = "peak_rss_self_mb", peakRSSChildrenMB = "peak_rss_children_mb"
     }
@@ -377,6 +380,16 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         }
     }
     if let d = o.uploadBodies { try? fm.removeItem(at: d) }
+    var adjudication: AdjudicationSummary?
+    if let f = o.adjudicate {
+        o.progress?(.adjudicate, n, n)
+        if let (d, a) = try stage("adjudicate", { try f(fused) }) {
+            fused = d
+            adjudication = a
+            if a.failed > 0 { degraded.append("在线裁决 \(a.failed) 处失败或没有发送, 这些行保留本地读法") }
+        }
+        if o.isCancelled?() == true { throw BookError.cancelled }
+    }
     try encodeJSON(fused).write(to: fURL)
     if Log.shared.enabled {
         let drops = Dictionary(grouping: flog.drops, by: \.page)
@@ -478,6 +491,8 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     ri.singleEnginePages = single
     ri.srcPages = n
     ri.vlm = vlmReports
+    ri.adjudication = adjudication
+    res.adjudication = adjudication
     if let u = o.uploadsPath, let rows = try? FileLedger.rows(u) {
         let tf = ISO8601DateFormatter()
         ri.uploads = rows.map { UploadRow(time: tf.string(from: $0.time), host: $0.host, model: $0.model, page: $0.page, bytes: $0.bytes, status: $0.status) }
@@ -546,6 +561,55 @@ public struct OnlinePlan: Sendable {
             sem.wait()
             return try out.get()
         }
+    }
+}
+
+/// 在线裁决的一次任务：确认前算好问题和清单。CLI 和 App 共用。
+public struct AdjudicationPlan: Sendable {
+    public let preset: ProviderPreset, endpoint: Endpoint, model: String, mode: AdjudicationMode
+    public let questions: [AdjudicationQuestion], pages: [OnlinePage], manifest: UploadManifest, bodies: URL
+
+    /// 候选文字的总字数
+    public var chars: Int { questions.map { $0.candidates.map(\.count).reduce(0, +) }.reduce(0, +) }
+    public var crops: Int { mode == .image ? questions.count : 0 }
+
+    public static func build(doc: FusedDoc, source: String, preset: ProviderPreset, model: String, mode: AdjudicationMode, pages filter: Set<Int>? = nil,
+                             bodies: URL, crop: (Int, FusedLine) throws -> Data?) throws -> AdjudicationPlan {
+        let endpoint = try Endpoint(preset.baseURL)
+        let qs = try adjudicationQuestions(doc, pages: filter, mode: mode, crop: crop)
+        try FileManager.default.createDirectory(at: bodies, withIntermediateDirectories: true)
+        let items = try qs.map { q -> OnlinePage in
+            let b = try AdjudicationBody.make(model: model, q), f = bodies.appendingPathComponent(q.id + ".json")
+            try b.write(to: f)
+            return OnlinePage(id: q.id, sourceFile: source, page: q.page, body: f, bytes: b.count)
+        }
+        let m = onlineManifest(items, providerID: preset.id, providerName: preset.name, host: endpoint.host, model: model)
+        return AdjudicationPlan(preset: preset, endpoint: endpoint, model: model, mode: mode, questions: qs, pages: items, manifest: m, bodies: bodies)
+    }
+
+    public static func prepare(doc: FusedDoc, pdf: URL?, source: String, preset: ProviderPreset, model: String, mode: AdjudicationMode,
+                               pages: Set<Int>? = nil, bodies: URL) throws -> AdjudicationPlan {
+        let cropper = try pdf.map { try LineCropper(pdf: $0, doc: doc) }
+        return try build(doc: doc, source: source, preset: preset, model: model, mode: mode, pages: pages, bodies: bodies) { pno, l in
+            try cropper?.crop(page: pno, line: l)
+        }
+    }
+
+    public func discard() { try? FileManager.default.removeItem(at: bodies) }
+
+    public func run(_ doc: FusedDoc, reader: OnlineReader) async -> AdjudicationOutcome {
+        await runAdjudication(doc, questions: questions, pages: pages, mode: mode, reader: reader, providerID: preset.id, model: model)
+    }
+
+    public func summary(_ o: AdjudicationOutcome) -> AdjudicationSummary {
+        o.summary(provider: preset.name, model: model, mode: mode, total: questions.count)
+    }
+
+    public func declinedSummary() -> AdjudicationSummary {
+        var s = AdjudicationSummary(provider: preset.name, model: model, mode: mode.title)
+        s.total = questions.count
+        s.declined = true
+        return s
     }
 }
 

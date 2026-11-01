@@ -91,21 +91,13 @@ func runAdjudicate(_ args: [String]) throws {
     let doc = try JSONDecoder().decode(FusedDoc.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
     let pages = option(args, "--pages").map { Set($0.split(separator: ",").compactMap { Int($0) }) }
     if mode == .image, option(args, "--pdf") == nil { fail("--mode image 要配 --pdf", code: 2) }
-    let cropper = try option(args, "--pdf").map { try LineCropper(pdf: URL(fileURLWithPath: $0), doc: doc) }
-    let qs = try adjudicationQuestions(doc, pages: pages, mode: mode) { pno, l in try cropper?.crop(page: pno, line: l) }
-    guard !qs.isEmpty else { fail("没有要裁决的分歧行", code: 2) }
-    let endpoint = try Endpoint(p.baseURL)
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("dococr-adj-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
-    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
-    let source = URL(fileURLWithPath: path).lastPathComponent
-    let items = try qs.map { q -> OnlinePage in
-        let b = try AdjudicationBody.make(model: model, q), f = dir.appendingPathComponent(q.id + ".json")
-        try b.write(to: f)
-        return OnlinePage(id: q.id, sourceFile: source, page: q.page, body: f, bytes: b.count)
-    }
-    let m = onlineManifest(items, providerID: p.id, providerName: p.name, host: endpoint.host, model: model)
-    let chars = qs.map { $0.candidates.map(\.count).reduce(0, +) }.reduce(0, +)
+    let plan = try AdjudicationPlan.prepare(doc: doc, pdf: mode == .image ? option(args, "--pdf").map { URL(fileURLWithPath: $0) } : nil,
+                                            source: URL(fileURLWithPath: path).lastPathComponent, preset: p, model: model, mode: mode, pages: pages, bodies: dir)
+    let (qs, m, endpoint) = (plan.questions, plan.manifest, plan.endpoint)
+    guard !qs.isEmpty else { fail("没有要裁决的分歧行", code: 2) }
+    let chars = plan.chars
     print("""
     将上传分歧行到非本机地址:
       服务商: \(p.name)  域名: \(endpoint.host)  模型: \(model)  方式: \(mode == .image ? "看图" : "仅文本")
@@ -140,7 +132,7 @@ func runAdjudicate(_ args: [String]) throws {
     let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(allowed: true), selection: selection, gate: gate)
     let reader = OnlineReader(transport: t, endpoint: endpoint, providerID: p.id, model: model, key: key, ticket: ticket,
                               ledger: try FileLedger(URL(fileURLWithPath: out + ".uploads.jsonl")))
-    let r = try await_ { await runAdjudication(doc, questions: qs, pages: items, mode: mode, reader: reader, providerID: p.id, model: model) }
+    let r = try await_ { await plan.run(doc, reader: reader) }
     let enc = JSONEncoder()
     enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
     try enc.encode(r.doc).write(to: URL(fileURLWithPath: out))

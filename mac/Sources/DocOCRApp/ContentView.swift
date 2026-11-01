@@ -1,5 +1,6 @@
 import AppKit
 import DocOCRAppCore
+import OCRCore
 import OCRProviders
 import SwiftUI
 import UniformTypeIdentifiers
@@ -95,7 +96,7 @@ struct ConfirmView: View {
                 row("服务商", request.providerName)
                 row("域名", request.host)
                 row("文件", request.fileName)
-                row("页数", "最多 \(request.pages) 页（有分歧的页才发送）")
+                row(request.contentLabel, request.contentText)
                 row("大小", String(format: "%.1f MB", request.megabytes))
                 row("请求数", "约 \(request.manifest.estimatedRequests) 次")
                 row("预估费用", request.costText)
@@ -107,7 +108,7 @@ struct ConfirmView: View {
             Toggle(request.checkboxLabel, isOn: $ticked)
             HStack {
                 Spacer()
-                Button("取消，不上传") { queue.declineUpload() }.keyboardShortcut(.cancelAction)
+                Button(request.cancelTitle) { queue.declineUpload() }.keyboardShortcut(.cancelAction)
                 Button("开始") { queue.confirmUpload(checkbox: ticked, forBatch: forBatch) }.disabled(!ticked)
             }
         }
@@ -229,13 +230,14 @@ struct QueueView: View {
                 }
                 Toggle("忽略已有文字层，重新 OCR", isOn: $queue.forceOCR).help("扫描件自带的文字层往往是别的 OCR 做的，质量差时打开")
                 Toggle("高精度模式", isOn: $queue.highPrecision)
+                Text(QueueModel.highPrecisionNote).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if queue.highPrecision {
-                    Text(QueueModel.highPrecisionNote).font(.caption).foregroundStyle(.secondary)
                     if queue.needsVLModel {
                         SettingsLink { Text("高精度模型还没装，去模型管理") }
                     }
                 }
                 onlineOptions
+                adjudicationOptions
             }.padding(4)
         }.disabled(queue.isRunning)
     }
@@ -258,6 +260,43 @@ struct QueueView: View {
         }
         .onChange(of: queue.onlineProviderID) { _, id in
             if let id { queue.onlineModel = providers.models[id] ?? "" }
+        }
+    }
+
+    private var adjudicationOptions: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("在线裁决分歧行", isOn: $queue.adjudicateOn).disabled(!app.networkControlsEnabled)
+            if let r = app.networkDisabledReason {
+                Text(r).font(.caption).foregroundStyle(.secondary)
+            } else if queue.adjudicateOn {
+                Picker("方式", selection: $queue.adjudicateMode) {
+                    Text("看图裁决").tag(AdjudicationMode.image)
+                    Text("纯文本裁决").tag(AdjudicationMode.text)
+                }.pickerStyle(.segmented).frame(width: 260)
+                Text(queue.adjudicateMode == .image ? "上传分歧行的裁切图和候选文字。" : "只上传候选文字和前后各一行，不传图片，结果标「仅文本依据」。")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Picker("服务商", selection: $queue.adjudicateProviderID) {
+                        Text("请选择").tag(String?.none)
+                        ForEach(queue.adjudicateProviders, id: \.id) { Text($0.name).tag(String?.some($0.id)) }
+                    }.frame(width: 240)
+                    if let p = queue.adjudicateProviderID.flatMap(ProviderPresets.find) {
+                        ModelField(preset: p, text: Binding(get: { queue.adjudicateModel }, set: {
+                            queue.adjudicateModel = $0
+                            providers.setModel($0, for: p.id)
+                        }))
+                    }
+                }
+                if queue.adjudicateProviders.isEmpty {
+                    Text("没有可用的服务商：请在设置里选中并填好 Key。").font(.caption).foregroundStyle(.orange)
+                }
+            }
+        }
+        .onChange(of: queue.adjudicateProviderID) { _, id in
+            if let id { queue.adjudicateModel = providers.models[id] ?? "" }
+        }
+        .onChange(of: queue.adjudicateMode) { _, _ in
+            if !queue.adjudicateProviders.contains(where: { $0.id == queue.adjudicateProviderID }) { queue.adjudicateProviderID = nil }
         }
     }
 
@@ -323,6 +362,7 @@ struct ResultView: View {
                 } else if record.state == "done" {
                     Label("没有降级", systemImage: "checkmark.circle").foregroundStyle(.green)
                 }
+                if let a = record.adjudication { AdjudicationBox(a: a) }
                 if sections.isEmpty {
                     Text(record.outputs.isEmpty ? "没有产物。" : "这份没有报告。已写出的产物: \(record.outputs.count) 个").foregroundStyle(.secondary)
                 }
@@ -341,6 +381,25 @@ struct ResultView: View {
                 guard let path, let t = try? String(contentsOfFile: path, encoding: .utf8) else { return [ReportSection]() }
                 return ReportDocument.sections(ReportDocument.parse(t))
             }.value
+        }
+    }
+}
+
+struct AdjudicationBox: View {
+    let a: AdjudicationSummary
+
+    var body: some View {
+        GroupBox("在线裁决") {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("来源：\(a.provider) / \(a.model)，\(a.mode)")
+                if a.declined {
+                    Text("\(a.total) 处分歧，你没有确认上传，保留本地结果。")
+                } else {
+                    Text("共 \(a.total) 处：裁决了 \(a.chosen) 处，改了 \(a.changed) 处，模型判断不了 \(a.undecided) 处，失败 \(a.failed) 处。")
+                }
+                if let s = a.stopped { Text("提前停止：\(s)").foregroundStyle(.orange) }
+                Text("逐条明细见下面的质量报告。").font(.caption).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

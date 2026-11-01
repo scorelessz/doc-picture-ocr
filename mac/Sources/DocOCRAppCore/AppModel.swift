@@ -106,5 +106,13 @@ public final class AppModel: ObservableObject {
     /// 在线读字能选的：DeepSeek 这类只做纯文本的不列
     public var readableProviders: [ProviderPreset] { ProviderPresets.all.filter { isUsable($0.id) && !$0.textOnly } }
 
+    /// 在线裁决能选的：亲自选中、有可读的 Key。看图裁决不列只做纯文本的服务商。
+    public func adjudicationProviders(_ mode: AdjudicationMode) -> [ProviderPreset] {
+        ProviderPresets.all.filter { p in
+            guard isUsable(p.id), mode == .text || !p.textOnly, case .readable? = try? secrets.state(p.id) else { return false }
+            return true
+        }
+    }
+
     public func isUsable(_ id: String) -> Bool { networkAllowed && selected.contains(id) && ProviderPresets.find(id).map(canUse) == true }
 }

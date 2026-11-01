@@ -1,5 +1,6 @@
 import DocOCRAppCore
 import Foundation
+import OCRCore
 import OCREngines
 import OCRProviders
 import XCTest
@@ -54,11 +55,25 @@ final class FakeBackend: BookBackend, @unchecked Sendable {
                           manifest: onlineManifest(pages, providerID: preset.id, providerName: preset.name, host: ep.host, model: model), bodies: bodies)
     }
 
+    func adjudicationPlan(doc: FusedDoc, pdf: URL, preset: ProviderPreset, model: String, mode: AdjudicationMode, bodies: URL) async throws -> AdjudicationPlan {
+        try AdjudicationPlan.build(doc: doc, source: pdf.lastPathComponent, preset: preset, model: model, mode: mode, bodies: bodies) { _, _ in Data([1]) }
+    }
+
+    /// 裁决挂钩要在工作线程上调，和 runBook 一样
+    var fused: FusedDoc?
+    private(set) var adjudicated: AdjudicationSummary?
+
     func run(_ opts: BookOptions, plan: OnlinePlan?, ticket: UploadTicket?, app: BackendContext) async throws -> BookResult {
         lock.lock(); ran.append(opts.pdf); lock.unlock()
         if opts.isCancelled?() == true { throw BookError.cancelled }
         if let error { throw error }
         var o = opts
+        if let hook = opts.adjudicate, let doc = fused {
+            nonisolated(unsafe) let h = hook
+            let r = try await Task.detached { try h(doc) }.value
+            adjudicated = r?.1
+            o.adjudicate = nil
+        }
         if let plan, let ticket {
             try plan.attach(to: &o, transport: app.transport, key: app.key, ticket: ticket)
             let f = o.vlmOnline
@@ -67,6 +82,7 @@ final class FakeBackend: BookBackend, @unchecked Sendable {
             }.value
         }
         var r = BookResult()
+        r.adjudication = adjudicated
         r.pages = 1
         r.outputs = [opts.outdir.appendingPathComponent("a.report.md").path]
         return r
@@ -373,6 +389,112 @@ final class AppCoreTests: XCTestCase {
         XCTAssertEqual(b.records[0].outputs.count, 1)
     }
 
+    // MARK: 在线裁决
+
+    private func fusedDoc() throws -> FusedDoc {
+        let line = "{\"x\":1,\"y\":2,\"w\":3,\"h\":4,\"text\":\"甲\",\"conf\":1,\"src\":\"both\",\"alt\":\"乙\",\"flag\":\"divergent\"}"
+        let stats = "{\"pages\":1,\"lines\":1,\"both\":1,\"divergent\":1,\"only_vision\":0,\"only_rapidocr\":0,\"low_conf\":0,\"glossary_hits\":0,\"dropped_empty\":0,\"dropped_contained\":0}"
+        let j = "{\"source\":\"a.pdf\",\"engines\":[\"vision\",\"rapidocr\"],\"stats\":\(stats),\"dpi\":300,\"pages\":[{\"page\":1,\"width\":100,\"height\":100,\"pdf_width\":50,\"pdf_height\":50,\"zoom\":2,\"rotation\":0,\"native_text\":false,\"lines\":[\(line)]}]}"
+        return try JSONDecoder().decode(FusedDoc.self, from: Data(j.utf8))
+    }
+
+    private func adjRig(network: Bool = true, select: Bool = true, reply: String = "{\"choice\": 0}") throws -> Rig {
+        let r = try rig(network: network, online: false)
+        r.backend.fused = try fusedDoc()
+        if select { r.app.setSelected(qwen, true) }
+        r.q.adjudicateOn = true
+        r.q.adjudicateMode = .text
+        r.q.adjudicateProviderID = "dashscope"
+        r.q.adjudicateModel = "m"
+        r.q.add([pdf("a")])
+        return r
+    }
+
+    func testAdjudicationOffByDefault() throws {
+        let r = try rig(online: false)
+        XCTAssertFalse(r.q.adjudicateOn)
+        XCTAssertFalse(r.q.adjudicateReady)
+    }
+
+    func testAdjudicationBlockedWhenNetworkOff() throws {
+        let r = try adjRig(network: false)
+        XCTAssertFalse(r.q.adjudicateReady)
+        XCTAssertEqual(r.q.blockReason, AppModel.offReason)
+        XCTAssertFalse(r.q.canStart)
+        XCTAssertTrue(r.q.adjudicateProviders.isEmpty)
+    }
+
+    func testAdjudicationNeedsSelectedProvider() async throws {
+        let r = try adjRig(select: false)
+        XCTAssertFalse(r.q.adjudicateReady)
+        XCTAssertFalse(r.q.canStart, "有 Key 但没选中")
+        r.q.start()
+        await r.q.waitUntilIdle()
+        XCTAssertEqual(r.wire.count, 0)
+    }
+
+    func testAdjudicationNeedsReadableKey() throws {
+        let r = try adjRig()
+        XCTAssertTrue(r.q.adjudicateReady)
+        r.secrets.locked = ["dashscope"]
+        XCTAssertFalse(r.q.adjudicateReady, "读不了的 Key 不算有 Key")
+    }
+
+    func testImageModeHidesTextOnlyProviders() throws {
+        let r = try adjRig()
+        let d = ProviderPresets.find("deepseek")!
+        r.app.setSelected(d, true)
+        try r.secrets.save("k", for: "deepseek")
+        XCTAssertTrue(r.q.adjudicateProviders.contains(d))
+        r.q.adjudicateMode = .image
+        XCTAssertFalse(r.q.adjudicateProviders.contains(d))
+    }
+
+    func testAdjudicationAwaitingConfirmZeroRequests() async throws {
+        let r = try adjRig()
+        r.q.start()
+        await until { r.q.confirm != nil }
+        XCTAssertEqual(r.wire.count, 0)
+        XCTAssertEqual(r.q.confirm?.contentText, "1 处分歧，约 2 字，不传图片")
+        XCTAssertEqual(r.q.confirm?.host, "dashscope.aliyuncs.com")
+        r.q.confirmUpload(checkbox: false, forBatch: false)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(r.wire.count, 0)
+        r.q.declineUpload()
+        await r.q.waitUntilIdle()
+    }
+
+    func testAdjudicationDeclineKeepsLocalResult() async throws {
+        let r = try adjRig()
+        r.q.start()
+        await until { r.q.confirm != nil }
+        r.q.declineUpload()
+        await r.q.waitUntilIdle()
+        XCTAssertEqual(r.wire.count, 0)
+        XCTAssertEqual(r.q.jobs[0].status, .done, "本地结果保留，任务算完成")
+        XCTAssertEqual(r.q.jobs[0].record?.adjudication?.declined, true)
+    }
+
+    func testAdjudicationConfirmedSendsOnlyDivergentLines() async throws {
+        let r = try adjRig()
+        r.q.start()
+        await until { r.q.confirm != nil }
+        r.q.confirmUpload(checkbox: true, forBatch: false)
+        await r.q.waitUntilIdle()
+        XCTAssertEqual(r.wire.count, 1)
+        XCTAssertEqual(r.q.jobs[0].record?.adjudication?.total, 1)
+        XCTAssertEqual(r.q.jobs[0].status, .done)
+    }
+
+    func testAdjudicationBodiesAreRemoved() async throws {
+        let r = try adjRig()
+        r.q.start()
+        await until { r.q.confirm != nil }
+        r.q.declineUpload()
+        await r.q.waitUntilIdle()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.appendingPathComponent(".work/a/adjudication").path))
+    }
+
     // MARK: Key 状态
 
     private func keyRig() -> (MemorySecretStore, ProviderSettings, AppModel, CountingWire) {
@@ -447,7 +569,7 @@ final class AppCoreTests: XCTestCase {
         let p = ProviderSettings(app: a, store: Mem(), profileDir: dir)
         XCTAssertEqual(p.models["dashscope"], "qwen3.7-flash")
         XCTAssertEqual(p.models["siliconflow"], "Qwen/Qwen3-VL-32B-Instruct")
-        XCTAssertEqual(p.models["deepseek"], "")
+        XCTAssertEqual(p.models["deepseek"], "deepseek-flash")
         a.allowNetwork()
         for x in ProviderPresets.all { a.setSelected(x, true) }
         XCTAssertFalse(a.readableProviders.contains { $0.id == "deepseek" })
