@@ -66,6 +66,7 @@ final class CapabilityTests: XCTestCase {
     }
 
     func testLadderStopsAtFirstFailure() async throws {  // 39
+        try Self.requireVision()
         let w = FakeVisionWire(maxEdge: 1024)
         w.onImage = { Self.readCode($0) }
         let p = try await prober(w).probe(model: "m")
@@ -86,6 +87,7 @@ final class CapabilityTests: XCTestCase {
     }
 
     func testEmptyReplyIsRetried() async throws {
+        try Self.requireVision()
         let w = FakeVisionWire(maxEdge: 512)
         nonisolated(unsafe) var n = 0
         w.onImage = { png in
@@ -94,6 +96,12 @@ final class CapabilityTests: XCTestCase {
         }
         let p = try await prober(w).probe(model: "m")
         XCTAssertEqual(p.maxLongEdge, 512)
+    }
+
+    /// 线上虚拟机的 Vision 可能读不出字，这时测的是环境，不是探测逻辑
+    private static func requireVision() throws {
+        let s = try XCTUnwrap(SyntheticImage.make(longEdge: 512))
+        try XCTSkipUnless(CapabilityProber.sawImage(readCode(s.png), code: s.code), "本机 Vision 读不出合成图")
     }
 
     /// 用 Vision 真读合成图，顺带确认图是可读的
