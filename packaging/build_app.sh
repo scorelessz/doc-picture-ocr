@@ -24,7 +24,7 @@ fi
 [ "$SKIP" = 1 ] || swift build -c release --product DocOCRApp
 
 # 版本号：最近的 tag 去掉 v；构建号是提交数；完整 commit 记进 Info.plist
-TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
+TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)
 VERSION=${DOCOCR_VERSION:-${TAG#v}}
 BUILD=$(git rev-list --count HEAD)
 COMMIT=$(git rev-parse --short=12 HEAD)

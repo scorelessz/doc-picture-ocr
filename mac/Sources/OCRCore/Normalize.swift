@@ -1,6 +1,6 @@
 import Foundation
 
-// src/normalize.py norm() 的移植：比对前的等价归一化，消除「同一字形被不同引擎读成不同字符」
+// python-final:src/normalize.py norm() 的移植：比对前的等价归一化，消除「同一字形被不同引擎读成不同字符」
 // 造成的假分歧（不归一化时 79% 的分歧是假的）。只用于比对，不改写输出文本。
 //
 // 与 Python 逐位一致的细节：

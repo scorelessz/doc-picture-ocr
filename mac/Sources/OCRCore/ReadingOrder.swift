@@ -1,4 +1,4 @@
-// src/book_render.py sort_reading_order 的移植：上到下、左到右，行高自适应分桶，
+// python-final:src/book_render.py sort_reading_order 的移植：上到下、左到右，行高自适应分桶，
 // 避免同一行被基线抖动拆成两桶。
 //
 // 与 Python 逐位一致的两个细节：

@@ -2,7 +2,6 @@
 # 发版：构建 → ad-hoc 签名 → 压缩 → 传到 GitHub Releases。默认发 Swift 版 DocOCR.app。
 # 发布前会停下来问一次，不回答 y 就只留本地 zip。
 #
-#   packaging/release.sh 2.0.0 --python         发 Python 旧链路的 DocPictureOCR.app
 #   packaging/release.sh 1.1.0                  重新构建并发布 v1.1.0
 #   packaging/release.sh 1.0.0 --skip-build     直接发布 dist/ 里现成的 .app
 #   packaging/release.sh 1.1.0 --draft          先发草稿, 自己确认后再 publish
@@ -15,13 +14,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
 
-SKIP_BUILD=0; DRAFT=""; NOTES_FILE=""; VERSION=""; PY=0
+SKIP_BUILD=0; DRAFT=""; NOTES_FILE=""; VERSION=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --skip-build) SKIP_BUILD=1; shift ;;
     --draft)      DRAFT="--draft"; shift ;;
-    --python)     PY=1; shift ;;
     --notes-file) NOTES_FILE="$2"; shift 2 ;;
     -h|--help)    sed -n '2,16p' "$0"; exit 0 ;;
     -*)           echo "未知参数: $1"; exit 2 ;;
@@ -30,7 +28,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$VERSION" ] || { echo "用法: packaging/release.sh <版本号> [--skip-build] [--draft]"; exit 2; }
 TAG="v$VERSION"
-if [ "$PY" = 1 ]; then NAME=DocPictureOCR; else NAME=DocOCR; fi
+NAME=DocOCR
 APP="$ROOT/dist/$NAME.app"
 
 say() { printf '\n\033[1m── %s\033[0m\n' "$1"; }
@@ -54,11 +52,7 @@ if [ "$SKIP_BUILD" = "1" ]; then
   [ "$HAVE" = "$VERSION" ] || echo "  ⚠ 包里写的版本是 $HAVE, 这次发的是 $VERSION(只影响 Info.plist 里的字符串)"
 else
   say "构建 $TAG"
-  if [ "$PY" = 1 ]; then
-    packaging/build.sh --version "$VERSION"
-  else
-    DOCOCR_VERSION="$VERSION" packaging/build_app.sh --keep-app
-  fi
+  DOCOCR_VERSION="$VERSION" packaging/build_app.sh --keep-app
 fi
 codesign --verify --deep "$APP" 2>&1 | sed 's/^/  /' || { echo "✗ 签名校验不过"; exit 1; }
 
@@ -77,7 +71,7 @@ echo "  sha256 $SHA"
 # ── 发布说明 ────────────────────────────────────────────────────────
 if [ -n "$NOTES_FILE" ]; then
   NOTES=$(cat "$NOTES_FILE")
-elif [ "$PY" = 0 ]; then
+else
   NOTES=$(cat <<EOF
 书籍扫描件 OCR 的 Mac 原生版：可搜索 PDF（原图不动，叠隐形文字层）和段落化 Markdown。默认全部在本机处理，不联网。
 
@@ -90,35 +84,6 @@ elif [ "$PY" = 0 ]; then
    \`\`\`
 
 需要 Apple Silicon 和 macOS 14 以上。App 不带模型，第一次打开时下载识别模型（约 139 MB）或从文件导入；高精度模式的模型约 1.1 GB。
-
-sha256: \`$SHA\`
-EOF
-)
-else
-  NOTES=$(cat <<EOF
-本地中文扫描件 OCR。把扫描件 PDF 丢进去, 得到**可搜索 PDF**(原图不动, 叠一层隐形文字层)
-和**段落化 Markdown**。全部本地推理, 不联网、不上传。
-
-## 安装
-
-1. 下载 \`DocPictureOCR-$VERSION-macOS-arm64.zip\` 并解压
-2. 把 \`DocPictureOCR.app\` 拖进「应用程序」
-3. **首次打开**: 这个 app 没有 Apple 开发者签名, 从网上下载的包会被 Gatekeeper 拦下。
-   在终端里去掉隔离属性即可:
-   \`\`\`
-   xattr -dr com.apple.quarantine /Applications/DocPictureOCR.app
-   \`\`\`
-   或者右键点图标 → 打开 → 在弹窗里再点一次「打开」。
-4. 首次启动约 40 秒(系统要校验 285MB 的动态库并加载模型), 之后就快了。
-
-## 环境要求
-
-Apple Silicon 的 Mac(识别用到 macOS Vision 框架)。自依赖, 不需要装 Python。
-
-## 实测
-
-373 页中文书: 8.4 分钟 / 1.35 秒每页, 逐行取回率 1.0000, 人工抽查 1100 字 0 错。
-峰值内存约 3.5GB。
 
 sha256: \`$SHA\`
 EOF

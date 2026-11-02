@@ -1,6 +1,6 @@
 import Foundation
 
-// src/book_fuse.py fuse() 的移植：Vision + RapidOCR 双引擎自动融合 → fused.json。
+// python-final:src/book_fuse.py fuse() 的移植：Vision + RapidOCR 双引擎自动融合 → fused.json。
 // 规则、参数默认值、输出字段、stats 与 Python 一致；唯一的行为改动是碎片重影的文本条件
 // （见 containedHost），legacyContain 打开时还原旧行为，只用于对拍。
 //

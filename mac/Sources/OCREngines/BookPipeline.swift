@@ -8,19 +8,17 @@ import OCRProviders
 import PDFKit
 
 // 总流程：渲染 → Vision + RapidOCR → 融合 → md / 可搜索 PDF / 报告。
-// PP-OCR 默认走 Core ML（PaddleEngine），src/rapid_pages.py 只留作对照。
 // 规矩与 run_books 相同：已存在就拒绝写；--force 只覆盖带本线归属标记的产物，别人的文件还要 --clobber。
 
 public struct BookOptions {
     public var pdf: URL
     public var outdir: URL
     public var workdir: URL
-    public var python: String
     public var md = true, searchable = true
     public var pageMarks = "comment"          // none | comment | rule
     public var force = false, clobber = false, forceOCR = false, keepPages = false
     public var jobs = max(2, ProcessInfo.processInfo.activeProcessorCount - 2)
-    /// PP-OCR 用哪条路：Core ML 模型目录；为 nil 时走 src/rapid_pages.py（只留作对照）
+    /// PP-OCR 的 Core ML 模型目录
     public var coreml: URL?
     public var units: MLComputeUnits = .cpuAndNeuralEngine
     public var unitsLabel = "ane"
@@ -45,8 +43,8 @@ public struct BookOptions {
     /// 默认只读有分歧行的页（别的页 VLM 翻转不了）；true 时每页都读，报告才有全书的独有片段
     public var vlmAll = false
 
-    public init(pdf: URL, outdir: URL, workdir: URL, python: String) {
-        self.pdf = pdf; self.outdir = outdir; self.workdir = workdir; self.python = python
+    public init(pdf: URL, outdir: URL, workdir: URL) {
+        self.pdf = pdf; self.outdir = outdir; self.workdir = workdir
     }
 }
 
@@ -280,7 +278,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     var rDoc = EngineDoc(source: o.pdf.path, engine: "rapidocr", dpi: vDoc.dpi,
                          pages: vDoc.pages.map { var p = $0; p.lines = []; return p })
     var rapidFailed: [Int] = []
-    if paddle != nil {
+    if let paddle {
         for (i, s) in slots.enumerated() { rDoc.pages[i].lines = s.paddle }
         rapidFailed = paddleFailed
         timing[0].1 -= paddleSeconds
@@ -290,38 +288,9 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
         let rss = peakRSSMB()
         Log.shared.info("stage", ["name": .s("ppocr-coreml"), "seconds": .d((paddleSeconds * 1000).rounded() / 1000),
                                   "peak_rss_mb": .d(rss.own), "peak_rss_children_mb": .d(rss.children),
-                                  "units": .s(o.unitsLabel), "load_seconds": .d((paddle!.loadSeconds * 1000).rounded() / 1000),
-                                  "det": .d(paddle!.timing.det), "post": .d(paddle!.timing.post), "crop": .d(paddle!.timing.crop),
-                                  "rec": .d(paddle!.timing.rec), "canvas_fallbacks": .i(paddle!.canvasFallbacks)])
-    } else {
-      try stage("rapidocr") {
-        let manifest = slots.compactMap { s -> [String: String]? in
-            s.png.map { ["page": "\(s.pno)", "png": $0.path] }
-        }.map { d -> [String: AnyCodable] in ["page": .int(Int(d["page"]!)!), "png": .string(d["png"]!)] }
-        let mf = o.workdir.appendingPathComponent("\(stem).rapid-manifest.json")
-        let of = o.workdir.appendingPathComponent("\(stem).rapid-lines.json")
-        try encodeJSON(manifest).write(to: mf)
-        try? fm.removeItem(at: of)
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: o.python)
-        proc.arguments = ["src/rapid_pages.py", mf.path, of.path]
-        do {
-            try proc.run()
-            proc.waitUntilExit()
-        } catch {
-            degraded.append("RapidOCR 没有启动(\(error)): 全书只有 Vision 一个引擎, 没有交叉验证")
-            return
-        }
-        guard proc.terminationStatus == 0, let data = try? Data(contentsOf: of),
-              let out = try? JSONDecoder().decode(RapidOut.self, from: data) else {
-            degraded.append("RapidOCR 退出码 \(proc.terminationStatus): 全书只有 Vision 一个引擎, 没有交叉验证")
-            return
-        }
-        rapidFailed = out.failed
-        for i in rDoc.pages.indices { rDoc.pages[i].lines = out.lines["\(rDoc.pages[i].page)"] ?? [] }
-        try? fm.removeItem(at: mf)
-        try? fm.removeItem(at: of)
-      }
+                                  "units": .s(o.unitsLabel), "load_seconds": .d((paddle.loadSeconds * 1000).rounded() / 1000),
+                                  "det": .d(paddle.timing.det), "post": .d(paddle.timing.post), "crop": .d(paddle.timing.crop),
+                                  "rec": .d(paddle.timing.rec), "canvas_fallbacks": .i(paddle.canvasFallbacks)])
     }
     if !o.keepPages { try? fm.removeItem(at: pagesDir) }
     try encodeJSON(vDoc).write(to: vURL)
@@ -728,20 +697,4 @@ func vlmRead(_ image: CGImage, url: URL, model: String) throws -> String {
     return try out.get()
 }
 
-private struct RapidOut: Decodable {
-    var lines: [String: [Line]]
-    var failed: [Int]
-}
-
-private enum AnyCodable: Encodable {
-    case int(Int), string(String)
-
-    func encode(to e: Encoder) throws {
-        var c = e.singleValueContainer()
-        switch self {
-        case .int(let i): try c.encode(i)
-        case .string(let s): try c.encode(s)
-        }
-    }
-}
 #endif

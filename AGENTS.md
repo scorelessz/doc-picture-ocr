@@ -3,9 +3,8 @@
 书籍扫描件 PDF → 原图不动 + 隐形文字层的可搜索 PDF，以及（可选）段落化 Markdown。
 全自动，没有人工校对环节，质量报告是唯一的质量抓手。
 
-**正在整体重构**为 Mac 原生（Swift）+ 多模型（Vision / PP-OCRv6 / Xiaomi-OCR-0 / MiniCPM-V /
-PaddleOCR-VL）+ 本地/在线双模式，流程与决策见 **`docs/REFACTOR_PLAN.md`**。
-重构期间现有 Python 实现（`src/` `app/`）是基准，新实现与它逐字对拍，Phase 7 才下线。
+Mac 原生（Swift）实现，默认组合 Vision + PP-OCRv6，可选 PaddleOCR-VL-1.6 和在线服务商，决策见 **`docs/REFACTOR_PLAN.md`**。
+旧 Python 实现已下线，留在 git tag `python-final`。
 
 剧本线（手机拍摄的剧本 → 保留版面 md，带人工校对）已于 2026-10-30 删除，git 历史可查。
 
@@ -16,20 +15,19 @@ PaddleOCR-VL）+ 本地/在线双模式，流程与决策见 **`docs/REFACTOR_PL
 - **不删除用户的本地文件**，除非用户明确要求。
 - **不允许电脑层面的断网**（关网卡、关 Wi-Fi、改系统网络设置等）。也**不再做断网测试**：「默认不联网」靠单测断言网络层调用计数为 0 来保证（用户 2026-11-01）。
 
-## 当前（Python）实现
+## 入口
 
 | 组件 | 说明 |
 |---|---|
-| `.venv/` | Python 3.13（paddlepaddle 无 cp314 wheel） |
-| `bin/vision-ocr` | macOS Vision，`swiftc -O src/vision_ocr.swift -o bin/vision-ocr` |
-| RapidOCR 3.9.2 | 自带 PP-OCRv6 small ONNX，不需要 PaddlePaddle |
-| pymupdf | 渲染 + 嵌字。AGPL，重构后由 PDFKit/CoreGraphics 取代 |
+| `DocOCR.app` | 主入口，SwiftUI，界面在 `mac/Sources/DocOCRApp`，逻辑在 `DocOCRAppCore` |
+| `ocr-cli` | 命令行，`swift build -c release` 后在 `.build/release/` |
+| `packaging/build_app.sh` | 打包 `.app` 和 zip，默认不带模型 |
 
-用法、数据契约、`pymupdf` 嵌字的坑见 **`BOOKS.md`**。入口：`一键OCR.command`、`books.sh`、`启动界面.command`。
+数据契约和踩过的坑见 **`docs/DATA_CONTRACT.md`**。
 
-目录：输入 `input/`，产物 `output/`，中间产物 `work/`（三者都被 `.gitignore` 挡住）。
+目录：中间产物 `work/`，打包产物 `dist/`，都被 `.gitignore` 挡住。
 
-## 不变量（新旧实现都必须遵守，括号内是违反后的实测后果）
+## 不变量（括号内是违反后的实测后果）
 
 - 比对前归一化；省略号折叠必须在 NFKC **之后**，字符集含 ASCII `.`（限 2 个以上）。
   （NFKC 把 `…` 拆成 `...` 而 `⋯` 不变，两者永远比不相等）
@@ -40,8 +38,10 @@ PaddleOCR-VL）+ 本地/在线双模式，流程与决策见 **`docs/REFACTOR_PL
   （OCR 对页眉逐页读得不同；真章节标题可能与书眉一字不差）
 - 页码删除要求与相邻页序列一致。（孤立数字当页码会误删正文）
 - 删除的页眉/页脚/页码逐页列进质量报告。
+- 「有原生文字层、但渲染图里没有墨迹」的页要报警并改用原生文字层，不能当空白页吞掉。
+  （基准书有 6 页 JBIG2 文字蒙版近乎全空，阅读器里也是白页，但文字层有 184~800 字）
 - Vision 置信度只有 0.3/0.5/1.0 三档且与对错无关，不可用作错误信号；RapidOCR 的是连续值。
-- VLM（Xiaomi-OCR-0 / MiniCPM-V / PaddleOCR-VL）不出坐标、会「润色」：
+- VLM（Xiaomi-OCR-0 / MiniCPM-V / PaddleOCR-VL / MinerU2.5-Pro / OvisOCR2）多数不出行级坐标、会「润色」：
   默认组合必须含一个 CTC 型识别器（Vision 或 PP-OCRv6），编造率要有独立指标。
 
 ## 教训
@@ -71,5 +71,5 @@ PaddleOCR-VL）+ 本地/在线双模式，流程与决策见 **`docs/REFACTOR_PL
 
 ## 多会话约定
 
-- 书籍线模块（`book_md` / `book_pdf` / `run_books`）产物已存在就拒绝写，`--force` 才覆盖，读不到归属标记还要 `--clobber`。
+- `book` 产物已存在就拒绝写，`--force` 才覆盖，读不到归属标记还要 `--clobber`。
 - 本文件只写项目级内容，不写某本书的处理进度。

@@ -3,7 +3,7 @@ import Foundation
 import OCRCore
 import PDFKit
 
-// src/book_pdf.py 的移植：fused.json + 原 PDF → 可搜索 PDF，原页面一字不动，只叠隐形文字层。
+// python-final:src/book_pdf.py 的移植：fused.json + 原 PDF → 可搜索 PDF，原页面一字不动，只叠隐形文字层。
 //
 // 实现与 Python 不同的地方（有意）：
 //   - 走增量更新，不是整本重存：源文件字节原样保留，再逐页比图是多余的保险；

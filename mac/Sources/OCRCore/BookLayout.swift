@@ -1,6 +1,6 @@
 import Foundation
 
-// src/book_md.py 的移植：fused.json → 段落化 Markdown。
+// python-final:src/book_md.py 的移植：fused.json → 段落化 Markdown。
 // 规则见 Python 模块头注释，这里只留与移植有关的说明：
 //   - 字符串按码点处理；集合键用码点数组（Swift 的 String 按规范等价比较和散列）；
 //   - 正则全部手写成等价判断（NSRegularExpression 按 UTF-16 走，\s 语义也不同）；

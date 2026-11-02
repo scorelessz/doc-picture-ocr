@@ -21,7 +21,7 @@
 | ViewModel 单测和冒烟脚本 | 完成 |
 | 在线裁决的界面 | 完成，见下 |
 
-## 冒烟（`dev/p7_smoke.sh`）
+## 冒烟（当时的 `dev/p7_smoke.sh`，已删除）
 
 走的是 `QueueModel`，和界面相同的路径，没有点击真实控件。结果写 `bench/results/p7-smoke.json`。
 
@@ -80,6 +80,6 @@
 | 服务商、Key | 设置 → 服务商 | `provider list`，`provider key`，`provider probe` |
 | 清理记录、中间文件、日志 | 侧栏右键，设置 → 存储 | `history list`，`history prune` |
 | 环境自检、日志 | 设置 → 诊断 | `doctor`，`--log-level`，`--log-file`，`--log-text` |
-| 只有命令行 | 无 | 调试子命令（`vision`、`render`、`recognize`、`page-info`、`fuse`、`md`、`pdf`、`paddle`、`paddle-plan`、`vl`、`vlm-fuse`），`--clobber`，`--paddle python`，`models fetch --url`，`verify-uploads`，`provider models`，`--result` |
+| 只有命令行 | 无 | 调试子命令（`vision`、`render`、`recognize`、`page-info`、`fuse`、`md`、`pdf`、`paddle`、`paddle-plan`、`vl`、`vlm-fuse`），`--clobber`，`models fetch --url`，`verify-uploads`，`provider models`，`--result` |
 
 `book --pages` 里单个数字就是那一页。旧子命令的 `--pages 20` 仍表示 1 到 20 页，没有改，避免影响现有基准脚本。

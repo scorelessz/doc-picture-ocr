@@ -1,4 +1,4 @@
-// src/crosscheck.py 的移植：两个引擎的行按几何位置贪心配对（1:1）。
+// python-final:src/crosscheck.py 的移植：两个引擎的行按几何位置贪心配对（1:1）。
 
 /// 垂直中心距离 < 行高的这个比例，且水平有重叠
 let vertTol = 0.6

@@ -4,7 +4,7 @@ import CoreML
 import Foundation
 import OCRCore
 
-// PP-OCRv6 的 Core ML 推理：替掉 src/rapid_pages.py。流程、参数与 RapidOCR 3.9.2 一致：
+// PP-OCRv6 的 Core ML 推理。流程、参数与 RapidOCR 3.9.2 一致：
 //   长边缩到 2000（对齐 32）→ DB 检测 → 透视裁行 → 方向分类 → 识别 → CTC 解码 → text_score 过滤。
 //
 // 与 OpenCV 不逐位相同的地方（都不影响文字层面）：

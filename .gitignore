@@ -109,7 +109,7 @@ Icon?
 # ── 7. 项目自己的文档：从上面的全局忽略里放行 ──────────────────────────────
 #  新增项目文档时，记得在这里补一行 `!/你的文档.md`
 !/README.md
-!/BOOKS.md
+!/bench/README.md
 !/CLAUDE.md
 !/AGENTS.md
 !/docs/

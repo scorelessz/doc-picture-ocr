@@ -45,10 +45,10 @@ usage:
   ocr-cli paddle-plan --models dir --out plan.json
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf] [--pages A-B|a,b,c]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
-               [--paddle coreml|python] [--models-dir dir] [--units ane|all|cpu|gpu]
+               [--models-dir dir] [--units ane|all|cpu|gpu]
                [--vlm [--vl-model dir] [--vlm-all] | --vlm-url http://127.0.0.1:端口/v1 [--vlm-model 名]]
                [--vlm-provider id --vlm-model 名 --allow-network [--online-jobs 1-8] [--confirm-upload 清单sha256] [--key-stdin]]
-               [--python .venv/bin/python] [--result result.json]
+               [--result result.json]
 
 
 所有子命令: --log-level error|warn|info|debug|trace  --log-file 路径  --log-format json|text  --log-text
@@ -350,8 +350,7 @@ do {
         guard let path = args.first else { fail(usage) }
         var o = BookOptions(pdf: URL(fileURLWithPath: path).standardizedFileURL,
                             outdir: URL(fileURLWithPath: option(args, "--outdir") ?? "output", isDirectory: true),
-                            workdir: URL(fileURLWithPath: option(args, "--workdir") ?? "work", isDirectory: true),
-                            python: option(args, "--python") ?? ".venv/bin/python")
+                            workdir: URL(fileURLWithPath: option(args, "--workdir") ?? "work", isDirectory: true))
         o.md = !args.contains("--no-md")
         o.searchable = !args.contains("--no-pdf")
         o.pageMarks = option(args, "--page-marks") ?? "comment"
@@ -363,16 +362,14 @@ do {
         o.clobber = args.contains("--clobber")
         o.forceOCR = args.contains("--force-ocr")
         o.keepPages = args.contains("--keep-pages")
-        if (option(args, "--paddle") ?? "coreml") == "coreml" {
-            let dir = defaultModels
-            guard FileManager.default.fileExists(atPath: dir + "/keys.txt") else {
-                fail("找不到 Core ML 模型: \(dir)（先跑 ocr-cli models fetch，或用 --models-dir 指定）", code: 2)
-            }
-            o.coreml = URL(fileURLWithPath: dir, isDirectory: true)
-            guard let u = computeUnits(option(args, "--units") ?? "ane") else { fail(usage) }
-            o.units = u
-            o.unitsLabel = option(args, "--units") ?? "ane"
+        let dir = defaultModels
+        guard FileManager.default.fileExists(atPath: dir + "/keys.txt") else {
+            fail("找不到 Core ML 模型: \(dir)（先跑 ocr-cli models fetch，或用 --models-dir 指定）", code: 2)
         }
+        o.coreml = URL(fileURLWithPath: dir, isDirectory: true)
+        guard let u = computeUnits(option(args, "--units") ?? "ane") else { fail(usage) }
+        o.units = u
+        o.unitsLabel = option(args, "--units") ?? "ane"
         if let v = option(args, "--vlm-url") {
             guard let u = URL(string: v), (try? Endpoint(v))?.isLoopback == true else {
                 fail("--vlm-url 只接受本机地址: 默认不外传用户文件", code: 2)

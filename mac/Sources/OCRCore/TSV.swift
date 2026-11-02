@@ -1,7 +1,7 @@
 import Foundation
 
 // bin/vision-ocr 的 TSV 行格式：x  y  w  h  confidence  text（像素，原点左上）。
-// Phase 2 的对拍门槛就是逐行比这个格式，所以格式化必须与 src/vision_ocr.swift 完全一致。
+// Phase 2 的对拍门槛就是逐行比这个格式，所以格式化必须与 python-final:src/vision_ocr.swift 完全一致。
 
 public func tsvLine(_ l: Line) -> String {
     let text = l.text.replacingOccurrences(of: "\t", with: " ")

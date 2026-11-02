@@ -1,5 +1,5 @@
 // 引擎输出的数据契约，与 Python 书籍线的 work/<名>.{vision,rapidocr}.json 字段一一对应
-// （见 src/book_engines.py 顶部注释）。只加字段、不改字段，新旧实现才能逐字对拍。
+// （见 python-final:src/book_engines.py 顶部注释）。只加字段、不改字段，新旧实现才能逐字对拍。
 //
 // 坐标：像素，原点左上，像素 = 视觉 PDF 点 × zoom。
 

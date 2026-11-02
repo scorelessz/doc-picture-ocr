@@ -5,7 +5,7 @@ import ImageIO
 import OCRCore
 import Vision
 
-// macOS Vision 文字识别。参数与输出顺序和 src/vision_ocr.swift（bin/vision-ocr）保持一致，
+// macOS Vision 文字识别。参数与输出顺序和 python-final:src/vision_ocr.swift保持一致，
 // Phase 2 门槛是两者逐行相同；Vision 由系统自行调度 ANE / GPU。
 //
 // 注意：Vision 的置信度只有 0.3 / 0.5 / 1.0 三档，与对错无关，不能当错误信号（CLAUDE.md 不变量）。

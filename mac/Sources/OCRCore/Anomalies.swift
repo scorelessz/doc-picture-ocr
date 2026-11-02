@@ -1,4 +1,4 @@
-// src/postcheck.py detect_anomalies 与 src/book_fuse.py 打分辅助的移植。
+// python-final:src/postcheck.py detect_anomalies 与 python-final:src/book_fuse.py 打分辅助的移植。
 // 融合只用到「命中几条」，所以这里只返回计数，不返回描述文字。
 
 let bracketPairs: [Unicode.Scalar: Unicode.Scalar] = [

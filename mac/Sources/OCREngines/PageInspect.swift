@@ -4,7 +4,7 @@ import Foundation
 import OCRCore
 import PDFKit
 
-// src/book_render.py 分辨率与原生文字层部分的移植：choose_dpi / embedded_dpi / has_native_text / native_lines。
+// python-final:src/book_render.py 分辨率与原生文字层部分的移植：choose_dpi / embedded_dpi / has_native_text / native_lines。
 // PDFKit 没有列内嵌图的接口，用 CGPDFScanner 走内容流：跟踪 q/Q/cm，遇到 Do 取图像字典，
 // Form XObject 递归进去（pymupdf 的 get_image_info 也会看到表单里的图）。行内图（BI/EI）不统计。
 

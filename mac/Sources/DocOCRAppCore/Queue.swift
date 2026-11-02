@@ -365,7 +365,7 @@ public final class QueueModel: ObservableObject {
                 return true
             }
         }
-        var o = BookOptions(pdf: job.pdf, outdir: outdir, workdir: work, python: "")
+        var o = BookOptions(pdf: job.pdf, outdir: outdir, workdir: work)
         o.md = makeMarkdown
         o.searchable = makePDF
         o.pageMarks = pageMarks
