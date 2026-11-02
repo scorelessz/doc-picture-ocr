@@ -1,0 +1,119 @@
+{
+ "phase": "p3",
+ "source": "失约之城",
+ "legacy_vs_python": {
+  "pages_py": 373,
+  "pages_swift": 373,
+  "stats_equal": true,
+  "page_line_count_mismatch": [],
+  "text": 0,
+  "src": 0,
+  "flag": 0,
+  "alt": 0,
+  "coord": 0,
+  "conf": 0,
+  "max_coord_diff": 0.0,
+  "max_conf_diff": 0.0,
+  "page_field_mismatch": 0,
+  "lines_compared": 10098,
+  "pages_with_diff": [],
+  "identical": true
+ },
+ "new_vs_legacy": {
+  "stats_legacy": {
+   "both": 10079,
+   "divergent": 2521,
+   "dropped_contained": 8,
+   "dropped_empty": 0,
+   "glossary_hits": 0,
+   "lines": 10098,
+   "low_conf": 1,
+   "only_rapidocr": 14,
+   "only_vision": 5,
+   "pages": 373
+  },
+  "stats_new": {
+   "both": 10079,
+   "divergent": 2521,
+   "dropped_contained": 8,
+   "dropped_empty": 0,
+   "glossary_hits": 0,
+   "lines": 10098,
+   "low_conf": 1,
+   "only_rapidocr": 14,
+   "only_vision": 5,
+   "pages": 373
+  },
+  "newly_dropped": 0,
+  "pages": []
+ },
+ "cer": {
+  "pages": [
+   7,
+   15,
+   18,
+   27,
+   30,
+   50,
+   100,
+   113,
+   150,
+   164,
+   200,
+   250,
+   258,
+   300,
+   350
+  ],
+  "legacy": {
+   "chars": 8568,
+   "edits": 44,
+   "cer": 0.00514,
+   "ins": 0.00222,
+   "del": 0.00187,
+   "sub": 0.00105,
+   "edits_by_page": {
+    "7": 4,
+    "15": 8,
+    "18": 4,
+    "27": 5,
+    "30": 2,
+    "50": 4,
+    "100": 5,
+    "113": 0,
+    "150": 1,
+    "164": 3,
+    "200": 0,
+    "250": 3,
+    "258": 4,
+    "300": 0,
+    "350": 1
+   }
+  },
+  "new": {
+   "chars": 8568,
+   "edits": 44,
+   "cer": 0.00514,
+   "ins": 0.00222,
+   "del": 0.00187,
+   "sub": 0.00105,
+   "edits_by_page": {
+    "7": 4,
+    "15": 8,
+    "18": 4,
+    "27": 5,
+    "30": 2,
+    "50": 4,
+    "100": 5,
+    "113": 0,
+    "150": 1,
+    "164": 3,
+    "200": 0,
+    "250": 3,
+    "258": 4,
+    "300": 0,
+    "350": 1
+   }
+  }
+ }
+}

@@ -1,0 +1,196 @@
+#if canImport(CryptoKit)
+import Foundation
+import OCRCore
+
+// 在线读字。失败只影响这一页：保留本地结果，绝不换家。请求体在确认前就定好，确认的就是这些字节。
+
+public struct OnlinePage: Sendable {
+    public let id: String, sourceFile: String, page: Int, body: URL, bytes: Int
+
+    public init(id: String, sourceFile: String, page: Int, body: URL, bytes: Int) {
+        self.id = id; self.sourceFile = sourceFile; self.page = page; self.body = body; self.bytes = bytes
+    }
+}
+
+public enum ChatBody {
+    public static let transcribePrompt = "逐字转写图中的全部文字，保持原有换行，不要翻译、不要改动、不要添加任何说明。"
+
+    public static func make(model: String, png: Data, prompt: String = transcribePrompt) throws -> Data {
+        let content: [[String: Any]] = [["type": "image_url", "image_url": ["url": "data:image/png;base64,\(png.base64EncodedString())"]],
+                                        ["type": "text", "text": prompt]]
+        return try JSONSerialization.data(withJSONObject: ["model": model, "temperature": 0, "max_tokens": 4096,
+                                                           "messages": [["role": "user", "content": content]]], options: [.sortedKeys])
+    }
+
+    static func text(_ d: Data) -> String? {
+        guard let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let c = o["choices"] as? [[String: Any]],
+              let m = c.first?["message"] as? [String: Any] else { return nil }
+        return m["content"] as? String
+    }
+}
+
+/// 清单：列的是所有可能上传的页，是上界。429 的请求体也算发出过，字节上限按每页最多重试次数算，否则一页被限流就会让整张票失效。
+public func onlineManifest(_ pages: [OnlinePage], providerID: String, providerName: String, host: String, model: String) -> UploadManifest {
+    let items = pages.map { UploadItem(id: $0.id, sourceFile: $0.sourceFile, page: $0.page, bytes: $0.bytes) }
+    let total = items.map(\.bytes).reduce(0, +)
+    return UploadManifest(providerID: providerID, providerName: providerName, host: host, model: model, items: items,
+                          estimatedRequests: items.count, byteLimit: total * OnlineReader.maxRateLimitAttempts)
+}
+
+public struct UploadRecord: Sendable, Codable, Equatable {
+    public let seq: Int, time: Date, host: String, provider: String, model: String, ticket: String, scope: String
+    public let page: Int, item: String, bytes: Int
+    public var status: String
+}
+
+public protocol UploadLedger: Sendable {
+    func write(_ r: UploadRecord) throws
+}
+
+/// 每次状态变化追加一行，同一 seq 以最后一行为准。
+public final class FileLedger: UploadLedger, @unchecked Sendable {
+    private let url: URL, lock = NSLock()
+
+    public init(_ url: URL) throws {
+        self.url = url
+        if !FileManager.default.fileExists(atPath: url.path) { try Data().write(to: url) }
+    }
+
+    public func write(_ r: UploadRecord) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .iso8601
+        enc.outputFormatting = [.sortedKeys]
+        let h = try FileHandle(forWritingTo: url)
+        defer { try? h.close() }
+        try h.seekToEnd()
+        try h.write(contentsOf: try enc.encode(r) + Data("\n".utf8))
+        try h.synchronize()
+    }
+
+    public static func rows(_ url: URL) throws -> [UploadRecord] {
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        var last: [Int: UploadRecord] = [:]
+        for l in try String(contentsOf: url, encoding: .utf8).split(separator: "\n") {
+            let r = try dec.decode(UploadRecord.self, from: Data(l.utf8))
+            last[r.seq] = r
+        }
+        return last.values.sorted { $0.seq < $1.seq }
+    }
+}
+
+public enum OnlineError: Error, Equatable {
+    case http(Int), emptyReply
+}
+
+/// 一家服务商、一张票据。没有备选服务商这个概念。并发请求共用这张票，每次都先写记录再发。
+public final class OnlineReader: @unchecked Sendable {
+    static let maxAttempts = 3, maxRateLimitAttempts = 5
+    static let maxWait = 120.0
+    let transport: HTTPTransport, endpoint: Endpoint, providerID: String, model: String, key: SecretKey?
+    let ticket: UploadTicket, ledger: UploadLedger, sleep: @Sendable (Double) async -> Void
+    public let limiter: ConcurrencyLimiter
+    private let lock = NSLock()
+    private var seq = Int(Date().timeIntervalSince1970 * 1000)    // 同一份记录文件可能有多个 reader 写
+
+    public init(transport: HTTPTransport, endpoint: Endpoint, providerID: String, model: String, key: SecretKey?, ticket: UploadTicket,
+                ledger: UploadLedger, jobs: Int = 1, sleep: @escaping @Sendable (Double) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1e9)) }) {
+        self.transport = transport; self.endpoint = endpoint; self.providerID = providerID; self.model = model
+        self.key = key; self.ticket = ticket; self.ledger = ledger; self.sleep = sleep
+        limiter = ConcurrencyLimiter(limit: jobs)
+    }
+
+    private func nextSeq() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        seq += 1
+        return seq
+    }
+
+    private func logRequest(_ p: OnlinePage, bytes: Int, seconds: Double, status: Int, first: Double?) {
+        func r(_ v: Double) -> Double { (v * 1000).rounded() / 1000 }
+        Log.shared.info("online_request", ["provider": .s(providerID), "model": .s(model), "page": .i(p.page), "item": .s(p.id), "bytes": .i(bytes),
+                                           "first_byte_seconds": first.map { .d(r($0)) } ?? .null, "seconds": .d(r(seconds)), "status": .i(status)])
+    }
+
+    public func read(_ p: OnlinePage) async throws -> String {
+        let body = try Data(contentsOf: p.body)
+        var scope = "once"
+        if case .batch = ticket.scope { scope = "batch" }
+        var attempt = 0
+        while true {
+            attempt += 1
+            var rec = UploadRecord(seq: nextSeq(), time: Date(), host: endpoint.host, provider: providerID, model: model,
+                                   ticket: String(ticket.id.uuidString.prefix(8)), scope: scope, page: p.page, item: p.id,
+                                   bytes: body.count, status: "pending")
+            try ledger.write(rec)       // 先写后发，崩溃也不漏记
+            let t0 = Date()
+            let reply: HTTPReply
+            do {
+                reply = try await transport.send(OutboundRequest(endpoint: endpoint, providerID: providerID, path: "chat/completions",
+                                                                 payload: .userData(body: body, ticket: ticket, itemID: p.id), key: key))
+            } catch let e as URLError {
+                logRequest(p, bytes: body.count, seconds: Date().timeIntervalSince(t0), status: 0, first: nil)
+                rec.status = "failed:url_\(e.errorCode)"
+                try ledger.write(rec)
+                guard attempt < Self.maxAttempts else { throw e }
+                await sleep(pow(2, Double(attempt)))
+                continue
+            } catch {
+                rec.status = "failed:\(error)"      // 策略拒绝：不重试
+                try ledger.write(rec)
+                throw error
+            }
+            logRequest(p, bytes: body.count, seconds: Date().timeIntervalSince(t0), status: reply.status, first: reply.firstByteSeconds)
+            if reply.status == 200, let t = ChatBody.text(reply.body), !t.isEmpty {
+                await limiter.succeeded()
+                rec.status = "ok"
+                try ledger.write(rec)
+                return t
+            }
+            rec.status = "failed:http_\(reply.status)"
+            try ledger.write(rec)
+            if reply.status == 429 {
+                let k = await limiter.rateLimited()
+                guard attempt < Self.maxRateLimitAttempts else { throw OnlineError.http(429) }
+                let wait = min(Self.maxWait, retryAfterSeconds(reply.retryAfter) ?? pow(2, Double(attempt)))
+                Log.shared.warn("rate_limited", ["provider": .s(providerID), "page": .i(p.page), "wait_seconds": .d(wait), "jobs": .i(k)])
+                await sleep(wait)
+                continue
+            }
+            let err: OnlineError = reply.status == 200 ? .emptyReply : .http(reply.status)
+            guard (500..<600).contains(reply.status), attempt < Self.maxAttempts else { throw err }
+            await sleep(pow(2, Double(attempt)))
+        }
+    }
+}
+#endif
+
+#if canImport(CryptoKit)
+/// 报告和上传记录对账。返回不一致的地方，空表示对得上。报告是用户看的，记录是实际发生的，两边必须一致。
+public func reconcileUploads(report: String, rows: [UploadRecord]) -> [String] {
+    var inTable = false
+    var seen: [String] = []
+    var calledPages: Int?
+    for l in report.components(separatedBy: "\n") {
+        if l.hasPrefix("## ") { inTable = l.hasSuffix("上传记录") }
+        let c = l.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        if c.count >= 3, c[1] == "调用页数" { calledPages = Int(c[2]) }
+        guard inTable, c.count == 8, Int(c[4]) != nil else { continue }
+        seen.append([c[2], c[3], c[4], c[5], c[6]].joined(separator: "|"))
+    }
+    let key: (UploadRecord) -> String = { "\($0.host)|\($0.model)|\($0.page)|\($0.bytes)|\($0.status)" }
+    var left = rows.map(key)
+    var out: [String] = []
+    for s in seen {
+        if let i = left.firstIndex(of: s) { left.remove(at: i) } else { out.append("报告里有、上传记录里没有: \(s)") }
+    }
+    out += left.map { "上传记录里有、报告里没有: \($0)" }
+    out += rows.filter { $0.status == "pending" }.map { "第 \($0.page) 页的上传没有结果（可能发出后中断）" }
+    let ok = Set(rows.filter { $0.status == "ok" && !$0.item.contains("-l") }.map(\.page))     // 裁决的条目是 p12-l3，不算读字
+    if let calledPages, !ok.isEmpty, calledPages != ok.count { out.append("报告调用页数 \(calledPages)，上传成功 \(ok.count) 页") }
+    return out
+}
+#endif

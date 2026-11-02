@@ -1,0 +1,52 @@
+{
+ "phase": "p1",
+ "name": "minicpm47-1b-q8-llamacpp",
+ "mode": "line",
+ "prompt_id": "minicpm",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:01:03",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  11,
+  12
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 3063,
+  "cer": 0.05126,
+  "ins_rate": 0.01241,
+  "del_rate": 0.02024,
+  "sub_rate": 0.01861,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 32.6,
+  "sec_per_page": 16.3,
+  "requests": 70,
+  "server_peak_rss_mb": 5974.7
+ },
+ "per_page": [
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1347,
+   "ins": 4,
+   "del": 28,
+   "sub": 46,
+   "requests": 31,
+   "seconds": 14.34,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1692,
+   "ins": 34,
+   "del": 34,
+   "sub": 11,
+   "requests": 39,
+   "seconds": 18.25,
+   "error": null
+  }
+ ]
+}

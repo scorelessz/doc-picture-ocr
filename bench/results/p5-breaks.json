@@ -1,0 +1,77 @@
+{
+ "phase": "p5",
+ "name": "vlm-breaks",
+ "note": "CER 含 md 删掉的页码, 只看两列的相对差",
+ "en": {
+  "pages": [
+   8,
+   9,
+   11,
+   12,
+   50,
+   120,
+   185,
+   236,
+   300
+  ],
+  "geometry": {
+   "paragraphs": 116,
+   "no_end_punct": 29,
+   "no_end_rate": 0.25,
+   "edits": 58,
+   "chars": 10016,
+   "cer": 0.00579
+  },
+  "with_vlm": {
+   "paragraphs": 129,
+   "no_end_punct": 33,
+   "no_end_rate": 0.2558,
+   "edits": 58,
+   "chars": 10016,
+   "cer": 0.00579
+  },
+  "overrides": 17,
+  "hint_true": 119,
+  "hint_false": 158,
+  "hint_none": 16
+ },
+ "zh": {
+  "pages": [
+   7,
+   15,
+   18,
+   27,
+   30,
+   50,
+   100,
+   113,
+   150,
+   164,
+   200,
+   250,
+   258,
+   300,
+   350
+  ],
+  "geometry": {
+   "paragraphs": 88,
+   "no_end_punct": 4,
+   "no_end_rate": 0.0455,
+   "edits": 49,
+   "chars": 8568,
+   "cer": 0.00572
+  },
+  "with_vlm": {
+   "paragraphs": 88,
+   "no_end_punct": 4,
+   "no_end_rate": 0.0455,
+   "edits": 49,
+   "chars": 8568,
+   "cer": 0.00572
+  },
+  "overrides": 0,
+  "hint_true": 80,
+  "hint_false": 310,
+  "hint_none": 20
+ }
+}

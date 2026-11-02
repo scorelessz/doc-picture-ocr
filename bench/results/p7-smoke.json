@@ -1,0 +1,41 @@
+{
+ "phase": "p7",
+ "name": "app-smoke",
+ "books": [
+  {
+   "cancel_seconds": 0,
+   "degraded": [],
+   "main_thread_max_gap": 0.20101700305938722,
+   "outputs": 3,
+   "pages": 5,
+   "pdf": "en5",
+   "sec_per_page": 4.88,
+   "seconds": 50.21592402458191,
+   "status": "done"
+  },
+  {
+   "cancel_seconds": 0,
+   "degraded": [],
+   "main_thread_max_gap": 0.20101700305938722,
+   "outputs": 3,
+   "pages": 5,
+   "pdf": "zh5",
+   "sec_per_page": 2.1,
+   "seconds": 50.2160040140152,
+   "status": "done"
+  }
+ ],
+ "cancel": [
+  {
+   "cancel_seconds": 3.3690379858016968,
+   "degraded": [],
+   "main_thread_max_gap": 0.006384949684143066,
+   "outputs": 0,
+   "pages": 0,
+   "pdf": "失约之城",
+   "sec_per_page": 0,
+   "seconds": 18.37547206878662,
+   "status": "cancelled"
+  }
+ ]
+}

@@ -1,0 +1,38 @@
+{
+ "phase": "p3",
+ "name": "full-chain",
+ "en": {
+  "py_chars": 571739,
+  "swift_chars": 569976,
+  "delta": -1763,
+  "ops": {
+   "delete": 61,
+   "chars_del": 1763,
+   "chars_ins": 0
+  },
+  "py_paragraphs": 2499,
+  "swift_paragraphs": 2499,
+  "py_rows": 11538,
+  "swift_rows": 11538,
+  "py_dropped": 314,
+  "swift_dropped": 314,
+  "py_headings": 10,
+  "swift_headings": 10,
+  "identical": false
+ },
+ "zh": {
+  "py_chars": 212781,
+  "swift_chars": 212781,
+  "delta": 0,
+  "ops": {},
+  "py_paragraphs": 2937,
+  "swift_paragraphs": 2937,
+  "py_rows": 10053,
+  "swift_rows": 10053,
+  "py_dropped": 369,
+  "swift_dropped": 369,
+  "py_headings": 36,
+  "swift_headings": 36,
+  "identical": true
+ }
+}

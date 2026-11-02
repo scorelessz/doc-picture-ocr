@@ -1,0 +1,208 @@
+{
+ "phase": "p1",
+ "name": "xiaomi-q8-llamacpp-zh-spot",
+ "mode": "page",
+ "prompt_id": "xiaomi",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T23:25:01",
+ "source": "失约之城.pdf",
+ "pages": [
+  7,
+  15,
+  18,
+  27,
+  30,
+  113,
+  164,
+  258,
+  50,
+  100,
+  150,
+  200,
+  250,
+  300,
+  350
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 1,
+  "cer": 0.0,
+  "ins_rate": 0.0,
+  "del_rate": 0.0,
+  "sub_rate": 0.0,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 102.4,
+  "sec_per_page": 6.83,
+  "requests": 15,
+  "server_peak_rss_mb": 2271.0
+ },
+ "per_page": [
+  {
+   "page": 7,
+   "ref_chars": 0,
+   "hyp_chars": 643,
+   "ins": 643,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 7.1,
+   "error": null
+  },
+  {
+   "page": 15,
+   "ref_chars": 0,
+   "hyp_chars": 610,
+   "ins": 610,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 7.21,
+   "error": null
+  },
+  {
+   "page": 18,
+   "ref_chars": 0,
+   "hyp_chars": 600,
+   "ins": 600,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 7.63,
+   "error": null
+  },
+  {
+   "page": 27,
+   "ref_chars": 0,
+   "hyp_chars": 589,
+   "ins": 589,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.89,
+   "error": null
+  },
+  {
+   "page": 30,
+   "ref_chars": 0,
+   "hyp_chars": 595,
+   "ins": 595,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 7.17,
+   "error": null
+  },
+  {
+   "page": 113,
+   "ref_chars": 0,
+   "hyp_chars": 487,
+   "ins": 487,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.69,
+   "error": null
+  },
+  {
+   "page": 164,
+   "ref_chars": 0,
+   "hyp_chars": 596,
+   "ins": 596,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 7.0,
+   "error": null
+  },
+  {
+   "page": 258,
+   "ref_chars": 0,
+   "hyp_chars": 564,
+   "ins": 564,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.82,
+   "error": null
+  },
+  {
+   "page": 50,
+   "ref_chars": 0,
+   "hyp_chars": 528,
+   "ins": 528,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.4,
+   "error": null
+  },
+  {
+   "page": 100,
+   "ref_chars": 0,
+   "hyp_chars": 617,
+   "ins": 617,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.98,
+   "error": null
+  },
+  {
+   "page": 150,
+   "ref_chars": 0,
+   "hyp_chars": 589,
+   "ins": 589,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 7.02,
+   "error": null
+  },
+  {
+   "page": 200,
+   "ref_chars": 0,
+   "hyp_chars": 479,
+   "ins": 479,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.57,
+   "error": null
+  },
+  {
+   "page": 250,
+   "ref_chars": 0,
+   "hyp_chars": 572,
+   "ins": 572,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.83,
+   "error": null
+  },
+  {
+   "page": 300,
+   "ref_chars": 0,
+   "hyp_chars": 519,
+   "ins": 519,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.74,
+   "error": null
+  },
+  {
+   "page": 350,
+   "ref_chars": 0,
+   "hyp_chars": 549,
+   "ins": 549,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.32,
+   "error": null
+  }
+ ]
+}

@@ -1,0 +1,160 @@
+{
+ "phase": "p1",
+ "name": "ovisocr2-mlx8",
+ "mode": "page",
+ "prompt_id": "ovis",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:14:29",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  3,
+  8,
+  9,
+  10,
+  11,
+  12,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 6912,
+  "cer": 1.16392,
+  "ins_rate": 0.68562,
+  "del_rate": 0.24986,
+  "sub_rate": 0.22844,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 163.4,
+  "sec_per_page": 14.85,
+  "requests": 11,
+  "server_peak_rss_mb": 1892.8
+ },
+ "per_page": [
+  {
+   "page": 3,
+   "ref_chars": 186,
+   "hyp_chars": 269,
+   "ins": 84,
+   "del": 1,
+   "sub": 35,
+   "requests": 1,
+   "seconds": 5.26,
+   "error": null
+  },
+  {
+   "page": 8,
+   "ref_chars": 265,
+   "hyp_chars": 249,
+   "ins": 7,
+   "del": 23,
+   "sub": 27,
+   "requests": 1,
+   "seconds": 3.4,
+   "error": null
+  },
+  {
+   "page": 9,
+   "ref_chars": 197,
+   "hyp_chars": 205,
+   "ins": 21,
+   "del": 13,
+   "sub": 10,
+   "requests": 1,
+   "seconds": 3.45,
+   "error": null
+  },
+  {
+   "page": 10,
+   "ref_chars": 182,
+   "hyp_chars": 2048,
+   "ins": 1866,
+   "del": 0,
+   "sub": 181,
+   "requests": 1,
+   "seconds": 44.74,
+   "error": null
+  },
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1367,
+   "ins": 0,
+   "del": 4,
+   "sub": 4,
+   "requests": 1,
+   "seconds": 5.98,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1686,
+   "ins": 0,
+   "del": 6,
+   "sub": 2,
+   "requests": 1,
+   "seconds": 6.72,
+   "error": null
+  },
+  {
+   "page": 20,
+   "ref_chars": 513,
+   "hyp_chars": 1,
+   "ins": 0,
+   "del": 512,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.11,
+   "error": null
+  },
+  {
+   "page": 62,
+   "ref_chars": 660,
+   "hyp_chars": 1,
+   "ins": 0,
+   "del": 659,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.1,
+   "error": null
+  },
+  {
+   "page": 98,
+   "ref_chars": 560,
+   "hyp_chars": 2048,
+   "ins": 1488,
+   "del": 0,
+   "sub": 547,
+   "requests": 1,
+   "seconds": 43.48,
+   "error": null
+  },
+  {
+   "page": 160,
+   "ref_chars": 775,
+   "hyp_chars": 2048,
+   "ins": 1273,
+   "del": 0,
+   "sub": 773,
+   "requests": 1,
+   "seconds": 43.9,
+   "error": null
+  },
+  {
+   "page": 324,
+   "ref_chars": 511,
+   "hyp_chars": 2,
+   "ins": 0,
+   "del": 509,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.21,
+   "error": null
+  }
+ ]
+}

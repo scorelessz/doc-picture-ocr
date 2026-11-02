@@ -1,0 +1,227 @@
+{
+ "phase": "p1",
+ "name": "xiaomi-q8-llamacpp-spot",
+ "mode": "line",
+ "prompt_id": "xiaomi",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:30:17",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  3,
+  8,
+  9,
+  11,
+  12,
+  50,
+  120,
+  185,
+  236,
+  300,
+  10,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 13421,
+  "cer": 0.2891,
+  "ins_rate": 0.02466,
+  "del_rate": 0.24223,
+  "sub_rate": 0.0222,
+  "empty_pages": [
+   10,
+   20,
+   62,
+   98,
+   160,
+   324
+  ]
+ },
+ "perf": {
+  "seconds": 91.3,
+  "sec_per_page": 5.71,
+  "requests": 319,
+  "server_peak_rss_mb": 4402.7
+ },
+ "per_page": [
+  {
+   "page": 3,
+   "ref_chars": 186,
+   "hyp_chars": 291,
+   "ins": 110,
+   "del": 5,
+   "sub": 26,
+   "requests": 21,
+   "seconds": 3.56,
+   "error": null
+  },
+  {
+   "page": 8,
+   "ref_chars": 265,
+   "hyp_chars": 249,
+   "ins": 7,
+   "del": 23,
+   "sub": 27,
+   "requests": 14,
+   "seconds": 2.68,
+   "error": null
+  },
+  {
+   "page": 9,
+   "ref_chars": 197,
+   "hyp_chars": 205,
+   "ins": 21,
+   "del": 13,
+   "sub": 10,
+   "requests": 19,
+   "seconds": 3.36,
+   "error": null
+  },
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1370,
+   "ins": 0,
+   "del": 1,
+   "sub": 5,
+   "requests": 31,
+   "seconds": 10.93,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1726,
+   "ins": 35,
+   "del": 1,
+   "sub": 10,
+   "requests": 39,
+   "seconds": 12.77,
+   "error": null
+  },
+  {
+   "page": 50,
+   "ref_chars": 1527,
+   "hyp_chars": 1554,
+   "ins": 27,
+   "del": 0,
+   "sub": 43,
+   "requests": 39,
+   "seconds": 11.11,
+   "error": null
+  },
+  {
+   "page": 120,
+   "ref_chars": 1464,
+   "hyp_chars": 1463,
+   "ins": 0,
+   "del": 1,
+   "sub": 23,
+   "requests": 37,
+   "seconds": 10.8,
+   "error": null
+  },
+  {
+   "page": 185,
+   "ref_chars": 1071,
+   "hyp_chars": 1129,
+   "ins": 58,
+   "del": 0,
+   "sub": 48,
+   "requests": 42,
+   "seconds": 11.23,
+   "error": null
+  },
+  {
+   "page": 236,
+   "ref_chars": 1168,
+   "hyp_chars": 1229,
+   "ins": 64,
+   "del": 3,
+   "sub": 49,
+   "requests": 38,
+   "seconds": 12.67,
+   "error": null
+  },
+  {
+   "page": 300,
+   "ref_chars": 1279,
+   "hyp_chars": 1285,
+   "ins": 9,
+   "del": 3,
+   "sub": 57,
+   "requests": 39,
+   "seconds": 12.21,
+   "error": null
+  },
+  {
+   "page": 10,
+   "ref_chars": 182,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 182,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 20,
+   "ref_chars": 513,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 513,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 62,
+   "ref_chars": 660,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 660,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 98,
+   "ref_chars": 560,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 560,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 160,
+   "ref_chars": 775,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 775,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 324,
+   "ref_chars": 511,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 511,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  }
+ ]
+}

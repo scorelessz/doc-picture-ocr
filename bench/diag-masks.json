@@ -1,0 +1,370 @@
+[
+ {
+  "page": 10,
+  "mupdf_warnings": [],
+  "images": [
+   {
+    "xref": 711,
+    "smask": 0,
+    "image": {
+     "w": 1488,
+     "h": 2448,
+     "n": 3,
+     "mean": 191.8,
+     "lt128": 0.0,
+     "gt128": 1.0
+    }
+   },
+   {
+    "xref": 713,
+    "smask": 714,
+    "image": {
+     "w": 1488,
+     "h": 2448,
+     "n": 3,
+     "mean": 1.6,
+     "lt128": 0.9992,
+     "gt128": 0.0008
+    },
+    "mask": {
+     "w": 1488,
+     "h": 2448,
+     "n": 1,
+     "mean": 0.0,
+     "lt128": 0.9999,
+     "gt128": 0.0001
+    },
+    "mask_dict": {
+     "Filter": "/JBIG2Decode",
+     "BitsPerComponent": "1",
+     "ColorSpace": "/DeviceGray",
+     "Width": "1488",
+     "Height": "2448"
+    },
+    "mask_dict_len": 125
+   }
+  ]
+ },
+ {
+  "page": 20,
+  "mupdf_warnings": [],
+  "images": [
+   {
+    "xref": 761,
+    "smask": 0,
+    "image": {
+     "w": 501,
+     "h": 819,
+     "n": 3,
+     "mean": 190.7,
+     "lt128": 0.0,
+     "gt128": 1.0
+    }
+   },
+   {
+    "xref": 763,
+    "smask": 764,
+    "image": {
+     "w": 1503,
+     "h": 2457,
+     "n": 3,
+     "mean": 1.8,
+     "lt128": 0.9993,
+     "gt128": 0.0007
+    },
+    "mask": {
+     "w": 1503,
+     "h": 2457,
+     "n": 1,
+     "mean": 0.0,
+     "lt128": 0.9999,
+     "gt128": 0.0001
+    },
+    "mask_dict": {
+     "Filter": "/JBIG2Decode",
+     "BitsPerComponent": "1",
+     "ColorSpace": "/DeviceGray",
+     "Width": "1503",
+     "Height": "2457"
+    },
+    "mask_dict_len": 125
+   }
+  ]
+ },
+ {
+  "page": 62,
+  "mupdf_warnings": [],
+  "images": [
+   {
+    "xref": 971,
+    "smask": 0,
+    "image": {
+     "w": 501,
+     "h": 819,
+     "n": 3,
+     "mean": 192.1,
+     "lt128": 0.0,
+     "gt128": 1.0
+    }
+   },
+   {
+    "xref": 973,
+    "smask": 974,
+    "image": {
+     "w": 1503,
+     "h": 2457,
+     "n": 3,
+     "mean": 1.5,
+     "lt128": 0.9994,
+     "gt128": 0.0006
+    },
+    "mask": {
+     "w": 1503,
+     "h": 2457,
+     "n": 1,
+     "mean": 0.0,
+     "lt128": 0.9999,
+     "gt128": 0.0001
+    },
+    "mask_dict": {
+     "Filter": "/JBIG2Decode",
+     "BitsPerComponent": "1",
+     "ColorSpace": "/DeviceGray",
+     "Width": "1503",
+     "Height": "2457"
+    },
+    "mask_dict_len": 125
+   }
+  ]
+ },
+ {
+  "page": 98,
+  "mupdf_warnings": [],
+  "images": [
+   {
+    "xref": 1151,
+    "smask": 0,
+    "image": {
+     "w": 501,
+     "h": 818,
+     "n": 3,
+     "mean": 192.4,
+     "lt128": 0.0,
+     "gt128": 1.0
+    }
+   },
+   {
+    "xref": 1153,
+    "smask": 1154,
+    "image": {
+     "w": 1505,
+     "h": 2456,
+     "n": 3,
+     "mean": 2.1,
+     "lt128": 0.9988,
+     "gt128": 0.0012
+    },
+    "mask": {
+     "w": 1505,
+     "h": 2456,
+     "n": 1,
+     "mean": 0.0,
+     "lt128": 0.9999,
+     "gt128": 0.0001
+    },
+    "mask_dict": {
+     "Filter": "/JBIG2Decode",
+     "BitsPerComponent": "1",
+     "ColorSpace": "/DeviceGray",
+     "Width": "1505",
+     "Height": "2456"
+    },
+    "mask_dict_len": 125
+   }
+  ]
+ },
+ {
+  "page": 160,
+  "mupdf_warnings": [],
+  "images": [
+   {
+    "xref": 1461,
+    "smask": 0,
+    "image": {
+     "w": 501,
+     "h": 818,
+     "n": 3,
+     "mean": 193.7,
+     "lt128": 0.0,
+     "gt128": 1.0
+    }
+   },
+   {
+    "xref": 1463,
+    "smask": 1464,
+    "image": {
+     "w": 1505,
+     "h": 2456,
+     "n": 3,
+     "mean": 2.8,
+     "lt128": 0.9982,
+     "gt128": 0.0017
+    },
+    "mask": {
+     "w": 1505,
+     "h": 2456,
+     "n": 1,
+     "mean": 0.1,
+     "lt128": 0.9998,
+     "gt128": 0.0002
+    },
+    "mask_dict": {
+     "Filter": "/JBIG2Decode",
+     "BitsPerComponent": "1",
+     "ColorSpace": "/DeviceGray",
+     "Width": "1505",
+     "Height": "2456"
+    },
+    "mask_dict_len": 125
+   }
+  ]
+ },
+ {
+  "page": 324,
+  "mupdf_warnings": [],
+  "images": [
+   {
+    "xref": 2281,
+    "smask": 0,
+    "image": {
+     "w": 504,
+     "h": 838,
+     "n": 3,
+     "mean": 197.1,
+     "lt128": 0.0,
+     "gt128": 1.0
+    }
+   },
+   {
+    "xref": 2283,
+    "smask": 2284,
+    "image": {
+     "w": 1512,
+     "h": 2515,
+     "n": 3,
+     "mean": 1.7,
+     "lt128": 0.9992,
+     "gt128": 0.0008
+    },
+    "mask": {
+     "w": 1512,
+     "h": 2515,
+     "n": 1,
+     "mean": 0.0,
+     "lt128": 0.9998,
+     "gt128": 0.0002
+    },
+    "mask_dict": {
+     "Filter": "/JBIG2Decode",
+     "BitsPerComponent": "1",
+     "ColorSpace": "/DeviceGray",
+     "Width": "1512",
+     "Height": "2515"
+    },
+    "mask_dict_len": 125
+   }
+  ]
+ },
+ {
+  "page": 3,
+  "mupdf_warnings": [],
+  "images": [
+   {
+    "xref": 676,
+    "smask": 0,
+    "image": {
+     "w": 1542,
+     "h": 2465,
+     "n": 3,
+     "mean": 185.4,
+     "lt128": 0.0291,
+     "gt128": 0.9708
+    }
+   },
+   {
+    "xref": 678,
+    "smask": 679,
+    "image": {
+     "w": 1542,
+     "h": 2465,
+     "n": 3,
+     "mean": 63.0,
+     "lt128": 0.9978,
+     "gt128": 0.002
+    },
+    "mask": {
+     "w": 1542,
+     "h": 2465,
+     "n": 1,
+     "mean": 8.8,
+     "lt128": 0.9656,
+     "gt128": 0.0344
+    },
+    "mask_dict": {
+     "Filter": "/JBIG2Decode",
+     "BitsPerComponent": "1",
+     "ColorSpace": "/DeviceGray",
+     "Width": "1542",
+     "Height": "2465"
+    },
+    "mask_dict_len": 126
+   }
+  ]
+ },
+ {
+  "page": 11,
+  "mupdf_warnings": [],
+  "images": [
+   {
+    "xref": 716,
+    "smask": 0,
+    "image": {
+     "w": 514,
+     "h": 810,
+     "n": 3,
+     "mean": 188.8,
+     "lt128": 0.0,
+     "gt128": 1.0
+    }
+   },
+   {
+    "xref": 718,
+    "smask": 719,
+    "image": {
+     "w": 1544,
+     "h": 2432,
+     "n": 3,
+     "mean": 60.4,
+     "lt128": 0.9993,
+     "gt128": 0.0007
+    },
+    "mask": {
+     "w": 1544,
+     "h": 2432,
+     "n": 1,
+     "mean": 28.8,
+     "lt128": 0.8871,
+     "gt128": 0.1129
+    },
+    "mask_dict": {
+     "Filter": "/JBIG2Decode",
+     "BitsPerComponent": "1",
+     "ColorSpace": "/DeviceGray",
+     "Width": "1544",
+     "Height": "2432"
+    },
+    "mask_dict_len": 127
+   }
+  ]
+ }
+]

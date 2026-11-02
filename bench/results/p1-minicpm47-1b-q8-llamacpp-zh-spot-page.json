@@ -1,0 +1,208 @@
+{
+ "phase": "p1",
+ "name": "minicpm47-1b-q8-llamacpp-zh-spot",
+ "mode": "page",
+ "prompt_id": "minicpm",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T23:26:44",
+ "source": "失约之城.pdf",
+ "pages": [
+  7,
+  15,
+  18,
+  27,
+  30,
+  113,
+  164,
+  258,
+  50,
+  100,
+  150,
+  200,
+  250,
+  300,
+  350
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 1,
+  "cer": 0.0,
+  "ins_rate": 0.0,
+  "del_rate": 0.0,
+  "sub_rate": 0.0,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 93.5,
+  "sec_per_page": 6.23,
+  "requests": 15,
+  "server_peak_rss_mb": 3469.0
+ },
+ "per_page": [
+  {
+   "page": 7,
+   "ref_chars": 0,
+   "hyp_chars": 646,
+   "ins": 646,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.19,
+   "error": null
+  },
+  {
+   "page": 15,
+   "ref_chars": 0,
+   "hyp_chars": 608,
+   "ins": 608,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.71,
+   "error": null
+  },
+  {
+   "page": 18,
+   "ref_chars": 0,
+   "hyp_chars": 598,
+   "ins": 598,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.44,
+   "error": null
+  },
+  {
+   "page": 27,
+   "ref_chars": 0,
+   "hyp_chars": 589,
+   "ins": 589,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.94,
+   "error": null
+  },
+  {
+   "page": 30,
+   "ref_chars": 0,
+   "hyp_chars": 593,
+   "ins": 593,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.19,
+   "error": null
+  },
+  {
+   "page": 113,
+   "ref_chars": 0,
+   "hyp_chars": 486,
+   "ins": 486,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.58,
+   "error": null
+  },
+  {
+   "page": 164,
+   "ref_chars": 0,
+   "hyp_chars": 593,
+   "ins": 593,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.59,
+   "error": null
+  },
+  {
+   "page": 258,
+   "ref_chars": 0,
+   "hyp_chars": 562,
+   "ins": 562,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.32,
+   "error": null
+  },
+  {
+   "page": 50,
+   "ref_chars": 0,
+   "hyp_chars": 505,
+   "ins": 505,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.76,
+   "error": null
+  },
+  {
+   "page": 100,
+   "ref_chars": 0,
+   "hyp_chars": 614,
+   "ins": 614,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.72,
+   "error": null
+  },
+  {
+   "page": 150,
+   "ref_chars": 0,
+   "hyp_chars": 590,
+   "ins": 590,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.64,
+   "error": null
+  },
+  {
+   "page": 200,
+   "ref_chars": 0,
+   "hyp_chars": 479,
+   "ins": 479,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 5.64,
+   "error": null
+  },
+  {
+   "page": 250,
+   "ref_chars": 0,
+   "hyp_chars": 574,
+   "ins": 574,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.03,
+   "error": null
+  },
+  {
+   "page": 300,
+   "ref_chars": 0,
+   "hyp_chars": 515,
+   "ins": 515,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.33,
+   "error": null
+  },
+  {
+   "page": 350,
+   "ref_chars": 0,
+   "hyp_chars": 550,
+   "ins": 550,
+   "del": 0,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 6.43,
+   "error": null
+  }
+ ]
+}

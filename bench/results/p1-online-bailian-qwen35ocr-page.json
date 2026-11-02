@@ -1,0 +1,220 @@
+{
+ "phase": "p1",
+ "name": "online-bailian-qwen35ocr",
+ "mode": "page",
+ "prompt_id": "generic",
+ "base_url_host": "dashscope.aliyuncs.com",
+ "date": "2026-10-31T22:19:19",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  3,
+  8,
+  9,
+  11,
+  12,
+  50,
+  120,
+  185,
+  236,
+  300,
+  10,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 13421,
+  "cer": 0.27196,
+  "ins_rate": 0.0082,
+  "del_rate": 0.23679,
+  "sub_rate": 0.02697,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 22.6,
+  "sec_per_page": 1.41,
+  "requests": 16,
+  "server_peak_rss_mb": null
+ },
+ "per_page": [
+  {
+   "page": 3,
+   "ref_chars": 186,
+   "hyp_chars": 255,
+   "ins": 70,
+   "del": 1,
+   "sub": 36,
+   "requests": 1,
+   "seconds": 1.04,
+   "error": null
+  },
+  {
+   "page": 8,
+   "ref_chars": 265,
+   "hyp_chars": 249,
+   "ins": 7,
+   "del": 23,
+   "sub": 27,
+   "requests": 1,
+   "seconds": 0.88,
+   "error": null
+  },
+  {
+   "page": 9,
+   "ref_chars": 197,
+   "hyp_chars": 205,
+   "ins": 21,
+   "del": 13,
+   "sub": 10,
+   "requests": 1,
+   "seconds": 1.09,
+   "error": null
+  },
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1371,
+   "ins": 2,
+   "del": 2,
+   "sub": 7,
+   "requests": 1,
+   "seconds": 2.17,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1690,
+   "ins": 0,
+   "del": 2,
+   "sub": 11,
+   "requests": 1,
+   "seconds": 2.6,
+   "error": null
+  },
+  {
+   "page": 50,
+   "ref_chars": 1527,
+   "hyp_chars": 1530,
+   "ins": 4,
+   "del": 1,
+   "sub": 47,
+   "requests": 1,
+   "seconds": 2.91,
+   "error": null
+  },
+  {
+   "page": 120,
+   "ref_chars": 1464,
+   "hyp_chars": 1462,
+   "ins": 0,
+   "del": 2,
+   "sub": 23,
+   "requests": 1,
+   "seconds": 2.5,
+   "error": null
+  },
+  {
+   "page": 185,
+   "ref_chars": 1071,
+   "hyp_chars": 1069,
+   "ins": 1,
+   "del": 3,
+   "sub": 49,
+   "requests": 1,
+   "seconds": 1.9,
+   "error": null
+  },
+  {
+   "page": 236,
+   "ref_chars": 1168,
+   "hyp_chars": 1164,
+   "ins": 0,
+   "del": 4,
+   "sub": 49,
+   "requests": 1,
+   "seconds": 2.54,
+   "error": null
+  },
+  {
+   "page": 300,
+   "ref_chars": 1279,
+   "hyp_chars": 1278,
+   "ins": 5,
+   "del": 6,
+   "sub": 59,
+   "requests": 1,
+   "seconds": 2.23,
+   "error": null
+  },
+  {
+   "page": 10,
+   "ref_chars": 182,
+   "hyp_chars": 32,
+   "ins": 0,
+   "del": 150,
+   "sub": 21,
+   "requests": 1,
+   "seconds": 0.5,
+   "error": null
+  },
+  {
+   "page": 20,
+   "ref_chars": 513,
+   "hyp_chars": 10,
+   "ins": 0,
+   "del": 503,
+   "sub": 5,
+   "requests": 1,
+   "seconds": 0.48,
+   "error": null
+  },
+  {
+   "page": 62,
+   "ref_chars": 660,
+   "hyp_chars": 10,
+   "ins": 0,
+   "del": 650,
+   "sub": 5,
+   "requests": 1,
+   "seconds": 0.41,
+   "error": null
+  },
+  {
+   "page": 98,
+   "ref_chars": 560,
+   "hyp_chars": 9,
+   "ins": 0,
+   "del": 551,
+   "sub": 5,
+   "requests": 1,
+   "seconds": 0.46,
+   "error": null
+  },
+  {
+   "page": 160,
+   "ref_chars": 775,
+   "hyp_chars": 10,
+   "ins": 0,
+   "del": 765,
+   "sub": 4,
+   "requests": 1,
+   "seconds": 0.46,
+   "error": null
+  },
+  {
+   "page": 324,
+   "ref_chars": 511,
+   "hyp_chars": 9,
+   "ins": 0,
+   "del": 502,
+   "sub": 4,
+   "requests": 1,
+   "seconds": 0.46,
+   "error": null
+  }
+ ]
+}

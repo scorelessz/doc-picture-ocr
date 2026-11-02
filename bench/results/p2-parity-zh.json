@@ -1,0 +1,31 @@
+{
+ "phase": "p2",
+ "source": "失约之城.pdf",
+ "pages": [
+  {
+   "page": 7,
+   "old_lines": 28,
+   "new_lines": 28,
+   "identical_lines": 28,
+   "identical_text": 28,
+   "identical": true
+  },
+  {
+   "page": 50,
+   "old_lines": 28,
+   "new_lines": 28,
+   "identical_lines": 28,
+   "identical_text": 28,
+   "identical": true
+  },
+  {
+   "page": 150,
+   "old_lines": 28,
+   "new_lines": 28,
+   "identical_lines": 28,
+   "identical_text": 28,
+   "identical": true
+  }
+ ],
+ "all_identical": true
+}

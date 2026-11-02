@@ -1,0 +1,52 @@
+{
+ "phase": "p1",
+ "name": "mineru25pro-mlx8",
+ "mode": "line",
+ "prompt_id": "mineru",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:10:21",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  11,
+  12
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 3063,
+  "cer": 0.01698,
+  "ins_rate": 0.01143,
+  "del_rate": 0.00033,
+  "sub_rate": 0.00522,
+  "empty_pages": []
+ },
+ "perf": {
+  "seconds": 32.4,
+  "sec_per_page": 16.2,
+  "requests": 70,
+  "server_peak_rss_mb": 2345.1
+ },
+ "per_page": [
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1371,
+   "ins": 0,
+   "del": 0,
+   "sub": 6,
+   "requests": 31,
+   "seconds": 13.81,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1726,
+   "ins": 35,
+   "del": 1,
+   "sub": 10,
+   "requests": 39,
+   "seconds": 18.59,
+   "error": null
+  }
+ ]
+}

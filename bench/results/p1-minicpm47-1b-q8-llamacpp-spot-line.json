@@ -1,0 +1,227 @@
+{
+ "phase": "p1",
+ "name": "minicpm47-1b-q8-llamacpp-spot",
+ "mode": "line",
+ "prompt_id": "minicpm",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:34:08",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  3,
+  8,
+  9,
+  11,
+  12,
+  50,
+  120,
+  185,
+  236,
+  300,
+  10,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 13421,
+  "cer": 0.32278,
+  "ins_rate": 0.04776,
+  "del_rate": 0.25505,
+  "sub_rate": 0.01997,
+  "empty_pages": [
+   10,
+   20,
+   62,
+   98,
+   160,
+   324
+  ]
+ },
+ "perf": {
+  "seconds": 140.0,
+  "sec_per_page": 8.75,
+  "requests": 319,
+  "server_peak_rss_mb": 8765.3
+ },
+ "per_page": [
+  {
+   "page": 3,
+   "ref_chars": 186,
+   "hyp_chars": 244,
+   "ins": 67,
+   "del": 9,
+   "sub": 27,
+   "requests": 21,
+   "seconds": 7.69,
+   "error": null
+  },
+  {
+   "page": 8,
+   "ref_chars": 265,
+   "hyp_chars": 250,
+   "ins": 7,
+   "del": 22,
+   "sub": 28,
+   "requests": 14,
+   "seconds": 5.41,
+   "error": null
+  },
+  {
+   "page": 9,
+   "ref_chars": 197,
+   "hyp_chars": 203,
+   "ins": 21,
+   "del": 15,
+   "sub": 24,
+   "requests": 19,
+   "seconds": 6.51,
+   "error": null
+  },
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1347,
+   "ins": 4,
+   "del": 28,
+   "sub": 46,
+   "requests": 31,
+   "seconds": 13.91,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1692,
+   "ins": 34,
+   "del": 34,
+   "sub": 11,
+   "requests": 39,
+   "seconds": 18.24,
+   "error": null
+  },
+  {
+   "page": 50,
+   "ref_chars": 1527,
+   "hyp_chars": 1517,
+   "ins": 26,
+   "del": 36,
+   "sub": 32,
+   "requests": 39,
+   "seconds": 16.98,
+   "error": null
+  },
+  {
+   "page": 120,
+   "ref_chars": 1464,
+   "hyp_chars": 1508,
+   "ins": 68,
+   "del": 24,
+   "sub": 22,
+   "requests": 37,
+   "seconds": 16.5,
+   "error": null
+  },
+  {
+   "page": 185,
+   "ref_chars": 1071,
+   "hyp_chars": 1166,
+   "ins": 109,
+   "del": 14,
+   "sub": 27,
+   "requests": 42,
+   "seconds": 17.92,
+   "error": null
+  },
+  {
+   "page": 236,
+   "ref_chars": 1168,
+   "hyp_chars": 1328,
+   "ins": 176,
+   "del": 16,
+   "sub": 19,
+   "requests": 38,
+   "seconds": 17.58,
+   "error": null
+  },
+  {
+   "page": 300,
+   "ref_chars": 1279,
+   "hyp_chars": 1384,
+   "ins": 129,
+   "del": 24,
+   "sub": 32,
+   "requests": 39,
+   "seconds": 19.26,
+   "error": null
+  },
+  {
+   "page": 10,
+   "ref_chars": 182,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 182,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 20,
+   "ref_chars": 513,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 513,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 62,
+   "ref_chars": 660,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 660,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 98,
+   "ref_chars": 560,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 560,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 160,
+   "ref_chars": 775,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 775,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 324,
+   "ref_chars": 511,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 511,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  }
+ ]
+}

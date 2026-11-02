@@ -1,0 +1,163 @@
+{
+ "phase": "p1",
+ "name": "minicpm47-1b-q8-llamacpp",
+ "mode": "page",
+ "prompt_id": "minicpm",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:00:30",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  3,
+  8,
+  9,
+  10,
+  11,
+  12,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 6912,
+  "cer": 0.51606,
+  "ins_rate": 0.03617,
+  "del_rate": 0.44242,
+  "sub_rate": 0.03747,
+  "empty_pages": [
+   20,
+   98
+  ]
+ },
+ "perf": {
+  "seconds": 45.2,
+  "sec_per_page": 4.11,
+  "requests": 11,
+  "server_peak_rss_mb": 3334.5
+ },
+ "per_page": [
+  {
+   "page": 3,
+   "ref_chars": 186,
+   "hyp_chars": 270,
+   "ins": 84,
+   "del": 0,
+   "sub": 37,
+   "requests": 1,
+   "seconds": 4.34,
+   "error": null
+  },
+  {
+   "page": 8,
+   "ref_chars": 265,
+   "hyp_chars": 248,
+   "ins": 7,
+   "del": 24,
+   "sub": 26,
+   "requests": 1,
+   "seconds": 3.68,
+   "error": null
+  },
+  {
+   "page": 9,
+   "ref_chars": 197,
+   "hyp_chars": 201,
+   "ins": 17,
+   "del": 13,
+   "sub": 17,
+   "requests": 1,
+   "seconds": 3.59,
+   "error": null
+  },
+  {
+   "page": 10,
+   "ref_chars": 182,
+   "hyp_chars": 278,
+   "ins": 96,
+   "del": 0,
+   "sub": 171,
+   "requests": 1,
+   "seconds": 6.72,
+   "error": null
+  },
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1415,
+   "ins": 46,
+   "del": 2,
+   "sub": 8,
+   "requests": 1,
+   "seconds": 6.9,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1687,
+   "ins": 0,
+   "del": 5,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 8.1,
+   "error": null
+  },
+  {
+   "page": 20,
+   "ref_chars": 513,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 513,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.4,
+   "error": null
+  },
+  {
+   "page": 62,
+   "ref_chars": 660,
+   "hyp_chars": 3,
+   "ins": 0,
+   "del": 657,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.39,
+   "error": null
+  },
+  {
+   "page": 98,
+   "ref_chars": 560,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 560,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.37,
+   "error": null
+  },
+  {
+   "page": 160,
+   "ref_chars": 775,
+   "hyp_chars": 1,
+   "ins": 0,
+   "del": 774,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.36,
+   "error": null
+  },
+  {
+   "page": 324,
+   "ref_chars": 511,
+   "hyp_chars": 1,
+   "ins": 0,
+   "del": 510,
+   "sub": 0,
+   "requests": 1,
+   "seconds": 2.37,
+   "error": null
+  }
+ ]
+}

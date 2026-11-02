@@ -1,0 +1,145 @@
+{
+ "phase": "p3",
+ "name": "e2e",
+ "en": {
+  "source": "City of Broken Promises",
+  "pages": 328,
+  "degraded": [],
+  "swift": {
+   "total_seconds": 389.4,
+   "sec_per_page": 1.187,
+   "peak_rss_self_mb": 4247.3,
+   "peak_rss_children_mb": 0,
+   "seconds": {
+    "fuse": 0.25,
+    "md": 0.19,
+    "pdf": 2.44,
+    "ppocr-coreml": 239.5,
+    "render+vision": 147.02
+   }
+  },
+  "python_p0": {
+   "seconds": 683.2,
+   "sec_per_page": 2.083,
+   "peak_rss_mb": 2208.9,
+   "peak_rss_children_mb": 137.1
+  },
+  "fusion_swift": {
+   "both": 11481,
+   "divergent": 4155,
+   "dropped_contained": 96,
+   "dropped_empty": 0,
+   "glossary_hits": 0,
+   "lines": 11807,
+   "low_conf": 11,
+   "only_rapidocr": 83,
+   "only_vision": 243,
+   "pages": 328
+  },
+  "fusion_p0": {
+   "lines": 11632,
+   "both": 11481,
+   "divergent_rate": 0.3683,
+   "single_source_rate": 0.013,
+   "only_vision": 66,
+   "only_rapidocr": 85,
+   "dropped_empty": 0,
+   "dropped_contained": 32
+  },
+  "gate_native_pages": [
+   10,
+   20,
+   62,
+   98,
+   160,
+   202,
+   324
+  ],
+  "gate_blank_pages": [
+   248,
+   325,
+   326,
+   327
+  ],
+  "native_pages": [],
+  "md_vs_swift_chain": {
+   "identical": false,
+   "blocks_a": 2596,
+   "blocks_b": 2735,
+   "blocks_equal": 2221,
+   "block_equal_ratio": 0.8121,
+   "chars_a": 569976,
+   "chars_b": 574985
+  },
+  "source_prefix_identical": true,
+  "pdf_pages": 328,
+  "pdf_producer": "ocr-book-line",
+  "size_in": 14941280,
+  "size_out": 15745641
+ },
+ "zh": {
+  "source": "失约之城",
+  "pages": 373,
+  "degraded": [],
+  "swift": {
+   "total_seconds": 305.3,
+   "sec_per_page": 0.818,
+   "peak_rss_self_mb": 7018.4,
+   "peak_rss_children_mb": 0,
+   "seconds": {
+    "fuse": 0.14,
+    "md": 0.11,
+    "pdf": 0.67,
+    "ppocr-coreml": 193.51,
+    "render+vision": 110.91
+   }
+  },
+  "python_p0": {
+   "seconds": 530.9,
+   "sec_per_page": 1.423,
+   "peak_rss_mb": 1921.1,
+   "peak_rss_children_mb": 144.9
+  },
+  "fusion_swift": {
+   "both": 10062,
+   "divergent": 2480,
+   "dropped_contained": 9,
+   "dropped_empty": 0,
+   "glossary_hits": 0,
+   "lines": 10099,
+   "low_conf": 1,
+   "only_rapidocr": 14,
+   "only_vision": 23,
+   "pages": 373
+  },
+  "fusion_p0": {
+   "lines": 10098,
+   "both": 10079,
+   "divergent_rate": 0.2501,
+   "single_source_rate": 0.0019,
+   "only_vision": 5,
+   "only_rapidocr": 14,
+   "dropped_empty": 0,
+   "dropped_contained": 8
+  },
+  "gate_native_pages": [],
+  "gate_blank_pages": [],
+  "native_pages": [
+   373
+  ],
+  "md_vs_swift_chain": {
+   "identical": false,
+   "blocks_a": 3123,
+   "blocks_b": 3118,
+   "blocks_equal": 2845,
+   "block_equal_ratio": 0.911,
+   "chars_a": 212781,
+   "chars_b": 212781
+  },
+  "source_prefix_identical": true,
+  "pdf_pages": 373,
+  "pdf_producer": "ocr-book-line",
+  "size_in": 47560910,
+  "size_out": 48210519
+ }
+}

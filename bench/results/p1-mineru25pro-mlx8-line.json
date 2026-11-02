@@ -1,0 +1,167 @@
+{
+ "phase": "p1",
+ "name": "mineru25pro-mlx8",
+ "mode": "line",
+ "prompt_id": "mineru",
+ "base_url_host": "127.0.0.1:8080",
+ "date": "2026-10-31T21:11:12",
+ "source": "City of Broken Promises.pdf",
+ "pages": [
+  3,
+  8,
+  9,
+  10,
+  11,
+  12,
+  20,
+  62,
+  98,
+  160,
+  324
+ ],
+ "max_side": 1792,
+ "accuracy": {
+  "ref_chars": 6912,
+  "cer": 0.50593,
+  "ins_rate": 0.02532,
+  "del_rate": 0.46918,
+  "sub_rate": 0.01143,
+  "empty_pages": [
+   10,
+   20,
+   62,
+   98,
+   160,
+   324
+  ]
+ },
+ "perf": {
+  "seconds": 49.4,
+  "sec_per_page": 4.49,
+  "requests": 124,
+  "server_peak_rss_mb": 2346.0
+ },
+ "per_page": [
+  {
+   "page": 3,
+   "ref_chars": 186,
+   "hyp_chars": 293,
+   "ins": 112,
+   "del": 5,
+   "sub": 26,
+   "requests": 21,
+   "seconds": 6.12,
+   "error": null
+  },
+  {
+   "page": 8,
+   "ref_chars": 265,
+   "hyp_chars": 249,
+   "ins": 7,
+   "del": 23,
+   "sub": 27,
+   "requests": 14,
+   "seconds": 4.24,
+   "error": null
+  },
+  {
+   "page": 9,
+   "ref_chars": 197,
+   "hyp_chars": 205,
+   "ins": 21,
+   "del": 13,
+   "sub": 10,
+   "requests": 19,
+   "seconds": 5.21,
+   "error": null
+  },
+  {
+   "page": 10,
+   "ref_chars": 182,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 182,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 11,
+   "ref_chars": 1371,
+   "hyp_chars": 1371,
+   "ins": 0,
+   "del": 0,
+   "sub": 6,
+   "requests": 31,
+   "seconds": 14.83,
+   "error": null
+  },
+  {
+   "page": 12,
+   "ref_chars": 1692,
+   "hyp_chars": 1726,
+   "ins": 35,
+   "del": 1,
+   "sub": 10,
+   "requests": 39,
+   "seconds": 18.99,
+   "error": null
+  },
+  {
+   "page": 20,
+   "ref_chars": 513,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 513,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 62,
+   "ref_chars": 660,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 660,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 98,
+   "ref_chars": 560,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 560,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 160,
+   "ref_chars": 775,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 775,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  },
+  {
+   "page": 324,
+   "ref_chars": 511,
+   "hyp_chars": 0,
+   "ins": 0,
+   "del": 511,
+   "sub": 0,
+   "requests": 0,
+   "seconds": 0.0,
+   "error": null
+  }
+ ]
+}

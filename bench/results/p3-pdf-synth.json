@@ -1,0 +1,42 @@
+{
+ "phase": "p3",
+ "name": "pdf-synth",
+ "runs": [
+  {
+   "objstm": false,
+   "pages": 12,
+   "prefix_identical": true,
+   "swift": {
+    "line_retrieval": 1,
+    "pages_rotated": 9,
+    "probe_found": 24,
+    "probe_max_offset_pt": 0.66,
+    "probe_missed": 0,
+    "probe_outside": 0,
+    "retrieval": 1
+   },
+   "bad": 0,
+   "first_bad": [],
+   "max_dx_pt": 18.59,
+   "max_dy_pt": 0.66
+  },
+  {
+   "objstm": true,
+   "pages": 12,
+   "prefix_identical": true,
+   "swift": {
+    "line_retrieval": 1,
+    "pages_rotated": 9,
+    "probe_found": 24,
+    "probe_max_offset_pt": 0.66,
+    "probe_missed": 0,
+    "probe_outside": 0,
+    "retrieval": 1
+   },
+   "bad": 0,
+   "first_bad": [],
+   "max_dx_pt": 18.59,
+   "max_dy_pt": 0.66
+  }
+ ]
+}
