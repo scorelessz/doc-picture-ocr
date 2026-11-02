@@ -10,8 +10,48 @@ struct SettingsView: View {
             ModelsTab().tabItem { Label("模型", systemImage: "shippingbox") }
             ProvidersTab().tabItem { Label("服务商", systemImage: "network") }
             AdvancedTab().tabItem { Label("高级", systemImage: "slider.horizontal.3") }
+            StorageTab().tabItem { Label("存储", systemImage: "internaldrive") }
             DiagnosticsTab().tabItem { Label("诊断", systemImage: "stethoscope") }
         }.padding()
+    }
+}
+
+struct StorageTab: View {
+    @EnvironmentObject var queue: QueueModel
+    @EnvironmentObject var d: DiagnosticsModel
+    @State private var days = 30
+    @State private var request: CleanupRequest?
+    @State private var logBytes = logsSize()
+
+    private func size(_ n: Int64) -> String { ByteCountFormatter.string(fromByteCount: n, countStyle: .file) }
+
+    var body: some View {
+        Form {
+            Section("处理记录（共 \(queue.history.count) 条）") {
+                Stepper("\(days) 天前的记录", value: $days, in: 1...3650)
+                HStack {
+                    Button("清理 \(days) 天前的") { request = CleanupRequest(plan: queue.cleanupPlan(.olderThan(days: days))) }
+                    Button("清理失败、中断、取消的") { request = CleanupRequest(plan: queue.cleanupPlan(.unfinished)) }
+                    Button("清理全部") { request = CleanupRequest(plan: queue.cleanupPlan(.all)) }
+                }
+                Text("运行中和排队中的不会被清理。输出文件默认保留。").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("中间文件（\(size(queue.cleanupPlan(.all).workBytes))）") {
+                Button("清理中间文件") { request = CleanupRequest(plan: queue.cleanupPlan(.all), keepRecords: true) }
+                Toggle("自动清理 N 天前的中间文件", isOn: Binding(get: { queue.autoCleanDays != nil }, set: { queue.autoCleanDays = $0 ? days : nil }))
+                if let n = queue.autoCleanDays { Text("启动时清理 \(n) 天前的中间文件，记录和输出不动。").font(.caption).foregroundStyle(.secondary) }
+            }
+            Section("日志（\(size(logBytes))）") {
+                Button("清理日志") {
+                    clearLogs()
+                    d.reopenLog()
+                    logBytes = logsSize()
+                }
+                Text("正在写的日志会清空，不删除文件。").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .sheet(item: $request) { CleanupConfirmView(request: $0).environmentObject(queue) }
     }
 }
 

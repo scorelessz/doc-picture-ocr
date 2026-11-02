@@ -2,6 +2,8 @@ import Foundation
 import OCRCore
 import OCREngines
 import OCRProviders
+import DocOCRAppCore
+import AppKit
 
 // provider 子命令。联网默认关：--allow-network 开总开关，点名的服务商才算用户选中。
 
@@ -190,4 +192,38 @@ func runProvider(_ args: [String]) throws {
 
     default: fail(usage)
     }
+}
+
+func runHistory(_ args: [String]) throws {
+    let h = History(url: AppPaths.history)
+    guard let sub = args.first else { fail(usage) }
+    if sub == "list" {
+        for r in h.records { print("\(r.state)\t\(r.pages) 页\t\(r.startedAt)\t\(URL(fileURLWithPath: r.pdf).lastPathComponent)") }
+        print("共 \(h.records.count) 条")
+        return
+    }
+    guard sub == "prune" else { fail(usage) }
+    let filter: CleanupFilter
+    if let v = option(args, "--older-than") {
+        guard v.hasSuffix("d"), let n = Int(v.dropLast()), n >= 0 else { fail("--older-than 写成 30d", code: 2) }
+        filter = .olderThan(days: n)
+    } else if args.contains("--unfinished") {
+        filter = .unfinished
+    } else if args.contains("--all") {
+        filter = .all
+    } else { fail(usage) }
+    let work = args.contains("--work"), trash = args.contains("--trash-outputs")
+    let plan = planCleanup(h.records, filter: filter, activePDFs: [])
+    print("记录 \(plan.items.count) 条，跳过运行中 \(plan.skippedActive) 条，路径校验未过 \(plan.rejectedPaths) 条")
+    if work { print("中间文件 \(plan.workBytes) 字节:"); plan.workPaths.forEach { print("  \($0)") } }
+    if trash { print("移到废纸篓 \(plan.outputBytes) 字节:"); plan.outputPaths.forEach { print("  \($0)") } }
+    guard args.contains("--yes"), !args.contains("--dry-run") else {
+        print("这是预览，没有改动。加 --yes 才执行。")
+        return
+    }
+    guard NSRunningApplication.runningApplications(withBundleIdentifier: "com.dococr.app").isEmpty else {
+        fail("DocOCR 正在运行，请先退出：它会同时写这份记录", code: 3)
+    }
+    let r = runCleanup(plan, work: work, trashOutputs: trash, history: h)
+    print("移除记录 \(r.records) 条，处理 \(r.bytes) 字节，失败 \(r.failed)")
 }

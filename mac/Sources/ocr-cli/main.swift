@@ -35,6 +35,9 @@ usage:
   ocr-cli adjudicate <fused.json> --provider id --model m --out o.json --allow-network [--mode image|text] [--pdf p]
                      [--pages 1,2] [--online-jobs 1-8] [--confirm-upload 清单sha256] [--key-stdin] [--force]
   ocr-cli verify-uploads <report.md> <uploads.jsonl>
+  ocr-cli history list
+  ocr-cli history prune (--older-than 30d | --unfinished | --all) [--work] [--trash-outputs] [--dry-run] [--yes]
+                        默认只预览，加 --yes 才执行；输出文件只进废纸篓
   ocr-cli provider list
   ocr-cli provider key set|status|delete <id>   Key 从 stdin 读，不接受参数
   ocr-cli provider models <id> --allow-network [--key-stdin]
@@ -169,6 +172,9 @@ do {
         for b in bad { print("✗ \(b)") }
         if !bad.isEmpty { exit(1) }
         print("✓ 报告与上传记录一致")
+
+    case "history":
+        try runHistory(args)
 
     case "adjudicate":
         try runAdjudicate(args)

@@ -78,6 +78,7 @@
 | 在线裁决 | 主界面，融合后执行 | `adjudicate`，处理做完的 `fused.json` |
 | 模型下载、校验、删除 | 设置 → 模型 | `models fetch`（校验看 `doctor`，没有删除） |
 | 服务商、Key | 设置 → 服务商 | `provider list`，`provider key`，`provider probe` |
+| 清理记录、中间文件、日志 | 侧栏右键，设置 → 存储 | `history list`，`history prune` |
 | 环境自检、日志 | 设置 → 诊断 | `doctor`，`--log-level`，`--log-file`，`--log-text` |
 | 只有命令行 | 无 | 调试子命令（`vision`、`render`、`recognize`、`page-info`、`fuse`、`md`、`pdf`、`paddle`、`paddle-plan`、`vl`、`vlm-fuse`），`--clobber`，`--paddle python`，`models fetch --url`，`verify-uploads`，`provider models`，`--result` |
 

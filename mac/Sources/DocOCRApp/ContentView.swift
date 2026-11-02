@@ -12,11 +12,12 @@ enum Pane: Hashable {
 struct ContentView: View {
     @EnvironmentObject var app: AppModel
     @EnvironmentObject var queue: QueueModel
-    @State private var pane: Pane? = .queue
+    @State private var panes: Set<Pane> = [.queue]
+    @State private var cleanup: CleanupRequest?
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $pane) {
+            List(selection: $panes) {
                 Label("处理队列", systemImage: "tray.full").tag(Pane.queue)
                 Section("结果") {
                     ForEach(queue.history) { r in
@@ -27,14 +28,22 @@ struct ContentView: View {
                     }
                 }
             }
+            .contextMenu(forSelectionType: Pane.self) { items in
+                let ids = Set(items.compactMap { p -> UUID? in
+                    if case .record(let i) = p { return i }
+                    return nil
+                })
+                Button("移除记录") { cleanup = CleanupRequest(plan: queue.cleanupPlan(.ids(ids)), recordsOnly: true) }.disabled(ids.isEmpty)
+            }
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
         } detail: {
-            switch pane ?? .queue {
-            case .queue: QueueView()
-            case .record(let id):
-                if let r = queue.history.first(where: { $0.id == id }) { ResultView(record: r) } else { QueueView() }
+            if panes.count == 1, case .record(let id)? = panes.first, let r = queue.history.first(where: { $0.id == id }) {
+                ResultView(record: r)
+            } else {
+                QueueView()
             }
         }
+        .sheet(item: $cleanup) { CleanupConfirmView(request: $0) }
         .onAppear {
             // 测加入文件后界面是否还活着：脚本用
             if let i = CommandLine.arguments.firstIndex(of: "--ui-add") {
@@ -63,6 +72,69 @@ struct ContentView: View {
         .sheet(isPresented: .constant(queue.confirm != nil)) {
             if let c = queue.confirm { ConfirmView(request: c).interactiveDismissDisabled() }
         }
+    }
+}
+
+struct CleanupRequest: Identifiable {
+    let id = UUID()
+    let plan: CleanupPlan
+    var recordsOnly = false
+    /// 只清中间文件，记录留着
+    var keepRecords = false
+}
+
+/// 每次清理都先过这里。输出文件默认不勾。
+struct CleanupConfirmView: View {
+    let request: CleanupRequest
+    @EnvironmentObject var queue: QueueModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var work: Bool
+    @State private var trash = false
+    @State private var done: CleanupResult?
+
+    init(request: CleanupRequest) {
+        self.request = request
+        _work = State(initialValue: !request.recordsOnly)
+    }
+
+    private func size(_ n: Int64) -> String { ByteCountFormatter.string(fromByteCount: n, countStyle: .file) }
+
+    var body: some View {
+        let p = request.plan
+        VStack(alignment: .leading, spacing: 10) {
+            Text("确认清理").font(.title2).bold()
+            Text(request.keepRecords ? "涉及 \(p.items.count) 条记录，记录保留" : "将移除 \(p.items.count) 条记录")
+            if p.skippedActive > 0 { Text("\(p.skippedActive) 条正在运行或排队，已跳过").foregroundStyle(.secondary) }
+            if p.rejectedPaths > 0 { Text("\(p.rejectedPaths) 条的路径没有通过校验，不碰它们的文件").foregroundStyle(.orange) }
+            Toggle("同时清理中间文件（\(size(p.workBytes))）", isOn: $work)
+            if work { DisclosureGroup("路径（\(p.workPaths.count)）") { paths(p.workPaths) } }
+            if !request.keepRecords {
+                Toggle("同时把输出文件移到废纸篓（\(size(p.outputBytes))）", isOn: $trash)
+                if trash {
+                    Text("Markdown、可搜索 PDF、报告和上传记录会进废纸篓。源 PDF 不动。").foregroundStyle(.red)
+                    DisclosureGroup("路径（\(p.outputPaths.count)）") { paths(p.outputPaths) }
+                }
+            }
+            if let d = done {
+                Text("已移除 \(d.records) 条，处理 \(size(d.bytes))，失败 \(d.failed)")
+            }
+            HStack {
+                Spacer()
+                Button(done == nil ? "取消" : "关闭") { dismiss() }.keyboardShortcut(.cancelAction)
+                if done == nil {
+                    Button("确认清理") { done = queue.runCleanupPlan(p, work: work, trashOutputs: trash, removeRecords: !request.keepRecords) }
+                        .disabled(p.items.isEmpty)
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 520)
+    }
+
+    private func paths(_ list: [String]) -> some View {
+        ScrollView {
+            VStack(alignment: .leading) { ForEach(list, id: \.self) { Text($0).font(.caption).lineLimit(1).truncationMode(.middle) } }
+        }.frame(maxHeight: 120)
     }
 }
 

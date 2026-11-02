@@ -58,6 +58,17 @@ public final class History: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         if let i = records.firstIndex(where: { $0.id == r.id }) { records[i] = r } else { records.insert(r, at: 0) }
+        save()
+    }
+
+    public func remove(_ ids: Set<UUID>) {
+        lock.lock()
+        defer { lock.unlock() }
+        records.removeAll { ids.contains($0.id) }
+        save()
+    }
+
+    private func save() {
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -457,6 +468,40 @@ public final class QueueModel: ObservableObject {
             return nil
         }
         return try? await app.gate.confirm(checkbox: true, scope: scope)
+    }
+
+    // MARK: 清理
+
+    /// 运行中和排队中的不能清
+    public var activePDFs: Set<String> {
+        Set(jobs.filter { j in
+            switch j.status {
+            case .done, .failed, .cancelled, .declined: return false
+            default: return true
+            }
+        }.map(\.pdf.path))
+    }
+
+    public func cleanupPlan(_ f: CleanupFilter) -> CleanupPlan { planCleanup(store.records, filter: f, activePDFs: activePDFs) }
+
+    public func runCleanupPlan(_ p: CleanupPlan, work: Bool, trashOutputs: Bool, removeRecords: Bool = true) -> CleanupResult {
+        let r = runCleanup(p, work: work, trashOutputs: trashOutputs, removeRecords: removeRecords, history: store)
+        history = store.records
+        return r
+    }
+
+    public var autoCleanDays: Int? {
+        get { prefs.string("autoCleanDays").flatMap(Int.init) }
+        set {
+            prefs.set(newValue.map(String.init), "autoCleanDays")
+            objectWillChange.send()
+        }
+    }
+
+    /// 启动时：只清中间文件，记录和输出都不动
+    public func autoClean() {
+        guard let d = autoCleanDays else { return }
+        _ = runCleanupPlan(cleanupPlan(.olderThan(days: d)), work: true, trashOutputs: false, removeRecords: false)
     }
 
     /// 回调是逐个切回主线程的，可能乱序：进度只增不减，任务结束后也不再改状态

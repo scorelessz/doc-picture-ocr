@@ -17,6 +17,7 @@ final class Env: ObservableObject {
         providers = ProviderSettings(app: app, store: store)
         diagnostics = DiagnosticsModel()
         ExitTrace.install()
+        if !CommandLine.arguments.contains("--smoke") { queue.autoClean() }
     }
 }
 

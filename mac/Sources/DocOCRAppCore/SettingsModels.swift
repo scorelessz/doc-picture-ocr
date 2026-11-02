@@ -335,6 +335,9 @@ public final class DiagnosticsModel: ObservableObject {
         apply()
     }
 
+    /// 日志文件清空后要重新打开，写入位置才对
+    public func reopenLog() { apply() }
+
     private func apply() {
         var a = ["--log-level", level, "--log-file", logFile.path]
         if logText { a.append("--log-text") }
