@@ -36,6 +36,10 @@ swift build -c release
 首次打开选「仅本地使用」或「允许联网」，然后在设置 → 模型下载识别模型。默认不联网，用户文件不离开这台 Mac。
 详情见 `docs/P7_RESULTS.md`。
 
+## 发版
+
+推送 `v` 开头的 tag（如 `v2.0.0-beta.2`），GitHub Actions 会在 macOS 机器上跑测试、构建 App、本机签名、打 DMG，然后发到 Releases（版本号带 `-` 的标成预发布）。工作流见 `.github/workflows/release.yml`，DMG 用 `packaging/make_dmg.sh` 生成，本地也能跑。
+
 ## 命令行
 
 ```bash
