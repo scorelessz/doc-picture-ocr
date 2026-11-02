@@ -21,7 +21,8 @@ concurrency:
 
 jobs:
   dmg:
-    runs-on: macos-26
+    # 和本机发版用的工具链一致：Xcode 26.6 的 swift build 不产出 mlx-swift_Cmlx.bundle
+    runs-on: xcode-27
     timeout-minutes: 90
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
@@ -42,7 +43,7 @@ jobs:
           sw_vers
           xcodebuild -version
           swift --version
-          uname -m
+          [ "$(uname -m)" = arm64 ] || { echo "✗ 需要 Apple Silicon 机器"; exit 1; }
           # Xcode 26 起 Metal 编译器要单独下载，mlx 的着色器要用它
           xcrun -f metal >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
           xcrun metal --version
