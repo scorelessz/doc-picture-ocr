@@ -100,6 +100,27 @@ final class BookLayoutTests: XCTestCase {
         XCTAssertEqual(joinSplice("lazy", "dog"), "lazy dog")
         XCTAssertEqual(joinSplice("中文", "继续"), "中文继续")
         XCTAssertEqual(joinSplice("a-", "中"), "a-中")
+        // 标点后接下一行要补空格（以前英文书会粘成 end.The）
+        XCTAssertEqual(joinSplice("the end.", "The next"), "the end. The next")
+        XCTAssertEqual(joinSplice("Bonjour,", "monde"), "Bonjour, monde")
+        XCTAssertEqual(joinSplice("“Yes,” she said;", "then"), "“Yes,” she said; then")
+        // 重音字母算西文字母
+        XCTAssertEqual(joinSplice("un café", "noir"), "un café noir")
+        XCTAssertEqual(joinSplice("Straße", "über"), "Straße über")
+        XCTAssertEqual(joinSplice("frè-", "re"), "frère")
+        XCTAssertEqual(joinSplice("Rück-", "kehr"), "Rückkehr")
+        // 下一行大写开头：保留连字符，是复合词
+        XCTAssertEqual(joinSplice("Nord-", "Süd"), "Nord-Süd")
+        XCTAssertEqual(joinSplice("Anglo-", "Saxon"), "Anglo-Saxon")
+        // 破折号、左括号后不补；右标点开头不补
+        XCTAssertEqual(joinSplice("so—", "and"), "so—and")
+        XCTAssertEqual(joinSplice("see (", "below)"), "see (below)")
+        XCTAssertEqual(joinSplice("word", ", next"), "word, next")
+        // 中文和中英混排不变
+        XCTAssertEqual(joinSplice("他说，", "我们走"), "他说，我们走")
+        XCTAssertEqual(joinSplice("使用 Python", "语言"), "使用 Python语言")
+        XCTAssertEqual(joinSplice("2023", "年"), "2023年")
+        XCTAssertEqual(joinSplice("ends with space ", "x"), "ends with space x")
     }
 
     func joinSplice(_ a: String, _ b: String) -> String {

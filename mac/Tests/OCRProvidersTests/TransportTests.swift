@@ -138,6 +138,16 @@ final class TransportTests: XCTestCase {
         XCTAssertEqual(w.count, 2)
     }
 
+    /// 本机服务的 Key：总开关关着也能发（只发本机），带 Bearer 头
+    func testLoopbackCarriesKeyWithNetworkOff() async throws {
+        let (w, t, _, _) = setup(net: false, select: false)
+        let e = try Endpoint("http://127.0.0.1:1234/v1")
+        _ = try await t.send(OutboundRequest(endpoint: e, providerID: LocalService.keyID, path: "models", payload: .metadata, key: SecretKey("lm-xyz")))
+        _ = try await t.send(OutboundRequest(endpoint: e, providerID: LocalService.keyID, path: "chat/completions", payload: .loopback(body: Data()), key: SecretKey("lm-xyz")))
+        XCTAssertEqual(w.count, 2)
+        XCTAssertEqual(w.requests.map { $0.value(forHTTPHeaderField: "Authorization") }, ["Bearer lm-xyz", "Bearer lm-xyz"])
+    }
+
     func testTurningOffCancelsInFlight() {
         let (w, _, _, n) = setup()
         n.set(allowed: false)

@@ -45,8 +45,9 @@ public func adjudicationQuestions(_ doc: FusedDoc, pages: Set<Int>?, mode: Adjud
 }
 
 public enum AdjudicationBody {
-    static func prompt(_ q: AdjudicationQuestion) -> String {
+    static func prompt(_ q: AdjudicationQuestion, language: BookLanguage = .default) -> String {
         var s = q.crop != nil ? "图中是书页的一行文字。" : "下面是书里一行文字的几种 OCR 读法。"
+        s += language.adjudicationHint
         if !q.context.isEmpty { s += "\n上下文：\n" + q.context.joined(separator: "\n") }
         s += "\n候选读法：\n"
         for (i, k) in q.order.enumerated() { s += "\(i): \(q.candidates[k])\n" }
@@ -54,8 +55,8 @@ public enum AdjudicationBody {
         return s
     }
 
-    public static func make(model: String, _ q: AdjudicationQuestion) throws -> Data {
-        var content: [[String: Any]] = [["type": "text", "text": prompt(q)]]
+    public static func make(model: String, _ q: AdjudicationQuestion, language: BookLanguage = .default) throws -> Data {
+        var content: [[String: Any]] = [["type": "text", "text": prompt(q, language: language)]]
         if let c = q.crop {
             content.insert(["type": "image_url", "image_url": ["url": "data:image/png;base64,\(c.base64EncodedString())"]], at: 0)
         }

@@ -15,6 +15,11 @@ public struct OnlinePage: Sendable {
 public enum ChatBody {
     public static let transcribePrompt = "逐字转写图中的全部文字，保持原有换行，不要翻译、不要改动、不要添加任何说明。"
 
+    /// 默认语言与以前一字不差；其他语言在后面写明语言、要求保留变音符号
+    public static func prompt(_ lang: BookLanguage) -> String {
+        lang.transcribeHint.isEmpty ? transcribePrompt : transcribePrompt + lang.transcribeHint
+    }
+
     public static func make(model: String, png: Data, prompt: String = transcribePrompt) throws -> Data {
         let content: [[String: Any]] = [["type": "image_url", "image_url": ["url": "data:image/png;base64,\(png.base64EncodedString())"]],
                                         ["type": "text", "text": prompt]]

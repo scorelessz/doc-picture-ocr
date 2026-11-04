@@ -25,6 +25,10 @@ public struct BookOptions {
     /// 本地 VLM（OpenAI 兼容接口）。只接受本机地址：默认不外传用户文件。
     public var vlmURL: URL?
     public var vlmModel = "local"
+    /// 本机服务的 API Key（LM Studio、llama-server 等开了鉴权时用）。只发本机地址。
+    public var vlmKey: SecretKey?
+    /// 书籍语言：Vision 识别语言、融合打分、在线提示词
+    public var language: BookLanguage = .default
     /// 进程内 VLM：灰度像素 → 文字。设了就优先于 vlmURL。
     public var vlmLocal: (([UInt8], Int, Int) -> String)?
     /// 在线读字：一批页码 → 文字，并发在里面做，第二个参数报告已完成的页数。出错只影响那一页，保留本地结果。
@@ -128,6 +132,9 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     }
     try fm.createDirectory(at: o.outdir, withIntermediateDirectories: true)
     try fm.createDirectory(at: pagesDir, withIntermediateDirectories: true)
+    let visionOpts = { var v = VisionOptions(); v.languages = o.language.vision; return v }()
+    Log.shared.info("book_language", ["id": .s(o.language.id), "vision": .s(o.language.vision.joined(separator: ","))])
+    if o.language != .default { log("书籍语言: \(o.language.title)") }
 
     var res = BookResult()
     var timing: [(String, Double)] = []
@@ -236,7 +243,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                 autoreleasepool {
                     let tv = Date()
                     do {
-                        var ls = try VisionEngine.recognize(s.upright ?? s.image!)
+                        var ls = try VisionEngine.recognize(s.upright ?? s.image!, options: visionOpts)
                         if s.rotation != 0 {
                             let (w, h) = (s.image!.width, s.image!.height)
                             ls = ls.map { rotateBack($0, s.rotation, w: w, h: h) }
@@ -301,7 +308,8 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
     // ---- 融合 ----
     let flog = FuseLog()
     o.progress?(.fuse, n, n)
-    var fused = try stage("fuse") { try fuse(vDoc, rDoc, log: flog) }
+    var fused = try stage("fuse") { try fuse(vDoc, rDoc, rules: .forLanguage(o.language), log: flog) }
+    if o.language != .default { fused.language = o.language.id }
 
     // ---- VLM 第三票 ----
     var vlmReports: [VLMPageReport] = []
@@ -348,7 +356,7 @@ public func runBook(_ o: BookOptions, log: (String) -> Void) throws -> BookResul
                             let (px, w, h) = try grayPixels(img)
                             text = f(px, w, h)
                         } else {
-                            text = try vlmRead(img, url: o.vlmURL!, model: o.vlmModel)
+                            text = try vlmRead(img, url: o.vlmURL!, model: o.vlmModel, key: o.vlmKey)
                         }
                     }
                     let (p, r) = applyVLM(fused.pages[i], vlm: text)
@@ -521,11 +529,12 @@ public struct OnlinePlan: Sendable {
         self.pages = pages; self.manifest = manifest; self.bodies = bodies
     }
 
-    public static func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String? = nil, workdir: URL, log: (String) -> Void) throws -> OnlinePlan {
+    public static func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String? = nil, language: BookLanguage = .default,
+                               workdir: URL, log: (String) -> Void) throws -> OnlinePlan {
         let endpoint = try Endpoint(preset.baseURL)
         let stem = pdf.deletingPathExtension().lastPathComponent
         let dir = workdir.appendingPathComponent("\(stem).upload", isDirectory: true)
-        let pages = try prepareOnlinePages(pdf: pdf, model: model, maxEdge: 1792, forceOCR: forceOCR, pagesSpec: pagesSpec, into: dir, log: log)
+        let pages = try prepareOnlinePages(pdf: pdf, model: model, maxEdge: 1792, forceOCR: forceOCR, pagesSpec: pagesSpec, language: language, into: dir, log: log)
         let m = onlineManifest(pages, providerID: preset.id, providerName: preset.name, host: endpoint.host, model: model)
         return OnlinePlan(preset: preset, endpoint: endpoint, model: model, pages: pages, manifest: m, bodies: dir)
     }
@@ -575,7 +584,7 @@ public struct AdjudicationPlan: Sendable {
         let qs = try adjudicationQuestions(doc, pages: filter, mode: mode, crop: crop)
         try FileManager.default.createDirectory(at: bodies, withIntermediateDirectories: true)
         let items = try qs.map { q -> OnlinePage in
-            let b = try AdjudicationBody.make(model: model, q), f = bodies.appendingPathComponent(q.id + ".json")
+            let b = try AdjudicationBody.make(model: model, q, language: BookLanguage.find(doc.language) ?? .default), f = bodies.appendingPathComponent(q.id + ".json")
             try b.write(to: f)
             return OnlinePage(id: q.id, sourceFile: source, page: q.page, body: f, bytes: b.count)
         }
@@ -636,7 +645,9 @@ public final class LineCropper {
 }
 
 /// 上传前的准备：渲染、缩放、编码成请求体落盘。跳过无墨迹页和用文字层的页。在做任何 OCR 之前调用。
-public func prepareOnlinePages(pdf: URL, model: String, maxEdge: Int, forceOCR: Bool, pagesSpec: String? = nil, into dir: URL, log: (String) -> Void) throws -> [OnlinePage] {
+public func prepareOnlinePages(pdf: URL, model: String, maxEdge: Int, forceOCR: Bool, pagesSpec: String? = nil, language: BookLanguage = .default,
+                               into dir: URL, log: (String) -> Void) throws -> [OnlinePage] {
+    let prompt = ChatBody.prompt(language)
     let doc = try PageRenderer.open(pdf)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     var out: [OnlinePage] = []
@@ -654,7 +665,7 @@ public func prepareOnlinePages(pdf: URL, model: String, maxEdge: Int, forceOCR: 
                   let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else { throw PaddleError.badImage }
             CGImageDestinationAddImage(dest, cg, nil)
             guard CGImageDestinationFinalize(dest) else { throw PaddleError.badImage }
-            let body = try ChatBody.make(model: model, png: data as Data)
+            let body = try ChatBody.make(model: model, png: data as Data, prompt: prompt)
             let f = dir.appendingPathComponent(String(format: "p%04d.json", pno))
             try body.write(to: f)
             out.append(OnlinePage(id: "p\(pno)", sourceFile: pdf.lastPathComponent, page: pno, body: f, bytes: body.count))
@@ -665,7 +676,7 @@ public func prepareOnlinePages(pdf: URL, model: String, maxEdge: Int, forceOCR: 
 }
 
 /// 本地 OpenAI 兼容接口读一页。长边缩到 1792，提示词用 PaddleOCR-VL 的 "OCR:"。
-func vlmRead(_ image: CGImage, url: URL, model: String) throws -> String {
+func vlmRead(_ image: CGImage, url: URL, model: String, key: SecretKey? = nil) throws -> String {
     let g = try Gray(image)
     let k = min(1, 1792.0 / Double(max(g.w, g.h)))
     let small = k < 1 ? g.resized(Int(Double(g.w) * k), Int(Double(g.h) * k)) : g
@@ -677,7 +688,7 @@ func vlmRead(_ image: CGImage, url: URL, model: String) throws -> String {
     let body: [String: Any] = ["model": model, "temperature": 0, "max_tokens": 4096, "messages": [["role": "user", "content": [
         ["type": "image_url", "image_url": ["url": "data:image/png;base64,\(b64)"]], ["type": "text", "text": "OCR:"]]]]]
     let payload = try JSONSerialization.data(withJSONObject: body)
-    let req = OutboundRequest(endpoint: try Endpoint(url.absoluteString), providerID: "local", path: "chat/completions", payload: .loopback(body: payload))
+    let req = OutboundRequest(endpoint: try Endpoint(url.absoluteString), providerID: "local", path: "chat/completions", payload: .loopback(body: payload), key: key)
     let t = GuardedTransport(wire: URLSessionWire(), network: NetworkSwitch(), selection: ProviderSelection(), gate: UploadGate())
     let sem = DispatchSemaphore(value: 0)
     nonisolated(unsafe) var out: Result<String, Error> = .failure(BookError.failed("VLM 无响应"))

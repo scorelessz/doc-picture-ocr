@@ -1,0 +1,91 @@
+# 线上打包：在 GitHub 的 Apple Silicon macOS 机器上构建 DocOCR.app → 本机签名（ad-hoc）→ DMG → 发到 Releases。
+# 触发：推送 v 开头的 tag（如 v2.0.0-beta.2），或合并到默认分支后在 Actions 页手动运行。
+# 版本号带 "-"（beta、rc）就标成预发布。没有开发者账号，不做公证；模型不打包，App 里下载。
+name: release-dmg
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（如 v2.0.0-beta.2），会建在当前所选分支的最新提交上'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dmg:
+    # 和本机发版用的工具链一致：Xcode 26.6 的 swift build 不产出 mlx-swift_Cmlx.bundle
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # build_app.sh 用提交数当构建号
+
+      - name: 检查 tag 和 Release
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "✗ tag 格式不对: $TAG"; exit 1; }
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "✗ Release $TAG 已存在，不覆盖"; exit 1; fi
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      - name: 工具链
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          [ "$(uname -m)" = arm64 ] || { echo "✗ 需要 Apple Silicon 机器"; exit 1; }
+          # Xcode 26 起 Metal 编译器要单独下载，mlx 的着色器要用它
+          xcrun -f metal >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
+          xcrun metal --version
+
+      - name: 单元测试
+        run: swift test
+
+      - name: 构建 App
+        run: DOCOCR_VERSION="$VERSION" packaging/build_app.sh --keep-app
+
+      - name: 打 DMG
+        run: packaging/make_dmg.sh "$VERSION"
+
+      - name: 发布到 Releases
+        run: |
+          DMG="dist/DocOCR-$VERSION-macOS-arm64.dmg"
+          SHA=$(shasum -a 256 "$DMG" | cut -d' ' -f1)
+          PRE=""; [[ "$VERSION" == *-* ]] && PRE="--prerelease"
+          cat > notes.md <<EOF
+          书籍扫描件 OCR 的 Mac 原生版：可搜索 PDF（原图不动，叠隐形文字层）和段落化 Markdown。默认在本机处理，不联网。
+
+          需要 Apple Silicon 和 macOS 14 以上。App 不带模型，第一次打开时下载识别模型（约 139 MB）或从文件导入；高精度模式的模型约 1.1 GB。
+
+          ## 安装
+
+          打开 DMG，把 \`DocOCR.app\` 拖进「应用程序」。
+
+          只有本机签名，没有公证。第一次打开：右键点图标 → 打开，或在终端运行
+          \`xattr -dr com.apple.quarantine /Applications/DocOCR.app\`
+
+          由 GitHub Actions 自动构建，提交 \`$(git rev-parse --short=12 HEAD)\`。
+
+          sha256: \`$SHA\`
+          EOF
+          gh release create "$TAG" "$DMG" --target "$(git rev-parse HEAD)" \
+            --title "DocOCR $TAG" --notes-file notes.md $PRE
+          gh release view "$TAG" --json url,isPrerelease,assets -q '.url, .isPrerelease, .assets[].name'
+
+      - name: 保留构建产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DocOCR-${{ env.VERSION }}
+          path: dist/*.dmg
+          if-no-files-found: ignore

@@ -152,30 +152,41 @@ func hasWord(_ t: String) -> Bool {
     t.unicodeScalars.contains {
         switch $0.value {
         case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x3040...0x30FF, 0xAC00...0xD7AF: return true
-        default: return false
+        default: return isLatinExtendedLetter($0)     // 法语的 à、德语的 Ü 单独成块时也是字
         }
     }
 }
 
-private func isASCIIAlpha(_ c: Unicode.Scalar) -> Bool {
-    (0x41...0x5A).contains(c.value) || (0x61...0x7A).contains(c.value)
+/// CJK 字、假名、谚文和全角标点：接缝任一侧是它就不补空格
+private func isWideScript(_ c: Unicode.Scalar) -> Bool {
+    let v = c.value
+    return isCJK(c) || (0x2E80...0x2FDF).contains(v) || (0x3000...0x30FF).contains(v)
+        || (0xAC00...0xD7AF).contains(v) || (0xFF00...0xFFEF).contains(v) || (0x20000...0x2FFFF).contains(v)
 }
 
-private func isASCIIAlnumMD(_ c: Unicode.Scalar) -> Bool {
-    isASCIIAlpha(c) || (0x30...0x39).contains(c.value)
-}
+/// 行尾是这些时，下一行直接接上：连字符、破折号、斜杠、左括号、左引号
+private let joinAfter = Set("-‐‑–—/([{“‘„‚¿¡".unicodeScalars)
+/// 行首是这些时，直接接到上一行后面：右标点
+private let joinBefore = Set(",.;:!?)]}%…’”".unicodeScalars)
 
 /// 拆成三段，才能在接缝处插入行内页标记。
-///   'post-' + 'marked' → 去连字符；两侧都是 ASCII 字母数字 → 补一个空格；其余不补。
+///   'post-' + 'marked'、'frè-' + 're' → 去连字符（连字符前是西文字母、下一行小写开头）；
+///   任一侧是中日韩字或全角标点 → 不补；行尾是连字符、左括号，或行首是右标点 → 不补；
+///   其余（西文词、句号逗号后接下一行）→ 补一个空格。
 func splice(_ a: String, _ b: String) -> (String, String, String) {
     guard let last = a.unicodeScalars.last else { return ("", "", b) }
     guard let first = b.unicodeScalars.first else { return (a, "", "") }
     let u = a.unicodeScalars
-    if last == "-", u.count >= 2, isASCIIAlpha(u[u.index(u.endIndex, offsetBy: -2)]), isASCIIAlpha(first) {
-        return (String(String.UnicodeScalarView(u.dropLast())), "", b)
+    if last == "-", u.count >= 2 {
+        let prev = u[u.index(u.endIndex, offsetBy: -2)]
+        if prev.properties.isAlphabetic, !isWideScript(prev), first.properties.isLowercase {
+            return (String(String.UnicodeScalarView(u.dropLast())), "", b)
+        }
     }
-    if isASCIIAlnumMD(last), isASCIIAlnumMD(first) { return (a, " ", b) }
-    return (a, "", b)
+    if isPySpace(last) || isPySpace(first) { return (a, "", b) }
+    if isWideScript(last) || isWideScript(first) { return (a, "", b) }
+    if joinAfter.contains(last) || joinBefore.contains(first) { return (a, "", b) }
+    return (a, " ", b)
 }
 
 func quantile(_ vals: [Double], _ q: Double) -> Double {

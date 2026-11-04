@@ -45,8 +45,10 @@ usage:
   ocr-cli paddle-plan --models dir --out plan.json
   ocr-cli book <pdf> [--outdir output] [--workdir work] [--md|--no-md] [--pdf|--no-pdf] [--pages A-B|a,b,c]
                [--page-marks none|comment|rule] [--force] [--clobber] [--force-ocr] [--keep-pages]
+               [--lang zh|en|fr|de|es|it|pt]   书籍语言，默认 zh（中文含英文）
                [--models-dir dir] [--units ane|all|cpu|gpu]
                [--vlm [--vl-model dir] [--vlm-all] | --vlm-url http://127.0.0.1:端口/v1 [--vlm-model 名]]
+                 本机服务的 Key：环境变量 DOCOCR_LOCAL_KEY，或 App 设置里保存的（钥匙串 local-service）
                [--vlm-provider id --vlm-model 名 --allow-network [--online-jobs 1-8] [--confirm-upload 清单sha256] [--key-stdin]]
                [--result result.json]
 
@@ -206,6 +208,10 @@ do {
         guard let path = args.first else { fail(usage) }
         var opts = VisionOptions()
         opts.languageCorrection = !args.contains("--nocorrect")
+        if let l = option(args, "--lang") {
+            guard let lang = BookLanguage.find(l) else { fail("--lang 只支持: " + BookLanguage.all.map(\.id).joined(separator: " "), code: 2) }
+            opts.languages = lang.vision
+        }
         let img = try VisionEngine.loadImage(URL(fileURLWithPath: path))
         FileHandle.standardError.write("image: \(img.width)x\(img.height)\n".data(using: .utf8)!)
         let lines = try VisionEngine.recognize(img, options: opts)
@@ -362,6 +368,10 @@ do {
         o.clobber = args.contains("--clobber")
         o.forceOCR = args.contains("--force-ocr")
         o.keepPages = args.contains("--keep-pages")
+        if let l = option(args, "--lang") {
+            guard let lang = BookLanguage.find(l) else { fail("--lang 只支持: " + BookLanguage.all.map(\.id).joined(separator: " "), code: 2) }
+            o.language = lang
+        }
         let dir = defaultModels
         guard FileManager.default.fileExists(atPath: dir + "/keys.txt") else {
             fail("找不到 Core ML 模型: \(dir)（先跑 ocr-cli models fetch，或用 --models-dir 指定）", code: 2)
@@ -376,6 +386,12 @@ do {
             }
             o.vlmURL = u
             o.vlmModel = option(args, "--vlm-model") ?? "local"
+            // Key 不接受命令行参数（会进 shell 历史）
+            if let k = ProcessInfo.processInfo.environment["DOCOCR_LOCAL_KEY"], !k.isEmpty {
+                o.vlmKey = SecretKey(k)
+            } else {
+                o.vlmKey = try? KeychainStore().loadAuthorizing(LocalService.keyID)
+            }
         }
         if let id = option(args, "--vlm-provider") {
             guard !args.contains("--vlm"), option(args, "--vlm-url") == nil else { fail("--vlm-provider 不能和 --vlm / --vlm-url 同用", code: 2) }

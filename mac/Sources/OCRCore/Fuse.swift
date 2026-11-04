@@ -28,6 +28,8 @@ public struct FuseRules: Sendable {
     public var containMaxDist = 0.15, containMaxDistHighGeo = 0.30
     public var containGeoHigh = 0.90
     public var containShortChars = 6
+    /// 西文书：带重音的字母不算噪声（wCJK 由 forLanguage 置 0）
+    public var latinLetters = false
     /// 还原「整个是子串」的旧文本条件，只用于与 Python 对拍
     public var legacyContain = false
 
@@ -124,6 +126,8 @@ public struct FusedDoc: Codable, Equatable, Sendable {
     public var engines: [String]
     public var pages: [FusedPage]
     public var stats: FuseStats
+    /// 书籍语言 id；默认语言不写，fused.json 与以前一致
+    public var language: String? = nil
 }
 
 /// 融合过程的明细，供质量报告用；不进 fused.json。
@@ -165,12 +169,25 @@ public enum FuseError: Error, CustomStringConvertible {
 
 // MARK: - 打分
 
+extension FuseRules {
+    /// 按书籍语言调整打分：默认语言与原规则完全一致。
+    /// 西文书不给含汉字的读法加分（误读成汉字反而会赢），也不罚重音字母。
+    public static func forLanguage(_ lang: BookLanguage) -> FuseRules {
+        var r = FuseRules()
+        if lang.isLatin {
+            r.wCJK = 0
+            r.latinLetters = true
+        }
+        return r
+    }
+}
+
 func scoreText(_ text: String, conf: Double, isRapid: Bool, _ r: FuseRules) -> Double {
     // 求和顺序与 Python 的 parts 一致：浮点加法不满足结合律
     let cjk = r.wCJK * cjkRatio(text)
     let anomaly = -r.wAnom * Double(anomalyCount(text))
     let bracket = -r.wBracket * Double(bracketDefects(text))
-    let noise = -r.wNoise * Double(noiseCount(text))
+    let noise = -r.wNoise * Double(noiseCount(text, latin: r.latinLetters))
     let confPart = isRapid ? r.wConf * (conf - r.confPivot) : 0.0
     return 0 + cjk + anomaly + bracket + noise + confPart
 }
