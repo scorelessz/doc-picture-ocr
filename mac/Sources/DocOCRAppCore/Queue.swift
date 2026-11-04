@@ -116,7 +116,7 @@ public struct ConfirmRequest: Equatable, Sendable {
 
 /// 可替换的后端，单测用假的。
 public protocol BookBackend: Sendable {
-    func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, workdir: URL) async throws -> OnlinePlan
+    func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, language: BookLanguage, workdir: URL) async throws -> OnlinePlan
     func adjudicationPlan(doc: FusedDoc, pdf: URL, preset: ProviderPreset, model: String, mode: AdjudicationMode, bodies: URL) async throws -> AdjudicationPlan
     func run(_ o: BookOptions, plan: OnlinePlan?, ticket: UploadTicket?, app: BackendContext) async throws -> BookResult
 }
@@ -147,8 +147,10 @@ public final class VLHandle: @unchecked Sendable {
 public struct LocalBackend: BookBackend {
     public init() {}
 
-    public func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, workdir: URL) async throws -> OnlinePlan {
-        try await Task.detached { try OnlinePlan.prepare(preset: preset, model: model, pdf: pdf, forceOCR: forceOCR, pagesSpec: pagesSpec, workdir: workdir, log: { _ in }) }.value
+    public func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, language: BookLanguage, workdir: URL) async throws -> OnlinePlan {
+        try await Task.detached {
+            try OnlinePlan.prepare(preset: preset, model: model, pdf: pdf, forceOCR: forceOCR, pagesSpec: pagesSpec, language: language, workdir: workdir, log: { _ in })
+        }.value
     }
 
     public func adjudicationPlan(doc: FusedDoc, pdf: URL, preset: ProviderPreset, model: String, mode: AdjudicationMode, bodies: URL) async throws -> AdjudicationPlan {
@@ -201,6 +203,9 @@ public final class QueueModel: ObservableObject {
     @Published public var useLocalService: Bool { didSet { prefs.set(useLocalService ? "1" : "0", "useLocalService") } }
     @Published public var localURL: String { didSet { prefs.set(localURL, "localURL") } }
     @Published public var localModel: String { didSet { prefs.set(localModel, "localModel") } }
+    /// 书籍语言 id，见 BookLanguage
+    @Published public var languageID: String { didSet { prefs.set(languageID, "bookLanguage") } }
+    public var language: BookLanguage { BookLanguage.find(languageID) ?? .default }
     @Published public var adjudicateOn = false
     @Published public var adjudicateMode: AdjudicationMode = .image
     @Published public var adjudicateProviderID: String?
@@ -229,6 +234,7 @@ public final class QueueModel: ObservableObject {
         useLocalService = prefs.string("useLocalService") == "1"
         localURL = prefs.string("localURL") ?? ""
         localModel = prefs.string("localModel") ?? ""
+        languageID = BookLanguage.find(prefs.string("bookLanguage"))?.id ?? BookLanguage.default.id
         self.app = app; self.backend = backend; self.modelsDir = modelsDir; self.store = history; self.outdir = outdir
         self.history = history.records
     }
@@ -342,7 +348,8 @@ public final class QueueModel: ObservableObject {
             do {
                 key = try app.secrets.load(id)
                 guard key != nil else { throw BookError.failed("没有 \(preset.name) 的 Key，请到设置里填写") }
-                let p = try await backend.prepare(preset: preset, model: onlineModel, pdf: job.pdf, forceOCR: forceOCR, pagesSpec: pagesSpec, workdir: work)
+                let p = try await backend.prepare(preset: preset, model: onlineModel, pdf: job.pdf, forceOCR: forceOCR, pagesSpec: pagesSpec,
+                                                    language: language, workdir: work)
                 let st = await app.gate.request(p.manifest)
                 if case .confirmed(let t) = st {        // 同一批次、同一域名
                     ticket = t
@@ -377,9 +384,15 @@ public final class QueueModel: ObservableObject {
         o.vlmBreaks = vlmBreaks
         o.unitsLabel = unitsLabel
         o.units = computeUnits(unitsLabel) ?? .cpuAndNeuralEngine
+        o.language = language
         if highPrecision, useLocalService, let e = localEndpoint {
             o.vlmURL = e.baseURL
             o.vlmModel = localModel
+            // 本机服务的 Key 可以不填；读不出来（需授权）时停下，不带着空 Key 去撞 401
+            do { o.vlmKey = try app.secrets.load(LocalService.keyID) } catch {
+                set(job.id, .failed("本机服务的 Key 读取失败: \(error)。请到设置 → 服务商 → 本机服务重新保存"))
+                return true
+            }
         }
         o.coreml = modelsDir
         let flag = cancelFlag, id = job.id

@@ -67,8 +67,15 @@ func isPlausible(_ c: Unicode.Scalar) -> Bool {
         || isPySpace(c) || plausibleExtra.contains(c)
 }
 
-func noiseCount(_ text: String) -> Int {
-    text.unicodeScalars.reduce(0) { $0 + (isPlausible($1) ? 0 : 1) }
+/// latin：西文书。带重音的字母和 « » „ 等不算噪声，否则融合会偏向读丢重音的那个；
+/// 反过来汉字算噪声：西文书里出现汉字几乎一定是误读（é 读成「é」之外的形近汉字）。
+func noiseCount(_ text: String, latin: Bool = false) -> Int {
+    text.unicodeScalars.reduce(0) { n, c in
+        if latin, isCJK(c) { return n + 1 }
+        if isPlausible(c) { return n }
+        if latin, isLatinExtendedLetter(c) || latinPunct.contains(c) { return n }
+        return n + 1
+    }
 }
 
 func cjkRatio(_ text: String) -> Double {

@@ -359,6 +359,11 @@ struct QueueView: View {
                 HStack {
                     Text("页范围").foregroundStyle(.secondary)
                     TextField("留空为全部，例如 1-20 或 3,5,8", text: $queue.pagesText).frame(width: 260)
+                    Spacer()
+                    Picker("书籍语言", selection: $queue.languageID) {
+                        ForEach(BookLanguage.all) { Text($0.title).tag($0.id) }
+                    }.frame(width: 220)
+                        .help("决定 Vision 的识别语言和融合规则；在线读字、在线裁决的提示词也会写明语言。中文书里夹英文选默认即可")
                 }
                 HStack {
                     Text("输出目录").foregroundStyle(.secondary)

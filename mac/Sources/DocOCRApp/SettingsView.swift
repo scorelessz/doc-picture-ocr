@@ -209,8 +209,11 @@ struct ProvidersTab: View {
 /// Ollama、LM Studio、mlx-vlm 这类本机服务：不算联网，不受总开关限制，不走上传确认
 struct LocalServiceSection: View {
     @EnvironmentObject var queue: QueueModel
+    @EnvironmentObject var providers: ProviderSettings
+    @State private var key = ""
 
     var body: some View {
+        let id = LocalService.keyID
         Section("本机服务（仅本机）") {
             TextField("地址", text: $queue.localURL, prompt: Text("http://127.0.0.1:11434/v1"))
             TextField("模型名", text: $queue.localModel)
@@ -222,7 +225,27 @@ struct LocalServiceSection: View {
             if !queue.localURL.isEmpty, queue.localEndpoint == nil {
                 Text("只接受本机地址。").foregroundStyle(.orange)
             }
-            Text("只连这台 Mac 上的服务，文件不离开本机。在高精度模式里选「本机服务」后使用。").font(.caption).foregroundStyle(.secondary)
+            Text("Key（可选）: " + providers.localKeyLine).font(.caption)
+            if providers.needsAuthorization(id) {
+                HStack {
+                    Text("这个 Key 是别的构建存的。").font(.caption).foregroundStyle(.orange)
+                    Button("授权读取旧 key") { providers.authorize(id) }.help(ProviderSettings.authorizeHint)
+                }
+            }
+            HStack {
+                SecureField("API Key（服务开了鉴权才需要）", text: $key)
+                Button("保存") {
+                    providers.saveKey(key, for: id)
+                    key = ""
+                }.disabled(key.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button("删除") { providers.deleteKey(id) }.disabled(providers.keyState(id) == .none)
+                Button("测试连接") { providers.testLocal(url: queue.localURL, model: queue.localModel) }
+                    .disabled(queue.localEndpoint == nil || providers.testing.contains(id))
+                    .help("只向本机地址请求模型列表，验证地址和 Key，不发任何文件")
+            }
+            if let r = providers.result[id] { Text(r).font(.caption) }
+            Text("只连这台 Mac 上的服务，文件不离开本机。在高精度模式里选「本机服务」后使用。Key 存在钥匙串里，只发给本机地址。")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

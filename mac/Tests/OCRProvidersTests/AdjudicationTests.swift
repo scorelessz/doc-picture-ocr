@@ -144,4 +144,22 @@ final class AdjudicationTests: XCTestCase {
         XCTAssertEqual(Set(w.requests.compactMap { $0.url?.host }), ["api.example.com"])
     }
 }
+final class LanguagePromptTests: XCTestCase {
+    func testDefaultPromptsUnchanged() {
+        XCTAssertEqual(ChatBody.prompt(.default), ChatBody.transcribePrompt)
+        let q = AdjudicationQuestion(id: "p1-l0", pageIndex: 0, lineIndex: 0, page: 1, candidates: ["a", "b"], crop: nil, context: [])
+        XCTAssertEqual(AdjudicationBody.prompt(q), AdjudicationBody.prompt(q, language: .default))
+        XCTAssertFalse(AdjudicationBody.prompt(q).contains("这本书是"))
+    }
+
+    func testLatinPromptsNameTheLanguage() {
+        let fr = BookLanguage.find("fr")!
+        XCTAssertTrue(ChatBody.prompt(fr).hasPrefix(ChatBody.transcribePrompt))
+        XCTAssertTrue(ChatBody.prompt(fr).contains("法文"))
+        XCTAssertTrue(ChatBody.prompt(fr).contains("不要翻译"))
+        let q = AdjudicationQuestion(id: "p1-l0", pageIndex: 0, lineIndex: 0, page: 1, candidates: ["cafe", "café"], crop: nil, context: [])
+        XCTAssertTrue(AdjudicationBody.prompt(q, language: BookLanguage.find("de")!).contains("德文"))
+    }
+}
+
 #endif

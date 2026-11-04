@@ -1,0 +1,35 @@
+# 推送到分支就在 GitHub 的 Apple Silicon macOS 机器上编译并跑全部单测（不打包、不发布）。
+# 开发容器是 Linux，编译不了 Vision / Core ML / PDFKit 部分，靠这里兜底。
+name: test
+
+on:
+  push:
+    branches: ['main', 'claude/**']
+    paths: ['mac/**', 'Package.swift', 'Package.resolved', 'packaging/**', '.github/workflows/test.yml']
+  pull_request:
+    paths: ['mac/**', 'Package.swift', 'Package.resolved', 'packaging/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swift-test:
+    # 与 release.yml 同一套工具链
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: 工具链
+        run: |
+          xcodebuild -version
+          swift --version
+          xcrun -f metal >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
+      - name: 编译（含 App）
+        run: swift build -c release --product DocOCRApp && swift build -c release --product ocr-cli
+      - name: 单元测试
+        run: swift test

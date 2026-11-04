@@ -315,6 +315,48 @@ public final class ProviderSettings: ObservableObject {
             Log.shared.info("provider_test_end", ["provider": .s(p.id), "result": .s(text)])
         }
     }
+
+    // MARK: 本机服务
+
+    /// 本机服务的 Key 存在 Keychain 的这个条目下，和服务商的 Key 分开
+    public var localKeyLine: String { keyLine(LocalService.keyID) }
+
+    /// 只发 GET /models 到本机地址：验证地址、Key，并看模型名在不在列表里。不受联网总开关限制，也不发任何用户内容。
+    public func testLocal(url: String, model: String) {
+        let id = LocalService.keyID
+        guard let ep = try? Endpoint(url), ep.isLoopback else {
+            result[id] = "只接受本机地址，例如 http://127.0.0.1:1234/v1"
+            return
+        }
+        guard !testing.contains(id) else { return }
+        let key: SecretKey?
+        do { key = try app.secrets.load(id) } catch {
+            result[id] = "Key 读取失败: \(error)。请重新保存"
+            return
+        }
+        testing.insert(id)
+        result[id] = "测试中…"
+        let prober = CapabilityProber(transport: app.transport, endpoint: ep, providerID: id, key: key)
+        Task {
+            let text: String, ok: Bool
+            switch await prober.fetchModels() {
+            case .success(let ids):
+                ok = true
+                let m = model.trimmingCharacters(in: .whitespaces)
+                let found = m.isEmpty ? "" : (ids.contains(m) ? "，模型 \(m) 在列表里" : "，但列表里没有 \(m)，请检查模型名")
+                text = "连接成功\(key == nil ? "（未使用 Key）" : "，Key 有效")：服务有 \(ids.count) 个模型\(found)"
+            case .failure(.http(let c)) where c == 401 || c == 403:
+                ok = false
+                text = key == nil ? "服务要求 API Key（HTTP \(c)），请先填写并保存" : "服务拒绝了这个 Key（HTTP \(c)），请检查后重新保存"
+            case .failure(let e):
+                ok = false
+                text = "连接失败：\(e)。确认服务已启动、地址和端口正确"
+            }
+            testing.remove(id)
+            result[id] = text
+            Log.shared.info("local_service_test", ["ok": .b(ok), "with_key": .b(key != nil), "host": .s(ep.host)])
+        }
+    }
 }
 
 @MainActor

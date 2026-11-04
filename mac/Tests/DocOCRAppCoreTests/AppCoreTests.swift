@@ -45,7 +45,7 @@ final class FakeBackend: BookBackend, @unchecked Sendable {
 
     init(dir: URL) { self.dir = dir }
 
-    func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, workdir: URL) async throws -> OnlinePlan {
+    func prepare(preset: ProviderPreset, model: String, pdf: URL, forceOCR: Bool, pagesSpec: String?, language: BookLanguage, workdir: URL) async throws -> OnlinePlan {
         let bodies = dir.appendingPathComponent(pdf.lastPathComponent + ".upload", isDirectory: true)
         try FileManager.default.createDirectory(at: bodies, withIntermediateDirectories: true)
         let f = bodies.appendingPathComponent("p1.json")
@@ -469,6 +469,50 @@ final class AppCoreTests: XCTestCase {
         XCTAssertEqual(r.backend.last?.vlmURL?.absoluteString, "http://127.0.0.1:11434/v1")
         XCTAssertNil(r.q.confirm)
         XCTAssertEqual(r.wire.count, 0)
+    }
+
+    func testLocalServiceKeyReachesBookOnlyForLocalService() async throws {
+        let r = try rig(network: false, online: false)
+        try r.secrets.save("lm-local", for: LocalService.keyID)
+        r.q.add([pdf("a")])
+        r.q.start()
+        await r.q.waitUntilIdle()
+        XCTAssertNil(r.backend.last?.vlmKey, "没选本机服务时不带 Key")
+        r.q.highPrecision = true
+        r.q.useLocalService = true
+        r.q.localURL = "http://127.0.0.1:1234/v1"
+        r.q.localModel = "m"
+        r.q.overwrite = true
+        r.q.add([pdf("b")])
+        r.q.start()
+        await r.q.waitUntilIdle()
+        XCTAssertNotNil(r.backend.last?.vlmKey, "选了本机服务、钥匙串里有 Key 时要带上")
+        XCTAssertEqual(r.wire.count, 0)
+    }
+
+    // MARK: 书籍语言
+
+    func testLanguageDefaultsToChineseAndReachesBook() async throws {
+        let r = try rig(online: false)
+        XCTAssertEqual(r.q.languageID, "zh")
+        r.q.languageID = "fr"
+        r.q.add([pdf("a")])
+        r.q.start()
+        await r.q.waitUntilIdle()
+        XCTAssertEqual(r.backend.last?.language.id, "fr")
+        XCTAssertEqual(r.backend.last?.language.vision.first, "fr-FR")
+    }
+
+    func testLanguagePersistsAndUnknownFallsBack() throws {
+        let p = Mem(), a = AppModel(store: Mem(), wire: CountingWire(), secrets: MemorySecretStore())
+        func q() throws -> QueueModel {
+            QueueModel(app: a, backend: FakeBackend(dir: dir), modelsDir: try models(), history: History(url: dir.appendingPathComponent("p.json")), prefs: p, outdir: dir)
+        }
+        let one = try q()
+        one.languageID = "de"
+        XCTAssertEqual(try q().language.id, "de")
+        p.set("xx", "bookLanguage")
+        XCTAssertEqual(try q().language.id, "zh")
     }
 
     // MARK: 并发设置
